@@ -9,7 +9,7 @@ const emptySessionsResponse = {
   total: 0
 }
 
-describe('hades REST session helpers', () => {
+describe('Hades REST session helpers', () => {
   let api: ReturnType<typeof vi.fn>
 
   beforeEach(() => {

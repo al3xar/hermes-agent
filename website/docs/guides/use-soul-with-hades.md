@@ -1,14 +1,14 @@
 ---
 sidebar_position: 7
-title: "Use SOUL.md with hades"
-description: "How to use SOUL.md to shape hades Agent's default voice, what belongs there, and how it differs from AGENTS.md and /personality"
+title: "Use SOUL.md with Hades"
+description: "How to use SOUL.md to shape Hades Agent's default voice, what belongs there, and how it differs from AGENTS.md and /personality"
 ---
 
-# Use SOUL.md with hades
+# Use SOUL.md with Hades
 
-`SOUL.md` is the **primary identity** for your hades instance. It's the first thing in the system prompt — it defines who the agent is, how it speaks, and what it avoids.
+`SOUL.md` is the **primary identity** for your Hades instance. It's the first thing in the system prompt — it defines who the agent is, how it speaks, and what it avoids.
 
-If you want hades to feel like the same assistant every time you talk to it — or if you want to replace the hades persona entirely with your own — this is the file to use.
+If you want Hades to feel like the same assistant every time you talk to it — or if you want to replace the Hades persona entirely with your own — this is the file to use.
 
 ## What SOUL.md is for
 
@@ -16,12 +16,12 @@ Use `SOUL.md` for:
 - tone
 - personality
 - communication style
-- how direct or warm hades should be
-- what hades should avoid stylistically
-- how hades should relate to uncertainty, disagreement, and ambiguity
+- how direct or warm Hades should be
+- what Hades should avoid stylistically
+- how Hades should relate to uncertainty, disagreement, and ambiguity
 
 In short:
-- `SOUL.md` is about who hades is and how hades speaks
+- `SOUL.md` is about who Hades is and how Hades speaks
 
 ## What SOUL.md is not for
 
@@ -41,33 +41,33 @@ A good rule:
 
 ## Where it lives
 
-hades now uses only the global SOUL file for the current instance:
+Hades now uses only the global SOUL file for the current instance:
 
 ```text
 ~/.hades/SOUL.md
 ```
 
-If you run hades with a custom home directory, it becomes:
+If you run Hades with a custom home directory, it becomes:
 
 ```text
-$hades_HOME/SOUL.md
+$HADES_HOME/SOUL.md
 ```
 
 ## First-run behavior
 
-hades automatically seeds a starter `SOUL.md` for you if one does not already exist.
+Hades automatically seeds a starter `SOUL.md` for you if one does not already exist.
 
 That means most users now begin with a real file they can read and edit immediately.
 
 Important:
-- if you already have a `SOUL.md`, hades does not overwrite it
-- if the file exists but is empty, hades adds nothing from it to the prompt
+- if you already have a `SOUL.md`, Hades does not overwrite it
+- if the file exists but is empty, Hades adds nothing from it to the prompt
 
-## How hades uses it
+## How Hades uses it
 
-When hades starts a session, it reads `SOUL.md` from `hades_HOME`, scans it for prompt-injection patterns, truncates it if needed, and uses it as the **agent identity** — slot #1 in the system prompt. This means SOUL.md completely replaces the built-in default identity text.
+When Hades starts a session, it reads `SOUL.md` from `HADES_HOME`, scans it for prompt-injection patterns, truncates it if needed, and uses it as the **agent identity** — slot #1 in the system prompt. This means SOUL.md completely replaces the built-in default identity text.
 
-If SOUL.md is missing, empty, or cannot be loaded, hades falls back to a built-in default identity.
+If SOUL.md is missing, empty, or cannot be loaded, Hades falls back to a built-in default identity.
 
 No wrapper language is added around the file. The content itself matters — write the way you want your agent to think and speak.
 
@@ -84,7 +84,7 @@ Push back clearly when an idea is weak.
 Keep answers compact unless deeper detail is useful.
 ```
 
-That alone can noticeably change how hades feels.
+That alone can noticeably change how Hades feels.
 
 ## Example styles
 
@@ -159,7 +159,7 @@ A weak `SOUL.md` is:
 - trying to micro-manage every response shape
 - mostly generic filler like "be helpful" and "be clear"
 
-hades already tries to be helpful and clear. `SOUL.md` should add real personality and style, not restate obvious defaults.
+Hades already tries to be helpful and clear. `SOUL.md` should add real personality and style, not restate obvious defaults.
 
 ## Suggested structure
 
@@ -169,16 +169,16 @@ A simple structure that works well:
 
 ```markdown
 # Identity
-Who hades is.
+Who Hades is.
 
 # Style
-How hades should sound.
+How Hades should sound.
 
 # Avoid
-What hades should not do.
+What Hades should not do.
 
 # Defaults
-How hades should behave when ambiguity appears.
+How Hades should behave when ambiguity appears.
 ```
 
 ## SOUL.md vs /personality
@@ -221,30 +221,30 @@ or
 vim ~/.hades/SOUL.md
 ```
 
-Then restart hades or start a new session.
+Then restart Hades or start a new session.
 
 ## A practical workflow
 
 1. Start with the seeded default file
 2. Trim anything that does not feel like the voice you want
 3. Add 4–8 lines that clearly define tone and defaults
-4. Talk to hades for a while
+4. Talk to Hades for a while
 5. Adjust based on what still feels off
 
 That iterative approach works better than trying to design the perfect personality in one shot.
 
 ## Troubleshooting
 
-### I edited SOUL.md but hades still sounds the same
+### I edited SOUL.md but Hades still sounds the same
 
 Check:
-- you edited `~/.hades/SOUL.md` or `$hades_HOME/SOUL.md`
+- you edited `~/.hades/SOUL.md` or `$HADES_HOME/SOUL.md`
 - not some repo-local `SOUL.md`
 - the file is not empty
 - your session was restarted after the edit
 - a `/personality` overlay is not dominating the result
 
-### hades is ignoring parts of my SOUL.md
+### Hades is ignoring parts of my SOUL.md
 
 Possible causes:
 - higher-priority instructions are overriding it

@@ -1,14 +1,14 @@
 ---
-title: "hades S6 Container Supervision"
-sidebar_label: "hades S6 Container Supervision"
-description: "Modify, debug, or extend the s6-overlay supervision tree inside the hades Agent Docker image — adding new services, debugging profile gateways, understandin..."
+title: "Hades S6 Container Supervision"
+sidebar_label: "Hades S6 Container Supervision"
+description: "Modify, debug, or extend the s6-overlay supervision tree inside the Hades Agent Docker image — adding new services, debugging profile gateways, understandin..."
 ---
 
 {/* This page is auto-generated from the skill's SKILL.md by website/scripts/generate-skill-docs.py. Edit the source SKILL.md, not this page. */}
 
-# hades S6 Container Supervision
+# Hades S6 Container Supervision
 
-Modify, debug, or extend the s6-overlay supervision tree inside the hades Agent Docker image — adding new services, debugging profile gateways, understanding the Architecture B main-program pattern.
+Modify, debug, or extend the s6-overlay supervision tree inside the Hades Agent Docker image — adding new services, debugging profile gateways, understanding the Architecture B main-program pattern.
 
 ## Skill metadata
 
@@ -17,7 +17,7 @@ Modify, debug, or extend the s6-overlay supervision tree inside the hades Agent 
 | Source | Optional — install with `hades skills install official/devops/hades-s6-container-supervision` |
 | Path | `optional-skills/devops/hades-s6-container-supervision` |
 | Version | `1.0.0` |
-| Author | hades Agent |
+| Author | Hades Agent |
 | License | MIT |
 | Platforms | linux |
 | Tags | `docker`, `s6`, `supervision`, `gateway`, `profiles` |
@@ -26,21 +26,21 @@ Modify, debug, or extend the s6-overlay supervision tree inside the hades Agent 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that hades loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hades loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
-# hades s6-overlay Container Supervision
+# Hades s6-overlay Container Supervision
 
 ## When to use this skill
 
 Load this skill when you're working on:
-- Adding or removing a static service in the hades Docker image (something that should be supervised at every container start, like the dashboard)
+- Adding or removing a static service in the Hades Docker image (something that should be supervised at every container start, like the dashboard)
 - Diagnosing why a per-profile gateway isn't starting, restarting, or surviving `docker restart`
 - Understanding why the container's CMD is `/opt/hades/docker/main-wrapper.sh` and how leading-dash args reach the user's program
 - Modifying `cont-init.d` boot scripts (UID remap, volume seeding, profile reconciliation)
 - Changing the rendered run-script for per-profile gateways (Phase 4)
 
-If you're just running the hades Agent and want to use Docker, see `website/docs/user-guide/docker.md` instead.
+If you're just running the Hades Agent and want to use Docker, see `website/docs/user-guide/docker.md` instead.
 
 ## Architecture at a glance
 
@@ -56,20 +56,20 @@ If you're just running the hades Agent and want to use Docker, see `website/docs
 │   │   └── skills_sync.py
 │   └── 02-reconcile-profiles          ← hades_cli.container_boot
 │       ├── chown /run/service (hades-writable for runtime register)
-│       └── walk $hades_HOME/profiles/<name>/gateway_state.json
+│       └── walk $HADES_HOME/profiles/<name>/gateway_state.json
 │           → recreate /run/service/gateway-<name>/
 │           → auto-start only those with prior_state == "running"
 │
 ├── s6-rc.d (static services, in /etc/s6-overlay/s6-rc.d/)
 │   ├── main-hades/run                ← exec sleep infinity (no-op slot)
-│   └── dashboard/run                  ← if hades_DASHBOARD=1, runs `hades dashboard`
+│   └── dashboard/run                  ← if HADES_DASHBOARD=1, runs `hades dashboard`
 │
 ├── /run/service (s6-svscan watches; tmpfs)
 │   ├── gateway-coder/                 ← runtime-registered per-profile
 │   │   ├── type        ("longrun")
 │   │   ├── run         ("#!/command/with-contenv sh ... exec s6-setuidgid hades hades -p coder gateway run")
 │   │   ├── down        (marker — present means "registered but don't auto-start")
-│   │   └── log/run     (s6-log → $hades_HOME/logs/gateways/coder/current)
+│   │   └── log/run     (s6-log → $HADES_HOME/logs/gateways/coder/current)
 │   └── ...
 │
 └── CMD ("main program")               ← /opt/hades/docker/main-wrapper.sh
@@ -87,7 +87,7 @@ If you're just running the hades Agent and want to use Docker, see `website/docs
 | `docker/cont-init.d/02-reconcile-profiles` | Calls `hades_cli.container_boot` on every boot to restore profile gateway slots from the persistent volume. |
 | `docker/main-wrapper.sh` | The container's CMD. Routes user args, drops to hades via `s6-setuidgid`, exec's the chosen program. |
 | `docker/s6-rc.d/main-hades/run` | No-op `sleep infinity` — slot exists so the s6-rc user bundle is valid; main hades runs as the CMD, not as a supervised service. |
-| `docker/s6-rc.d/dashboard/run` | Conditional service — `exec sleep infinity` unless `hades_DASHBOARD` is truthy. |
+| `docker/s6-rc.d/dashboard/run` | Conditional service — `exec sleep infinity` unless `HADES_DASHBOARD` is truthy. |
 | `docker/entrypoint.sh` | Back-compat shim that `exec`s the stage2 hook. External scripts that hard-coded the old entrypoint path still work. |
 | `hades_cli/service_manager.py` | `S6ServiceManager`: `register_profile_gateway`, `unregister_profile_gateway`, `start/stop/restart/is_running`, `list_profile_gateways`. |
 | `hades_cli/container_boot.py` | `reconcile_profile_gateways()` — walks persistent profiles, regenerates s6 slots, emits `container-boot.log`. |
@@ -97,7 +97,7 @@ If you're just running the hades Agent and want to use Docker, see `website/docs
 
 The original plan (v1–v3) called for main hades to run as a supervised s6-rc service. Two real s6-overlay v3 mechanics blocked that:
 
-1. **cont-init.d scripts receive no CMD args** — so the stage2 hook can't parse `docker run <image> chat -q "hi"` to set `hades_ARGS` for a service `run` script to consume.
+1. **cont-init.d scripts receive no CMD args** — so the stage2 hook can't parse `docker run <image> chat -q "hi"` to set `HADES_ARGS` for a service `run` script to consume.
 2. **`/run/s6/basedir/bin/halt` does NOT propagate the exit code** written to `/run/s6-linux-init-container-results/exitcode`. Containers always exit 143 (SIGTERM) regardless. Confirmed by skarnet (s6 author) in [issue #477](https://github.com/just-containers/s6-overlay/issues/477): _"if you want a container shutdown, you need to either have your CMD exit, or, if you have no CMD, write the container exit code you want then call halt"_.
 
 So we use the s6-overlay-native CMD pattern: `ENTRYPOINT ["/init", "/opt/hades/docker/main-wrapper.sh"]`. /init prepends the wrapper to user args automatically — so `docker run <image> --version` becomes `/init main-wrapper.sh --version`, and `--version` doesn't get intercepted by /init's POSIX shell. The wrapper drops to hades via `s6-setuidgid`, then exec's the chosen program. The program's exit code becomes the container exit code, exactly matching the pre-s6 tini contract.
@@ -155,7 +155,7 @@ Edit `S6ServiceManager._render_run_script` in `hades_cli/service_manager.py`. Th
 
 ```sh
 docker build -t hades-agent-harness:latest .
-hades_TEST_IMAGE=hades-agent-harness:latest scripts/run_tests.sh tests/docker/ -v
+HADES_TEST_IMAGE=hades-agent-harness:latest scripts/run_tests.sh tests/docker/ -v
 # Expect 19 passed, 0 xfailed against the s6 image
 ```
 
@@ -169,11 +169,11 @@ The harness lives in `tests/docker/` and skips when Docker isn't available. The 
 
 ### Profile directory ownership
 
-The cont-init reconciler runs as hades (`s6-setuidgid hades` in `02-reconcile-profiles`). If a profile dir ends up root-owned (e.g. because `docker exec <c> hades profile create …` ran as root by default), the reconciler can't read SOUL.md and fails with `PermissionError`. Mitigation: `stage2-hook.sh` chowns `$hades_HOME/profiles` to hades on **every** boot, idempotently. Don't remove that block.
+The cont-init reconciler runs as hades (`s6-setuidgid hades` in `02-reconcile-profiles`). If a profile dir ends up root-owned (e.g. because `docker exec <c> hades profile create …` ran as root by default), the reconciler can't read SOUL.md and fails with `PermissionError`. Mitigation: `stage2-hook.sh` chowns `$HADES_HOME/profiles` to hades on **every** boot, idempotently. Don't remove that block.
 
 ### Files written by `docker exec` are root-owned
 
-`docker exec` defaults to root. Either pass `--user hades` or rely on the stage2 chown sweep next reboot. Don't write files under `$hades_HOME/profiles/<name>/` as root manually — the next reconcile pass will sweep them but in-flight operations may hit perm errors.
+`docker exec` defaults to root. Either pass `--user hades` or rely on the stage2 chown sweep next reboot. Don't write files under `$HADES_HOME/profiles/<name>/` as root manually — the next reconcile pass will sweep them but in-flight operations may hit perm errors.
 
 ### Service slot exists but s6-svstat says "s6-supervise not running"
 
@@ -194,4 +194,4 @@ Check whether something is invoking `s6-svscanctl -t` or `/run/s6/basedir/bin/ha
 ## Related skills
 
 - `hades-agent-dev`: General hades-agent codebase navigation
-- `hades-tool-quirks`: Specific hades-tool workarounds (sed/grep/etc.) — load when debugging the s6 stack's interaction with hades built-in tools.
+- `hades-tool-quirks`: Specific Hades-tool workarounds (sed/grep/etc.) — load when debugging the s6 stack's interaction with hades built-in tools.

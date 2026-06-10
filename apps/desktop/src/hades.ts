@@ -14,8 +14,8 @@ import type {
   CronJobUpdates,
   ElevenLabsVoicesResponse,
   EnvVarInfo,
-  hadesConfig,
-  hadesConfigRecord,
+  HadesConfig,
+  HadesConfigRecord,
   LogsResponse,
   MessagingPlatformsResponse,
   MessagingPlatformTestResponse,
@@ -68,8 +68,8 @@ export type {
   ElevenLabsVoicesResponse,
   EnvVarInfo,
   GatewayReadyPayload,
-  hadesConfig,
-  hadesConfigRecord,
+  HadesConfig,
+  HadesConfigRecord,
   LogsResponse,
   MessagingEnvVarInfo,
   MessagingHomeChannel,
@@ -104,13 +104,13 @@ export type {
   ToolsetInfo
 } from '@/types/hades'
 
-export class hadesGateway extends JsonRpcGatewayClient {
+export class HadesGateway extends JsonRpcGatewayClient {
   constructor() {
     super({
-      closedErrorMessage: 'hades gateway connection closed',
-      connectErrorMessage: 'Could not connect to hades gateway',
+      closedErrorMessage: 'Hades gateway connection closed',
+      connectErrorMessage: 'Could not connect to Hades gateway',
       createRequestId: nextId => nextId,
-      notConnectedErrorMessage: 'hades gateway is not connected',
+      notConnectedErrorMessage: 'Hades gateway is not connected',
       requestTimeoutMs: DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS
     })
   }
@@ -120,7 +120,7 @@ export class hadesGateway extends JsonRpcGatewayClient {
 // should target. Mirrors $activeGatewayProfile, pushed in from the store via
 // setApiRequestProfile so this module needs no store import (avoids a cycle).
 // Electron main consumes request.profile to pick which backend *process* serves
-// the call; each pooled backend already has its own hades_HOME, so no backend
+// the call; each pooled backend already has its own HADES_HOME, so no backend
 // change is needed. Null → primary, so single-profile users are unaffected.
 let _apiProfile: null | string = null
 
@@ -288,35 +288,35 @@ export function getLogs(params: {
   })
 }
 
-export function gethadesConfig(): Promise<hadesConfig> {
-  return window.hadesDesktop.api<hadesConfig>({
+export function getHadesConfig(): Promise<HadesConfig> {
+  return window.hadesDesktop.api<HadesConfig>({
     ...profileScoped(),
     path: '/api/config'
   })
 }
 
-export function gethadesConfigRecord(): Promise<hadesConfigRecord> {
-  return window.hadesDesktop.api<hadesConfigRecord>({
+export function getHadesConfigRecord(): Promise<HadesConfigRecord> {
+  return window.hadesDesktop.api<HadesConfigRecord>({
     ...profileScoped(),
     path: '/api/config'
   })
 }
 
-export function gethadesConfigDefaults(): Promise<hadesConfigRecord> {
-  return window.hadesDesktop.api<hadesConfigRecord>({
+export function getHadesConfigDefaults(): Promise<HadesConfigRecord> {
+  return window.hadesDesktop.api<HadesConfigRecord>({
     ...profileScoped(),
     path: '/api/config/defaults'
   })
 }
 
-export function gethadesConfigSchema(): Promise<ConfigSchemaResponse> {
+export function getHadesConfigSchema(): Promise<ConfigSchemaResponse> {
   return window.hadesDesktop.api<ConfigSchemaResponse>({
     ...profileScoped(),
     path: '/api/config/schema'
   })
 }
 
-export function savehadesConfig(config: hadesConfigRecord): Promise<{ ok: boolean }> {
+export function saveHadesConfig(config: HadesConfigRecord): Promise<{ ok: boolean }> {
   return window.hadesDesktop.api<{ ok: boolean }>({
     ...profileScoped(),
     path: '/api/config',
@@ -681,7 +681,7 @@ export function restartGateway(): Promise<ActionResponse> {
   })
 }
 
-export function updatehades(): Promise<ActionResponse> {
+export function updateHades(): Promise<ActionResponse> {
   return window.hadesDesktop.api<ActionResponse>({
     path: '/api/hades/update',
     method: 'POST'
@@ -691,7 +691,7 @@ export function updatehades(): Promise<ActionResponse> {
 /** Query the connected backend's own update state. In remote mode this is the
  *  authoritative source for the backend's behind-count + "what's changed",
  *  distinct from the Electron client clone's git state. */
-export function checkhadesUpdate(force = false): Promise<BackendUpdateCheckResponse> {
+export function checkHadesUpdate(force = false): Promise<BackendUpdateCheckResponse> {
   return window.hadesDesktop.api<BackendUpdateCheckResponse>({
     path: `/api/hades/update/check${force ? '?force=true' : ''}`
   })

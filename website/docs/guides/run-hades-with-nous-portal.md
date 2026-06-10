@@ -1,16 +1,16 @@
 ---
 sidebar_position: 1
-title: "Run hades Agent with Nous Portal"
+title: "Run Hades Agent with Nous Portal"
 description: "Start-to-finish walkthrough: subscribe, set up, switch models, enable gateway tools, and verify routing"
 ---
 
-# Run hades Agent with Nous Portal
+# Run Hades Agent with Nous Portal
 
-This guide walks you through running hades Agent on a [Nous Portal](https://portal.nousresearch.com) subscription end to end — from signing up to verifying that every tool routes correctly. If you just want the overview of what the Portal is and what's in the subscription, see the [Nous Portal integration page](/integrations/nous-portal). This page is the task script.
+This guide walks you through running Hades Agent on a [Nous Portal](https://portal.nousresearch.com) subscription end to end — from signing up to verifying that every tool routes correctly. If you just want the overview of what the Portal is and what's in the subscription, see the [Nous Portal integration page](/integrations/nous-portal). This page is the task script.
 
 ## Prerequisites
 
-- hades Agent installed ([Quickstart](/getting-started/quickstart))
+- Hades Agent installed ([Quickstart](/getting-started/quickstart))
 - A web browser on the machine you're setting up (or SSH port forwarding — see [OAuth over SSH](/guides/oauth-over-ssh))
 - About 5 minutes
 
@@ -40,7 +40,7 @@ When it finishes, you're back at your terminal ready to chat.
 
 ### What if I'm SSH'd into a server?
 
-OAuth needs a browser, but the loopback callback runs on the machine where hades is running. Two options:
+OAuth needs a browser, but the loopback callback runs on the machine where Hades is running. Two options:
 
 ```bash
 # Option A: SSH port forwarding (preferred)
@@ -88,10 +88,10 @@ hades chat
 Try something that exercises both the model and the Tool Gateway:
 
 ```
-Hey, search the web for "hades Agent release notes" and summarize the top 3 hits.
+Hey, search the web for "Hades Agent release notes" and summarize the top 3 hits.
 ```
 
-You should see hades call `web_search` (Firecrawl-backed, through the gateway) and respond with a summary. If the search runs and the response makes sense, you're done — the Portal is wired up end to end.
+You should see Hades call `web_search` (Firecrawl-backed, through the gateway) and respond with a summary. If the search runs and the response makes sense, you're done — the Portal is wired up end to end.
 
 ## 5. Pick the model you actually want
 
@@ -118,11 +118,11 @@ Pick a different default permanently:
 hades config set model.default anthropic/claude-sonnet-4.6
 ```
 
-### Don't pick hades-4 for agent work
+### Don't pick Hades-4 for agent work
 
-hades-4-70B and hades-4-405B are available on the Portal at deep discounts, but they're **chat/reasoning models**, not tool-call-tuned. They will struggle with multi-step agent loops. Use them via [Nous Chat](https://chat.nousresearch.com) for conversation/research work, or through the [subscription proxy](/user-guide/features/subscription-proxy) from non-agent tools. For hades Agent itself, stick to the frontier agentic models above.
+Hades-4-70B and Hades-4-405B are available on the Portal at deep discounts, but they're **chat/reasoning models**, not tool-call-tuned. They will struggle with multi-step agent loops. Use them via [Nous Chat](https://chat.nousresearch.com) for conversation/research work, or through the [subscription proxy](/user-guide/features/subscription-proxy) from non-agent tools. For Hades Agent itself, stick to the frontier agentic models above.
 
-The Portal's own [info page](https://portal.nousresearch.com/info) carries this warning too — it's the official Nous guidance, not just a hades-side opinion.
+The Portal's own [info page](https://portal.nousresearch.com/info) carries this warning too — it's the official Nous guidance, not just a Hades-side opinion.
 
 ## 6. (Optional) Customize Tool Gateway routing
 
@@ -136,7 +136,7 @@ hades tools
 # → TTS              → "Nous Subscription"     (recommended)
 ```
 
-These rows appear in `hades tools` even before you've logged into Nous Portal — if you pick "Nous Subscription" without an active session, hades runs the Portal login inline (without changing your inference provider or your other tools).
+These rows appear in `hades tools` even before you've logged into Nous Portal — if you pick "Nous Subscription" without an active session, Hades runs the Portal login inline (without changing your inference provider or your other tools).
 
 Verify your mix with:
 
@@ -156,7 +156,7 @@ hades setup voice
 # → pick a speech-to-text backend (local faster-whisper is free, no setup)
 ```
 
-Then in any messaging-platform session (Telegram, Discord, Signal, etc.), send a voice message and hades will transcribe it, respond, and reply with synthesized voice — all on your Portal subscription.
+Then in any messaging-platform session (Telegram, Discord, Signal, etc.), send a voice message and Hades will transcribe it, respond, and reply with synthesized voice — all on your Portal subscription.
 
 ## 8. (Optional) Cron + always-on workflows
 
@@ -172,7 +172,7 @@ The cron job runs unattended, calls the model + web search + summarization all t
 
 ## Profiles and multi-user setups
 
-If you use [hades profiles](/user-guide/profiles) (e.g. a separate config per project), the Portal refresh token is automatically shared across all profiles via a shared token store. Sign in once on any profile, and the rest pick it up automatically.
+If you use [Hades profiles](/user-guide/profiles) (e.g. a separate config per project), the Portal refresh token is automatically shared across all profiles via a shared token store. Sign in once on any profile, and the rest pick it up automatically.
 
 For team setups where multiple humans share a machine, each human has their own Portal account → each home directory holds its own `~/.hades/auth.json` → no token sharing across users. This is the right boundary.
 
@@ -218,7 +218,7 @@ Some users intentionally mix — e.g. routing web through Nous but using their o
 
 ### "Re-authentication required" mid-session
 
-Your Portal refresh token was invalidated (password change, manual revoke, session expiry). The token is now quarantined locally so hades doesn't replay it endlessly. Just log in again:
+Your Portal refresh token was invalidated (password change, manual revoke, session expiry). The token is now quarantined locally so Hades doesn't replay it endlessly. Just log in again:
 
 ```bash
 hades auth add nous
@@ -243,7 +243,7 @@ If a model is genuinely unavailable, [open an issue](https://github.com/NousRese
 
 - `model.provider` set to `openrouter`/`anthropic`/etc. instead of `nous`
 - An OAuth refresh failure that fell back to a different configured provider
-- Multiple hades profiles where you're using the wrong one (check `hades profile current`)
+- Multiple Hades profiles where you're using the wrong one (check `hades profile current`)
 
 ### Want to revoke and start clean
 
@@ -270,7 +270,7 @@ That's the deal. If you're using more than two of those backends anyway, the sub
 
 - **[Nous Portal integration page](/integrations/nous-portal)** — Overview of what's in the subscription
 - **[Tool Gateway](/user-guide/features/tool-gateway)** — Full details on every gateway-routed tool
-- **[Subscription proxy](/user-guide/features/subscription-proxy)** — Use your Portal subscription from non-hades tools
+- **[Subscription proxy](/user-guide/features/subscription-proxy)** — Use your Portal subscription from non-Hades tools
 - **[Voice mode](/user-guide/features/voice-mode)** — Set up voice conversations on the Portal subscription
 - **[OAuth over SSH](/guides/oauth-over-ssh)** — Remote / headless login patterns
-- **[Profiles](/user-guide/profiles)** — Share one Portal login across multiple hades configurations
+- **[Profiles](/user-guide/profiles)** — Share one Portal login across multiple Hades configurations

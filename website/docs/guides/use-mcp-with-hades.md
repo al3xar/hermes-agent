@@ -1,25 +1,25 @@
 ---
 sidebar_position: 6
-title: "Use MCP with hades"
-description: "A practical guide to connecting MCP servers to hades Agent, filtering their tools, and using them safely in real workflows"
+title: "Use MCP with Hades"
+description: "A practical guide to connecting MCP servers to Hades Agent, filtering their tools, and using them safely in real workflows"
 ---
 
-# Use MCP with hades
+# Use MCP with Hades
 
-This guide shows how to actually use MCP with hades Agent in day-to-day workflows.
+This guide shows how to actually use MCP with Hades Agent in day-to-day workflows.
 
 If the feature page explains what MCP is, this guide is about how to get value from it quickly and safely.
 
 ## When should you use MCP?
 
 Use MCP when:
-- a tool already exists in MCP form and you do not want to build a native hades tool
-- you want hades to operate against a local or remote system through a clean RPC layer
+- a tool already exists in MCP form and you do not want to build a native Hades tool
+- you want Hades to operate against a local or remote system through a clean RPC layer
 - you want fine-grained per-server exposure control
-- you want to connect hades to internal APIs, databases, or company systems without modifying hades core
+- you want to connect Hades to internal APIs, databases, or company systems without modifying Hades core
 
 Do not use MCP when:
-- a built-in hades tool already solves the job well
+- a built-in Hades tool already solves the job well
 - the server exposes a huge dangerous tool surface and you are not prepared to filter it
 - you only need one very narrow integration and a native tool would be simpler and safer
 
@@ -27,9 +27,9 @@ Do not use MCP when:
 
 Think of MCP as an adapter layer:
 
-- hades remains the agent
+- Hades remains the agent
 - MCP servers contribute tools
-- hades discovers those tools at startup or reload time
+- Hades discovers those tools at startup or reload time
 - the model can use them like normal tools
 - you control how much of each server is visible
 
@@ -37,7 +37,7 @@ That last part matters. Good MCP usage is not just “connect everything.” It 
 
 ## Step 1: install MCP support
 
-If you installed hades with the standard install script, MCP support is already included (the installer runs `uv pip install -e ".[all]"`).
+If you installed Hades with the standard install script, MCP support is already included (the installer runs `uv pip install -e ".[all]"`).
 
 If you installed without extras and need to add MCP separately:
 
@@ -63,7 +63,7 @@ mcp_servers:
     args: ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/my-project"]
 ```
 
-Then start hades:
+Then start Hades:
 
 ```bash
 hades chat
@@ -79,8 +79,8 @@ Inspect this project and summarize the repo layout.
 
 You can verify MCP in a few ways:
 
-- hades banner/status should show MCP integration when configured
-- ask hades what tools it has available
+- Hades banner/status should show MCP integration when configured
+- ask Hades what tools it has available
 - use `/reload-mcp` after config changes
 - check logs if the server failed to connect
 
@@ -109,32 +109,32 @@ mcp_servers:
 
 This is usually the best default for sensitive systems.
 
-## WSL2: bridge hades in WSL to Windows Chrome
+## WSL2: bridge Hades in WSL to Windows Chrome
 
 This is the practical setup when:
 
-- hades runs inside WSL2
+- Hades runs inside WSL2
 - the browser you want to control is your normal signed-in Chrome on Windows
 - `/browser connect` is awkward or unreliable from WSL
 
-In this setup, hades does **not** connect to Chrome directly. Instead:
+In this setup, Hades does **not** connect to Chrome directly. Instead:
 
-- hades runs in WSL
-- hades starts a local stdio MCP server
+- Hades runs in WSL
+- Hades starts a local stdio MCP server
 - that MCP server is launched through Windows interop (`cmd.exe` or `powershell.exe`)
 - the MCP server attaches to your live Windows Chrome session
 
 Mental model:
 
 ```text
-hades (WSL) -> MCP stdio bridge -> Windows Chrome
+Hades (WSL) -> MCP stdio bridge -> Windows Chrome
 ```
 
 ### Why this mode is useful
 
 - you keep your real Windows browser profile, cookies, and logins
-- hades stays in its supported Unix environment (WSL2)
-- browser control is exposed as MCP tools instead of relying on hades core browser transport
+- Hades stays in its supported Unix environment (WSL2)
+- browser control is exposed as MCP tools instead of relying on Hades core browser transport
 
 ### Recommended server
 
@@ -152,7 +152,7 @@ After saving the server:
 hades mcp test chrome-devtools-win
 ```
 
-Then start a fresh hades session or run:
+Then start a fresh Hades session or run:
 
 ```text
 /reload-mcp
@@ -160,7 +160,7 @@ Then start a fresh hades session or run:
 
 ### Typical prompt
 
-Once loaded, hades can use the MCP-prefixed browser tools directly. For example:
+Once loaded, Hades can use the MCP-prefixed browser tools directly. For example:
 
 ```text
 调用 MCP 工具 mcp_chrome_devtools_win_list_pages，列出当前浏览器标签页。
@@ -168,7 +168,7 @@ Once loaded, hades can use the MCP-prefixed browser tools directly. For example:
 
 ### When `/browser connect` is the wrong tool
 
-If hades runs in WSL and Chrome runs on Windows, `/browser connect` may fail even though Chrome is open and debuggable.
+If Hades runs in WSL and Chrome runs on Windows, `/browser connect` may fail even though Chrome is open and debuggable.
 
 Common reasons:
 
@@ -180,8 +180,8 @@ In those cases, keep `/browser connect` for same-environment setups and use MCP 
 
 ### Known pitfalls
 
-- Start hades from a Windows-mounted path like `/mnt/c/Users/<you>` or `/mnt/c/workspace/...` when using Windows stdio executables through MCP.
-- If you start hades from `/root` or `/home/...`, Windows may emit a `UNC` current-directory warning before the MCP server starts.
+- Start Hades from a Windows-mounted path like `/mnt/c/Users/<you>` or `/mnt/c/workspace/...` when using Windows stdio executables through MCP.
+- If you start Hades from `/root` or `/home/...`, Windows may emit a `UNC` current-directory warning before the MCP server starts.
 - If `chrome-devtools-mcp --autoConnect` times out while enumerating pages, reduce background/frozen tabs in Chrome and retry.
 
 ### Example: blacklist dangerous actions
@@ -209,14 +209,14 @@ mcp_servers:
 
 ## What does filtering actually affect?
 
-There are two categories of MCP-exposed functionality in hades:
+There are two categories of MCP-exposed functionality in Hades:
 
 1. Server-native MCP tools
 - filtered with:
   - `tools.include`
   - `tools.exclude`
 
-2. hades-added utility wrappers
+2. Hades-added utility wrappers
 - filtered with:
   - `tools.resources`
   - `tools.prompts`
@@ -235,13 +235,13 @@ These wrappers only appear if:
 - your config allows them, and
 - the MCP server session actually supports those capabilities
 
-So hades will not pretend a server has resources/prompts if it does not.
+So Hades will not pretend a server has resources/prompts if it does not.
 
 ## Common patterns
 
 ### Pattern 1: local project assistant
 
-Use MCP for a repo-local filesystem or git server when you want hades to reason over a bounded workspace.
+Use MCP for a repo-local filesystem or git server when you want Hades to reason over a bounded workspace.
 
 ```yaml
 mcp_servers:
@@ -353,7 +353,7 @@ mcp_servers:
       resources: false
 ```
 
-Start hades and ask:
+Start Hades and ask:
 
 ```text
 Search the codebase for references to MCP and summarize the main integration points.
@@ -393,13 +393,13 @@ mcp_servers:
     args: ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/project"]
 ```
 
-Now hades can combine them:
+Now Hades can combine them:
 
 ```text
 Inspect the local project files, then create a GitHub issue summarizing the bug you find.
 ```
 
-That is where MCP gets powerful: multi-system workflows without changing hades core.
+That is where MCP gets powerful: multi-system workflows without changing Hades core.
 
 ## Safe usage recommendations
 
@@ -458,7 +458,7 @@ Check:
 
 ### "Why do I see fewer tools than the MCP server advertises?"
 
-Because hades now respects your per-server policy and capability-aware registration. That is expected, and usually desirable.
+Because Hades now respects your per-server policy and capability-aware registration. That is expected, and usually desirable.
 
 ### "How do I remove an MCP server without deleting the config?"
 

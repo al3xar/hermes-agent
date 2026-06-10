@@ -163,7 +163,7 @@ export interface GatewayReadyPayload {
   skin?: unknown
 }
 
-export interface hadesConfig {
+export interface HadesConfig {
   agent?: {
     reasoning_effort?: string
     personalities?: Record<string, unknown>
@@ -184,7 +184,7 @@ export interface hadesConfig {
   }
 }
 
-export type hadesConfigRecord = Record<string, unknown>
+export type HadesConfigRecord = Record<string, unknown>
 
 export interface ModelInfoResponse {
   auto_context_length?: number

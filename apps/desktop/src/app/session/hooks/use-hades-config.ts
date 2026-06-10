@@ -1,6 +1,6 @@
 import { type MutableRefObject, useCallback, useState } from 'react'
 
-import { gethadesConfig, gethadesConfigDefaults } from '@/hades'
+import { getHadesConfig, getHadesConfigDefaults } from '@/hades'
 import { BUILTIN_PERSONALITIES, normalizePersonalityValue, personalityNamesFromConfig } from '@/lib/chat-runtime'
 import {
   $currentCwd,
@@ -20,18 +20,18 @@ function recordingLimit(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : DEFAULT_VOICE_SECONDS
 }
 
-interface hadesConfigOptions {
+interface HadesConfigOptions {
   activeSessionIdRef: MutableRefObject<string | null>
   refreshProjectBranch: (cwd: string) => Promise<void>
 }
 
-export function usehadesConfig({ activeSessionIdRef, refreshProjectBranch }: hadesConfigOptions) {
+export function useHadesConfig({ activeSessionIdRef, refreshProjectBranch }: HadesConfigOptions) {
   const [voiceMaxRecordingSeconds, setVoiceMaxRecordingSeconds] = useState(DEFAULT_VOICE_SECONDS)
   const [sttEnabled, setSttEnabled] = useState(true)
 
-  const refreshhadesConfig = useCallback(async () => {
+  const refreshHadesConfig = useCallback(async () => {
     try {
-      const [config, defaults] = await Promise.all([gethadesConfig(), gethadesConfigDefaults().catch(() => ({}))])
+      const [config, defaults] = await Promise.all([getHadesConfig(), getHadesConfigDefaults().catch(() => ({}))])
 
       const personality = normalizePersonalityValue(
         typeof config.display?.personality === 'string' ? config.display.personality : ''
@@ -70,5 +70,5 @@ export function usehadesConfig({ activeSessionIdRef, refreshProjectBranch }: had
     }
   }, [activeSessionIdRef, refreshProjectBranch])
 
-  return { refreshhadesConfig, sttEnabled, voiceMaxRecordingSeconds }
+  return { refreshHadesConfig, sttEnabled, voiceMaxRecordingSeconds }
 }
