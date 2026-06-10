@@ -379,6 +379,18 @@ class DeepAgentsAIAgent:
         "debug", "langsmith_api_key", "langsmith_project", "langsmith_tags",
     ))
 
+    # Attributes initialized during __init__ that must not raise
+    # AttributeError when read on partially-constructed or mock agents.
+    _DEFAULT_ATTRS = frozenset((
+        "_quiet_mode", "_skip_memory", "_platform",
+        "_session_id", "_max_iterations",
+        "_langgraph_checkpointer", "_langgraph_store",
+        "_langsmith_api_key", "_langsmith_project", "_langsmith_tags",
+        "_ls_api_key", "_ls_project", "_ls_tags",
+        "_checkpointer", "_store", "_agent",
+        "_callbacks",
+    ))
+
     def __init__(
         self,
         base_url: str = None,
@@ -426,6 +438,12 @@ class DeepAgentsAIAgent:
 
         # Set env vars for LangChain model bindings
         _inject_provider_env(provider, base_url, api_key)
+
+        # LangSmith tracing defaults (set before _build_langgraph_agent so
+        # they exist even when __init__ is bypassed by test mocks).
+        self._ls_api_key = None
+        self._ls_project = "hades"
+        self._ls_tags = ["hades"]
 
         # Build the LangGraph agent
         self._agent = self._build_langgraph_agent(
@@ -578,6 +596,8 @@ class DeepAgentsAIAgent:
     def __getattr__(self, name):
         if name in self._CAPTURED_NAMES:
             return self._get_cap(name)
+        if name in self._DEFAULT_ATTRS:
+            return None
         raise AttributeError(f"'{type(self).__name__}' object has no attr '{name}'")
 
     # ------------------------------------------------------------------
