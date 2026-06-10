@@ -2152,6 +2152,10 @@ DEFAULT_CONFIG = {
     # Gateway settings — control how messaging platforms (Telegram, Discord,
     # Slack, etc.) deliver agent-produced files as native attachments.
     "gateway": {
+        # When true, all gateway message turns use the deep agents
+        # runtime (LangGraph / DeepAgents SDK). When false (default),
+        # the legacy Hermes agent loop runs as usual.
+        "deepagents_mode": False,
         # When false (default), any file path the agent emits is delivered
         # as a native attachment as long as it isn't under the credential /
         # system-path denylist (/etc, /proc, ~/.ssh, ~/.aws, ~/.hermes/.env,

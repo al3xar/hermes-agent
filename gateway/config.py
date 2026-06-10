@@ -546,6 +546,10 @@ class GatewayConfig:
     # fresh session exactly as if the reset policy had fired.  0 = disabled.
     session_store_max_age_days: int = 90
 
+    # When true, all gateway message turns use the DeepAgents runtime instead of the
+    # native conversation loop. Toggled at runtime via /runtime command or config.yaml.
+    deepagents_mode: bool = False
+
     def get_connected_platforms(self) -> List[Platform]:
         """Return list of platforms that are enabled and configured."""
         connected = []
@@ -705,6 +709,11 @@ class GatewayConfig:
         except (TypeError, ValueError):
             session_store_max_age_days = 90
 
+        deepagents_raw = nested_gateway.get("deepagents_mode") if nested_gateway else None
+        if deepagents_raw is None:
+            deepagents_raw = data.get("deepagents_mode")
+        deepagents_mode = _coerce_bool(deepagents_raw, False)
+
         return cls(
             platforms=platforms,
             default_reset_policy=default_policy,
@@ -724,6 +733,7 @@ class GatewayConfig:
             unauthorized_dm_behavior=unauthorized_dm_behavior,
             streaming=StreamingConfig.from_dict(data.get("streaming", {})),
             session_store_max_age_days=session_store_max_age_days,
+            deepagents_mode=deepagents_mode,
         )
 
     def get_unauthorized_dm_behavior(self, platform: Optional[Platform] = None) -> str:

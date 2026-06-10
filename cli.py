@@ -7261,6 +7261,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin):
             self._toggle_yolo()
         elif canonical == "reasoning":
             self._handle_reasoning_command(cmd_original)
+        elif canonical == "runtime":
+            self._handle_runtime_command(cmd_original)
         elif canonical == "fast":
             self._handle_fast_command(cmd_original)
         elif canonical == "compress":

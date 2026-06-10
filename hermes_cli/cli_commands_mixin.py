@@ -2046,6 +2046,31 @@ class CLICommandsMixin:
         else:
             _cprint(f"  {_ACCENT}✓ Busy input mode set to '{arg}' (session only){_RST}")
 
+    def _handle_runtime_command(self, cmd: str):
+        """Handle /runtime — view or toggle agent runtime (native | deepagents)."""
+        from cli import _ACCENT, _DIM, _RST, _cprint, save_config_value
+        runtime = (cmd or "").strip().lower()
+
+        if runtime in {"", "status"}:
+            current = getattr(getattr(self, "agent", None), "_runtime_mode", None) or "native"
+            _cprint(f"  {_ACCENT}Runtime: {current}{_RST}")
+            _cprint(f"  {_DIM}Usage: /runtime [native|deepagents]{_RST}")
+            return
+
+        valid = {"native", "deepagents"}
+        if runtime not in valid:
+            _cprint(f"  {_DIM}(._.) Unknown value: {runtime}{_RST}")
+            _cprint(f"  {_DIM}Usage: /runtime [native|deepagents]{_RST}")
+            return
+
+        saved_value = save_config_value("deepagents.runtime", runtime)
+        self.agent = None  # Force agent re-init with new runtime
+        label = "deep agents runtime" if runtime == "deepagents" else "native runtime"
+        if saved_value:
+            _cprint(f"  {_ACCENT}✓ Switched to {label} (saved to config){_RST}")
+        else:
+            _cprint(f"  {_ACCENT}✓ Switched to {label} (session only){_RST}")
+
     def _handle_fast_command(self, cmd: str):
         """Handle /fast — toggle fast mode (OpenAI Priority Processing / Anthropic Fast Mode)."""
         from cli import _ACCENT, _DIM, _RST, _cprint, save_config_value
