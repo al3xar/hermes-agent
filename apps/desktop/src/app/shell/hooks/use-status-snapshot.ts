@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import { getLogs, getStatus } from '@/hermes'
+import { getLogs, getStatus } from '@/hades'
 import { evaluateRuntimeReadiness, type RuntimeReadinessResult } from '@/lib/runtime-readiness'
-import type { StatusResponse } from '@/types/hermes'
+import type { StatusResponse } from '@/types/hades'
 
 const REFRESH_MS = 15_000
 const LOG_TAIL = 12

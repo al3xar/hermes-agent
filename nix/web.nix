@@ -1,13 +1,13 @@
-# nix/web.nix — Hermes Web Dashboard (Vite/React) frontend build
-{ pkgs, hermesNpmLib, ... }:
+# nix/web.nix — Hades Web Dashboard (Vite/React) frontend build
+{ pkgs, hadesNpmLib, ... }:
 let
-  npm = hermesNpmLib.mkNpmPassthru { folder = "web"; attr = "web"; pname = "hermes-web"; };
+  npm = hadesNpmLib.mkNpmPassthru { folder = "web"; attr = "web"; pname = "hades-web"; };
 
   packageJson = builtins.fromJSON (builtins.readFile (npm.src + "/web/package.json"));
   version = packageJson.version;
 in
 pkgs.buildNpmPackage (npm // {
-  pname = "hermes-web";
+  pname = "hades-web";
   inherit version;
 
   doCheck = false;
@@ -17,7 +17,7 @@ pkgs.buildNpmPackage (npm // {
     # The workspace root's node_modules/ is at ../node_modules/.
     cd web
     node ../node_modules/typescript/bin/tsc -b
-    # outDir in vite.config.ts points to ../hermes_cli/web_dist for the
+    # outDir in vite.config.ts points to ../hades_cli/web_dist for the
     # monorepo layout.  Override with --outDir dist for the nix build.
     node ../node_modules/vite/bin/vite.js build --outDir dist
 

@@ -7,7 +7,7 @@ Test categories:
   - TestRunConversation: DeepAgentsAIAgent.run_conversation end-to-end
   - TestStreamingEndToEnd: Full streaming event routing
   - TestToolDispatcherEndToEnd: Tool execution integration
-  - TestMessageRoundTrip: Hermes ↔ LangChain message conversion
+  - TestMessageRoundTrip: Hades ↔ LangChain message conversion
   - TestDeepAgentsAIAgentIntegration: Full facade with agent attributes
 """
 
@@ -90,8 +90,8 @@ def _make_langchain_message(msg_type, **kwargs):
         raise ValueError(f"Unknown msg_type: {msg_type}")
 
 
-def _make_hermes_message(role, content="", tool_calls=None, tool_call_id=None):
-    """Create a Hermes-format message dict."""
+def _make_hades_message(role, content="", tool_calls=None, tool_call_id=None):
+    """Create a Hades-format message dict."""
     msg = {"role": role, "content": content}
     if tool_calls:
         msg["tool_calls"] = tool_calls
@@ -157,7 +157,7 @@ class TestRunConversation:
             "messages": [_make_langchain_message("assistant", content="Hello!")],
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             result = agent.run_conversation(user_message="Hi")
 
@@ -172,7 +172,7 @@ class TestRunConversation:
         agent = self._make_sync_agent()
         agent._agent.invoke.side_effect = RuntimeError("model unavailable")
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             result = agent.run_conversation(user_message="test")
 
@@ -188,12 +188,12 @@ class TestRunConversation:
         }
 
         history = [
-            _make_hermes_message("system", "You are helpful."),
-            _make_hermes_message("user", "first question"),
-            _make_hermes_message("assistant", "first answer"),
+            _make_hades_message("system", "You are helpful."),
+            _make_hades_message("user", "first question"),
+            _make_hades_message("assistant", "first answer"),
         ]
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             agent.run_conversation(
                 user_message="second question",
@@ -211,7 +211,7 @@ class TestRunConversation:
             "messages": [_make_langchain_message("assistant", content="ok")]
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             agent.run_conversation(
                 user_message="hello",
@@ -234,7 +234,7 @@ class TestRunConversation:
             "messages": [_make_langchain_message("assistant", content="the answer is 42")]
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             response = agent.chat("What is 6 * 7?")
 
@@ -250,7 +250,7 @@ class TestRunConversation:
             "messages": [_make_langchain_message("assistant", content="ok")]
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             agent.run_conversation(
                 user_message="test",
@@ -269,7 +269,7 @@ class TestRunConversation:
             "messages": [_make_langchain_message("assistant", content="ok")]
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             agent.run_conversation(user_message="hi")
 
@@ -339,7 +339,7 @@ class TestStreamingEndToEnd:
             "messages": [_make_langchain_message("assistant", content="answer")]
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             response = agent.run_conversation(user_message="hello")
 
@@ -349,12 +349,12 @@ class TestStreamingEndToEnd:
 
     def test_streaming_bridge_event_routing(self):
         """Bridge routes AIMessageChunk to stream_delta, ToolCall to tool_progress."""
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        from agent.deep_agents_runtime import _HadesStreamingBridge
 
         deltas = []
         tools = []
 
-        bridge = _HermesStreamingBridge(
+        bridge = _HadesStreamingBridge(
             agent=MagicMock(),
             stream_delta=lambda x: deltas.append(x),
             tool_progress=lambda a, **kw: tools.append((a, kw)),
@@ -374,10 +374,10 @@ class TestStreamingEndToEnd:
 
     def test_streaming_bridge_output_event_yields_final_response(self):
         """Bridge processes output events and extracts final_response text."""
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        from agent.deep_agents_runtime import _HadesStreamingBridge
 
         deltas = []
-        bridge = _HermesStreamingBridge(
+        bridge = _HadesStreamingBridge(
             agent=MagicMock(),
             stream_delta=lambda x: deltas.append(x),
         )
@@ -390,9 +390,9 @@ class TestStreamingEndToEnd:
 
     def test_streaming_bridge_handles_non_dicts_gracefully(self):
         """Non-dict events in the stream don't crash the bridge."""
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        from agent.deep_agents_runtime import _HadesStreamingBridge
 
-        bridge = _HermesStreamingBridge(agent=MagicMock())
+        bridge = _HadesStreamingBridge(agent=MagicMock())
 
         bridge.process_event("string event")
         bridge.process_event(None)
@@ -403,7 +403,7 @@ class TestStreamingEndToEnd:
 
     def test_streaming_bridge_empty_stream(self):
         """An empty stream yields no callbacks but _run_streamed doesn't crash."""
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        from agent.deep_agents_runtime import _HadesStreamingBridge
 
         agent = self._make_deepagents_agent()
         agent._agent = MagicMock()
@@ -430,10 +430,10 @@ class TestStreamingEndToEnd:
 class TestToolDispatcherEndToEnd:
     """E2E: tool dispatcher integration with agent context."""
 
-    def test_hermes_tool_adapter_creates_structured_tool(self):
-        """_HermesToolAdapter produces a LangChain StructuredTool."""
+    def test_hades_tool_adapter_creates_structured_tool(self):
+        """_HadesToolAdapter produces a LangChain StructuredTool."""
         from langchain_core.tools import StructuredTool
-        from agent.deep_agents_runtime import _HermesToolAdapter
+        from agent.deep_agents_runtime import _HadesToolAdapter
 
         entry = types.SimpleNamespace(
             name="wc",
@@ -441,7 +441,7 @@ class TestToolDispatcherEndToEnd:
             schema={"name": "wc", "description": "word count", "parameters": {"type": "object"}},
             description="wc tool",
         )
-        adapter = _HermesToolAdapter(entry)
+        adapter = _HadesToolAdapter(entry)
         assert isinstance(adapter.langchain_tool, StructuredTool)
         assert adapter.name == "wc"
         assert adapter.toolset == "search"
@@ -451,7 +451,7 @@ class TestToolDispatcherEndToEnd:
         with patch("model_tools.handle_function_call") as mock_hfc:
             mock_hfc.return_value = json.dumps({"count": 42})
 
-            from agent.deep_agents_runtime import _HermesToolAdapter
+            from agent.deep_agents_runtime import _HadesToolAdapter
 
             entry = types.SimpleNamespace(
                 name="test_tool",
@@ -459,7 +459,7 @@ class TestToolDispatcherEndToEnd:
                 schema={"name": "test_tool", "description": "test", "parameters": {"type": "object"}},
                 description="test",
             )
-            adapter = _HermesToolAdapter(entry)
+            adapter = _HadesToolAdapter(entry)
 
             result = adapter.langchain_tool.func(myarg="value")
             result_obj = json.loads(result)
@@ -475,7 +475,7 @@ class TestToolDispatcherEndToEnd:
         with patch("model_tools.handle_function_call") as mock_hfc:
             mock_hfc.side_effect = FileNotFoundError("no such file")
 
-            from agent.deep_agents_runtime import _HermesToolAdapter
+            from agent.deep_agents_runtime import _HadesToolAdapter
 
             entry = types.SimpleNamespace(
                 name="read_file",
@@ -483,7 +483,7 @@ class TestToolDispatcherEndToEnd:
                 schema={"name": "read_file", "description": "read", "parameters": {"type": "object"}},
                 description="read file",
             )
-            adapter = _HermesToolAdapter(entry)
+            adapter = _HadesToolAdapter(entry)
 
             result = adapter.langchain_tool.func(path="/nonexistent")
             result_obj = json.loads(result)
@@ -491,9 +491,9 @@ class TestToolDispatcherEndToEnd:
             assert "error" in result_obj
             assert "no such file" in result_obj["error"]
 
-    def test_build_hermes_tools_creates_tools_from_registry(self):
-        """build_hermes_tools queries the registry and returns adapters."""
-        from agent.deep_agents_runtime import build_hermes_tools
+    def test_build_hades_tools_creates_tools_from_registry(self):
+        """build_hades_tools queries the registry and returns adapters."""
+        from agent.deep_agents_runtime import build_hades_tools
 
         mock_entry = types.SimpleNamespace(
             name="list_files",
@@ -509,7 +509,7 @@ class TestToolDispatcherEndToEnd:
         saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
-            tools = build_hermes_tools(enabled_toolsets=["terminal"], disabled_toolsets=[])
+            tools = build_hades_tools(enabled_toolsets=["terminal"], disabled_toolsets=[])
             assert len(tools) == 1
             assert hasattr(tools[0], "func")  # StructuredTool has .func
         finally:
@@ -518,9 +518,9 @@ class TestToolDispatcherEndToEnd:
             else:
                 sys.modules.pop("tools.registry", None)
 
-    def test_build_hermes_tools_empty_on_missing_entry(self):
+    def test_build_hades_tools_empty_on_missing_entry(self):
         """Tools with None registry entry are skipped."""
-        from agent.deep_agents_runtime import build_hermes_tools
+        from agent.deep_agents_runtime import build_hades_tools
 
         mock_reg = MagicMock()
         mock_reg.get_definitions.return_value = [{"name": "missing"}]
@@ -530,14 +530,14 @@ class TestToolDispatcherEndToEnd:
         saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
-            tools = build_hermes_tools(enabled_toolsets=[], disabled_toolsets=[])
+            tools = build_hades_tools(enabled_toolsets=[], disabled_toolsets=[])
             assert tools == []
         finally:
             sys.modules.pop("tools.registry", None)
 
-    def test_build_hermes_tools_handles_registry_exception(self):
+    def test_build_hades_tools_handles_registry_exception(self):
         """If registry.get_definitions raises, an empty list is returned."""
-        from agent.deep_agents_runtime import build_hermes_tools
+        from agent.deep_agents_runtime import build_hades_tools
 
         mock_reg = MagicMock()
         mock_reg.get_definitions.side_effect = ImportError("registry gone")
@@ -546,99 +546,99 @@ class TestToolDispatcherEndToEnd:
         saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
-            tools = build_hermes_tools(enabled_toolsets=[], disabled_toolsets=[])
+            tools = build_hades_tools(enabled_toolsets=[], disabled_toolsets=[])
             assert tools == []
         finally:
             sys.modules.pop("tools.registry", None)
 
 
 # ---------------------------------------------------------------------------
-# TestMessageRoundTrip — Hermes ↔ LangChain conversion
+# TestMessageRoundTrip — Hades ↔ LangChain conversion
 # ---------------------------------------------------------------------------
 
 
 class TestMessageRoundTrip:
-    """E2E: Hermes message dict ↔ LangChain message round-trip."""
+    """E2E: Hades message dict ↔ LangChain message round-trip."""
 
-    def test_hermes_to_langchain_to_hermes_roundtrip_system_user(self):
+    def test_hades_to_langchain_to_hades_roundtrip_system_user(self):
         """System → User roundtrip preserves content and roles."""
         from agent.deep_agents_runtime import (
-            _convert_messages_to_langchain, _convert_langchain_to_hermes,
+            _convert_messages_to_langchain, _convert_langchain_to_hades,
         )
 
         original = [
-            _make_hermes_message("system", "You are a cat."),
-            _make_hermes_message("user", "Meow?"),
+            _make_hades_message("system", "You are a cat."),
+            _make_hades_message("user", "Meow?"),
         ]
         lc = _convert_messages_to_langchain(original)
-        back = _convert_langchain_to_hermes(lc)
+        back = _convert_langchain_to_hades(lc)
 
         assert back == original
 
-    def test_hermes_to_langchain_to_hermes_roundtrip_tool_call(self):
+    def test_hades_to_langchain_to_hades_roundtrip_tool_call(self):
         """Assistant with tool_calls → LangChain AIMessage → back."""
         from agent.deep_agents_runtime import (
-            _convert_messages_to_langchain, _convert_langchain_to_hermes,
+            _convert_messages_to_langchain, _convert_langchain_to_hades,
         )
 
         tool_calls = [{"id": "call_abc", "function": {"name": "cmd", "arguments": '{"n": 1}'}}]
         original = [
-            _make_hermes_message("assistant", "checking", tool_calls=tool_calls),
-            _make_hermes_message("tool", "result", tool_call_id="call_abc"),
+            _make_hades_message("assistant", "checking", tool_calls=tool_calls),
+            _make_hades_message("tool", "result", tool_call_id="call_abc"),
         ]
         lc = _convert_messages_to_langchain(original)
-        back = _convert_langchain_to_hermes(lc)
+        back = _convert_langchain_to_hades(lc)
 
         assert back == original
 
     def test_full_sequence_roundtrip(self):
         """Full conversation sequence: system → user → assistant → tool → assistant."""
         from agent.deep_agents_runtime import (
-            _convert_messages_to_langchain, _convert_langchain_to_hermes,
+            _convert_messages_to_langchain, _convert_langchain_to_hades,
         )
 
         original = [
-            _make_hermes_message("system", "Be brief."),
-            _make_hermes_message("user", "What is 2+2?"),
-            _make_hermes_message("assistant", "4", tool_calls=[
+            _make_hades_message("system", "Be brief."),
+            _make_hades_message("user", "What is 2+2?"),
+            _make_hades_message("assistant", "4", tool_calls=[
                 {"id": "call_1", "function": {"name": "verify", "arguments": "{}"}},
             ]),
-            _make_hermes_message("tool", "verified", tool_call_id="call_1"),
-            _make_hermes_message("assistant", "2+2=4"),
+            _make_hades_message("tool", "verified", tool_call_id="call_1"),
+            _make_hades_message("assistant", "2+2=4"),
         ]
 
         lc = _convert_messages_to_langchain(original)
-        back = _convert_langchain_to_hermes(lc)
+        back = _convert_langchain_to_hades(lc)
 
         assert back == original
         roles = [m["role"] for m in back]
         assert roles == ["system", "user", "assistant", "tool", "assistant"]
 
-    def test_langchain_to_hermes_none_input_raises(self):
-        """_convert_langchain_to_hermes raises TypeError on None."""
-        from agent.deep_agents_runtime import _convert_langchain_to_hermes
+    def test_langchain_to_hades_none_input_raises(self):
+        """_convert_langchain_to_hades raises TypeError on None."""
+        from agent.deep_agents_runtime import _convert_langchain_to_hades
         with pytest.raises(TypeError):
-            _convert_langchain_to_hermes(None)
+            _convert_langchain_to_hades(None)
 
-    def test_hermes_to_langchain_empty_messages(self):
+    def test_hades_to_langchain_empty_messages(self):
         """Empty list returns empty list."""
         from agent.deep_agents_runtime import _convert_messages_to_langchain
         assert _convert_messages_to_langchain([]) == []
 
-    def test_hermes_to_langchain_with_tool_calls_preserves_args(self):
+    def test_hades_to_langchain_with_tool_calls_preserves_args(self):
         """Tool calls on assistant messages preserve id and args."""
         from agent.deep_agents_runtime import _convert_messages_to_langchain
         from langchain_core.messages import AIMessage
 
-        hermes = [
-            _make_hermes_message("assistant", "let me check", tool_calls=[
+        hades = [
+            _make_hades_message("assistant", "let me check", tool_calls=[
                 {
                     "id": "tc-123",
                     "function": {"name": "web_search", "arguments": '{"q": "test query"}'},
                 }
             ]),
         ]
-        lc = _convert_messages_to_langchain(hermes)
+        lc = _convert_messages_to_langchain(hades)
         ai = lc[0]
         assert isinstance(ai, AIMessage)
         assert len(ai.tool_calls) == 1
@@ -799,7 +799,7 @@ class TestDeepAgentsAIAgentIntegration:
             "messages": [_make_langchain_message("assistant", content="chat response")]
         }
 
-        with patch("agent.deep_agents_runtime._HermesStreamingBridge") as mock_br:
+        with patch("agent.deep_agents_runtime._HadesStreamingBridge") as mock_br:
             mock_br.return_value.any_callbacks_set.return_value = False
             resp = agent.chat("hello")
 

@@ -1,12 +1,12 @@
 #
-# docker-compose.yml for Hermes Agent
+# docker-compose.yml for Hades Agent
 #
 # Usage:
-#   HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d
+#   HADES_UID=$(id -u) HADES_GID=$(id -g) docker compose up -d
 #
-# Set HERMES_UID / HERMES_GID to the host user that owns ~/.hermes so
+# Set HADES_UID / HADES_GID to the host user that owns ~/.hades so
 # files created inside the container stay readable/writable on the host.
-# The s6-overlay stage2 hook remaps the internal `hermes` user to these
+# The s6-overlay stage2 hook remaps the internal `hades` user to these
 # values via usermod/groupmod; each supervised service then drops to that
 # user via `s6-setuidgid`.
 #
@@ -17,7 +17,7 @@
 #     adds authentication — do NOT pass --insecure --host 0.0.0.0.
 #   - If you override entrypoint, keep `/init` as the first command in
 #     the chain (or let docker use the image's default ENTRYPOINT,
-#     which is `["/init", "/opt/hermes/docker/main-wrapper.sh"]`).
+#     which is `["/init", "/opt/hades/docker/main-wrapper.sh"]`).
 #     `/init` is s6-overlay's PID 1 — it runs the cont-init.d scripts
 #     (chown, profile reconcile, dashboard toggle) and sets up the
 #     supervision tree before any service starts. Bypassing it skips
@@ -28,27 +28,27 @@
 #
 services:
   gateway:
-    image: al3xar/hermes-agent:latest
+    image: al3xar/hades-agent:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hermes
+    container_name: hades
     restart: unless-stopped
     network_mode: host
     # Volúmenes deshabilitados temporalmente: en Podman daban problemas de
     # permisos de escritura. Todo corre dentro del contenedor por ahora; los
     # datos en /opt/data NO persisten entre recreaciones del contenedor.
     volumes:
-      #   - ~/.hermes:/opt/data
-      # Hermes lee el config en $HERMES_HOME/config.yaml (= /opt/data/config.yaml),
-      # NO en /opt/data/.hermes (ese montaje antiguo era una ruta muerta). Bind
+      #   - ~/.hades:/opt/data
+      # Hades lee el config en $HADES_HOME/config.yaml (= /opt/data/config.yaml),
+      # NO en /opt/data/.hades (ese montaje antiguo era una ruta muerta). Bind
       # del fichero concreto, read-only: sombrea el config sembrado por defecto
       # sin tocar el resto del home (volumen anónimo) y sin los problemas de
       # permisos de escritura de Podman.
-      - ./.hermes-config/config.yaml:/opt/data/config.yaml:ro
+      - ./.hades-config/config.yaml:/opt/data/config.yaml:ro
     environment:
-      - HERMES_UID=${HERMES_UID:-501}
-      - HERMES_GID=${HERMES_GID:-20}
+      - HADES_UID=${HADES_UID:-501}
+      - HADES_GID=${HADES_GID:-20}
       - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
       # To expose the OpenAI-compatible API server beyond localhost,
       # uncomment BOTH lines (API_SERVER_KEY is mandatory for auth):
@@ -64,7 +64,7 @@ services:
       # Google Chat — uncomment and fill in to enable the Google Chat gateway.
       # See website/docs/user-guide/messaging/google_chat.md for the full setup.
       # The SA JSON path must point to a file mounted into the container —
-      # add a volume entry above (e.g. ``- ~/.hermes/google-chat-sa.json:/secrets/google-chat-sa.json:ro``)
+      # add a volume entry above (e.g. ``- ~/.hades/google-chat-sa.json:/secrets/google-chat-sa.json:ro``)
       # then set GOOGLE_CHAT_SERVICE_ACCOUNT_JSON to that mount path.
       # - GOOGLE_CHAT_PROJECT_ID=${GOOGLE_CHAT_PROJECT_ID}
       # - GOOGLE_CHAT_SUBSCRIPTION_NAME=${GOOGLE_CHAT_SUBSCRIPTION_NAME}
@@ -73,11 +73,11 @@ services:
     command: ["gateway", "run"]
 
   dashboard:
-    image: al3xar/hermes-agent:latest
+    image: al3xar/hades-agent:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hermes-dashboard
+    container_name: hades-dashboard
     restart: unless-stopped
     # Sin network_mode: host. En macOS + Podman, host networking bindea a la
     # VM (no al Mac) e ignora el mapeo `ports`, dejando el dashboard
@@ -87,13 +87,13 @@ services:
       - gateway
     # Volúmenes deshabilitados temporalmente (ver nota en el servicio gateway).
     # volumes:
-    #   - ./.hermes-config:/opt/data/.hermes:ro
+    #   - ./.hades-config:/opt/data/.hades:ro
     ports:
       - 9119:9119
     environment:
-      - HERMES_UID=${HERMES_UID:-501}
-      - HERMES_GID=${HERMES_GID:-20}
-      - HERMES_HOME=/tmp/hermes
+      - HADES_UID=${HADES_UID:-501}
+      - HADES_GID=${HADES_GID:-20}
+      - HADES_HOME=/tmp/hades
       - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
     # Sin este `command`, la imagen arranca el agente interactivo por defecto,
     # que muere al no haber TTY y entra en bucle de reinicio. `dashboard`

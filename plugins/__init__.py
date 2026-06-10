@@ -1,1 +1,1 @@
-# Hermes plugins package
+# Hades plugins package

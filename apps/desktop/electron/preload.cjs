@@ -1,32 +1,32 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
-contextBridge.exposeInMainWorld('hermesDesktop', {
-  getConnection: profile => ipcRenderer.invoke('hermes:connection', profile),
-  revalidateConnection: () => ipcRenderer.invoke('hermes:connection:revalidate'),
-  touchBackend: profile => ipcRenderer.invoke('hermes:backend:touch', profile),
-  getGatewayWsUrl: profile => ipcRenderer.invoke('hermes:gateway:ws-url', profile),
-  getBootProgress: () => ipcRenderer.invoke('hermes:boot-progress:get'),
-  getConnectionConfig: profile => ipcRenderer.invoke('hermes:connection-config:get', profile),
-  saveConnectionConfig: payload => ipcRenderer.invoke('hermes:connection-config:save', payload),
-  applyConnectionConfig: payload => ipcRenderer.invoke('hermes:connection-config:apply', payload),
-  testConnectionConfig: payload => ipcRenderer.invoke('hermes:connection-config:test', payload),
-  probeConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:probe', remoteUrl),
-  oauthLoginConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:oauth-login', remoteUrl),
-  oauthLogoutConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:oauth-logout', remoteUrl),
+contextBridge.exposeInMainWorld('hadesDesktop', {
+  getConnection: profile => ipcRenderer.invoke('hades:connection', profile),
+  revalidateConnection: () => ipcRenderer.invoke('hades:connection:revalidate'),
+  touchBackend: profile => ipcRenderer.invoke('hades:backend:touch', profile),
+  getGatewayWsUrl: profile => ipcRenderer.invoke('hades:gateway:ws-url', profile),
+  getBootProgress: () => ipcRenderer.invoke('hades:boot-progress:get'),
+  getConnectionConfig: profile => ipcRenderer.invoke('hades:connection-config:get', profile),
+  saveConnectionConfig: payload => ipcRenderer.invoke('hades:connection-config:save', payload),
+  applyConnectionConfig: payload => ipcRenderer.invoke('hades:connection-config:apply', payload),
+  testConnectionConfig: payload => ipcRenderer.invoke('hades:connection-config:test', payload),
+  probeConnectionConfig: remoteUrl => ipcRenderer.invoke('hades:connection-config:probe', remoteUrl),
+  oauthLoginConnectionConfig: remoteUrl => ipcRenderer.invoke('hades:connection-config:oauth-login', remoteUrl),
+  oauthLogoutConnectionConfig: remoteUrl => ipcRenderer.invoke('hades:connection-config:oauth-logout', remoteUrl),
   profile: {
-    get: () => ipcRenderer.invoke('hermes:profile:get'),
-    set: name => ipcRenderer.invoke('hermes:profile:set', name)
+    get: () => ipcRenderer.invoke('hades:profile:get'),
+    set: name => ipcRenderer.invoke('hades:profile:set', name)
   },
-  api: request => ipcRenderer.invoke('hermes:api', request),
-  notify: payload => ipcRenderer.invoke('hermes:notify', payload),
-  requestMicrophoneAccess: () => ipcRenderer.invoke('hermes:requestMicrophoneAccess'),
-  readFileDataUrl: filePath => ipcRenderer.invoke('hermes:readFileDataUrl', filePath),
-  readFileText: filePath => ipcRenderer.invoke('hermes:readFileText', filePath),
-  selectPaths: options => ipcRenderer.invoke('hermes:selectPaths', options),
-  writeClipboard: text => ipcRenderer.invoke('hermes:writeClipboard', text),
-  saveImageFromUrl: url => ipcRenderer.invoke('hermes:saveImageFromUrl', url),
-  saveImageBuffer: (data, ext) => ipcRenderer.invoke('hermes:saveImageBuffer', { data, ext }),
-  saveClipboardImage: () => ipcRenderer.invoke('hermes:saveClipboardImage'),
+  api: request => ipcRenderer.invoke('hades:api', request),
+  notify: payload => ipcRenderer.invoke('hades:notify', payload),
+  requestMicrophoneAccess: () => ipcRenderer.invoke('hades:requestMicrophoneAccess'),
+  readFileDataUrl: filePath => ipcRenderer.invoke('hades:readFileDataUrl', filePath),
+  readFileText: filePath => ipcRenderer.invoke('hades:readFileText', filePath),
+  selectPaths: options => ipcRenderer.invoke('hades:selectPaths', options),
+  writeClipboard: text => ipcRenderer.invoke('hades:writeClipboard', text),
+  saveImageFromUrl: url => ipcRenderer.invoke('hades:saveImageFromUrl', url),
+  saveImageBuffer: (data, ext) => ipcRenderer.invoke('hades:saveImageBuffer', { data, ext }),
+  saveClipboardImage: () => ipcRenderer.invoke('hades:saveClipboardImage'),
   getPathForFile: file => {
     try {
       return webUtils.getPathForFile(file) || ''
@@ -34,35 +34,35 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
       return ''
     }
   },
-  normalizePreviewTarget: (target, baseDir) => ipcRenderer.invoke('hermes:normalizePreviewTarget', target, baseDir),
-  watchPreviewFile: url => ipcRenderer.invoke('hermes:watchPreviewFile', url),
-  stopPreviewFileWatch: id => ipcRenderer.invoke('hermes:stopPreviewFileWatch', id),
-  setTitleBarTheme: payload => ipcRenderer.send('hermes:titlebar-theme', payload),
-  setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
-  openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
-  fetchLinkTitle: url => ipcRenderer.invoke('hermes:fetchLinkTitle', url),
+  normalizePreviewTarget: (target, baseDir) => ipcRenderer.invoke('hades:normalizePreviewTarget', target, baseDir),
+  watchPreviewFile: url => ipcRenderer.invoke('hades:watchPreviewFile', url),
+  stopPreviewFileWatch: id => ipcRenderer.invoke('hades:stopPreviewFileWatch', id),
+  setTitleBarTheme: payload => ipcRenderer.send('hades:titlebar-theme', payload),
+  setPreviewShortcutActive: active => ipcRenderer.send('hades:previewShortcutActive', Boolean(active)),
+  openExternal: url => ipcRenderer.invoke('hades:openExternal', url),
+  fetchLinkTitle: url => ipcRenderer.invoke('hades:fetchLinkTitle', url),
   settings: {
-    getDefaultProjectDir: () => ipcRenderer.invoke('hermes:setting:defaultProjectDir:get'),
-    setDefaultProjectDir: dir => ipcRenderer.invoke('hermes:setting:defaultProjectDir:set', dir),
-    pickDefaultProjectDir: () => ipcRenderer.invoke('hermes:setting:defaultProjectDir:pick')
+    getDefaultProjectDir: () => ipcRenderer.invoke('hades:setting:defaultProjectDir:get'),
+    setDefaultProjectDir: dir => ipcRenderer.invoke('hades:setting:defaultProjectDir:set', dir),
+    pickDefaultProjectDir: () => ipcRenderer.invoke('hades:setting:defaultProjectDir:pick')
   },
-  revealLogs: () => ipcRenderer.invoke('hermes:logs:reveal'),
-  getRecentLogs: () => ipcRenderer.invoke('hermes:logs:recent'),
-  readDir: dirPath => ipcRenderer.invoke('hermes:fs:readDir', dirPath),
-  gitRoot: startPath => ipcRenderer.invoke('hermes:fs:gitRoot', startPath),
+  revealLogs: () => ipcRenderer.invoke('hades:logs:reveal'),
+  getRecentLogs: () => ipcRenderer.invoke('hades:logs:recent'),
+  readDir: dirPath => ipcRenderer.invoke('hades:fs:readDir', dirPath),
+  gitRoot: startPath => ipcRenderer.invoke('hades:fs:gitRoot', startPath),
   terminal: {
-    dispose: id => ipcRenderer.invoke('hermes:terminal:dispose', id),
-    resize: (id, size) => ipcRenderer.invoke('hermes:terminal:resize', id, size),
-    start: options => ipcRenderer.invoke('hermes:terminal:start', options),
-    write: (id, data) => ipcRenderer.invoke('hermes:terminal:write', id, data),
+    dispose: id => ipcRenderer.invoke('hades:terminal:dispose', id),
+    resize: (id, size) => ipcRenderer.invoke('hades:terminal:resize', id, size),
+    start: options => ipcRenderer.invoke('hades:terminal:start', options),
+    write: (id, data) => ipcRenderer.invoke('hades:terminal:write', id, data),
     onData: (id, callback) => {
-      const channel = `hermes:terminal:${id}:data`
+      const channel = `hades:terminal:${id}:data`
       const listener = (_event, payload) => callback(payload)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
     },
     onExit: (id, callback) => {
-      const channel = `hermes:terminal:${id}:exit`
+      const channel = `hades:terminal:${id}:exit`
       const listener = (_event, payload) => callback(payload)
       ipcRenderer.on(channel, listener)
       return () => ipcRenderer.removeListener(channel, listener)
@@ -70,67 +70,67 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   },
   onClosePreviewRequested: callback => {
     const listener = () => callback()
-    ipcRenderer.on('hermes:close-preview-requested', listener)
-    return () => ipcRenderer.removeListener('hermes:close-preview-requested', listener)
+    ipcRenderer.on('hades:close-preview-requested', listener)
+    return () => ipcRenderer.removeListener('hades:close-preview-requested', listener)
   },
   onOpenUpdatesRequested: callback => {
     const listener = () => callback()
-    ipcRenderer.on('hermes:open-updates', listener)
-    return () => ipcRenderer.removeListener('hermes:open-updates', listener)
+    ipcRenderer.on('hades:open-updates', listener)
+    return () => ipcRenderer.removeListener('hades:open-updates', listener)
   },
   onWindowStateChanged: callback => {
     const listener = (_event, payload) => callback(payload)
-    ipcRenderer.on('hermes:window-state-changed', listener)
-    return () => ipcRenderer.removeListener('hermes:window-state-changed', listener)
+    ipcRenderer.on('hades:window-state-changed', listener)
+    return () => ipcRenderer.removeListener('hades:window-state-changed', listener)
   },
   onPreviewFileChanged: callback => {
     const listener = (_event, payload) => callback(payload)
-    ipcRenderer.on('hermes:preview-file-changed', listener)
-    return () => ipcRenderer.removeListener('hermes:preview-file-changed', listener)
+    ipcRenderer.on('hades:preview-file-changed', listener)
+    return () => ipcRenderer.removeListener('hades:preview-file-changed', listener)
   },
   onBackendExit: callback => {
     const listener = (_event, payload) => callback(payload)
-    ipcRenderer.on('hermes:backend-exit', listener)
-    return () => ipcRenderer.removeListener('hermes:backend-exit', listener)
+    ipcRenderer.on('hades:backend-exit', listener)
+    return () => ipcRenderer.removeListener('hades:backend-exit', listener)
   },
   onPowerResume: callback => {
     const listener = () => callback()
-    ipcRenderer.on('hermes:power-resume', listener)
-    return () => ipcRenderer.removeListener('hermes:power-resume', listener)
+    ipcRenderer.on('hades:power-resume', listener)
+    return () => ipcRenderer.removeListener('hades:power-resume', listener)
   },
   onBootProgress: callback => {
     const listener = (_event, payload) => callback(payload)
-    ipcRenderer.on('hermes:boot-progress', listener)
-    return () => ipcRenderer.removeListener('hermes:boot-progress', listener)
+    ipcRenderer.on('hades:boot-progress', listener)
+    return () => ipcRenderer.removeListener('hades:boot-progress', listener)
   },
   // First-launch bootstrap progress -- emitted by the install.ps1 stage
   // runner in main.cjs (apps/desktop/electron/bootstrap-runner.cjs).
   // Renderer's install overlay subscribes to live events and queries the
   // current snapshot via getBootstrapState() to recover after a devtools
   // reload mid-bootstrap.
-  getBootstrapState: () => ipcRenderer.invoke('hermes:bootstrap:get'),
-  resetBootstrap: () => ipcRenderer.invoke('hermes:bootstrap:reset'),
-  repairBootstrap: () => ipcRenderer.invoke('hermes:bootstrap:repair'),
-  cancelBootstrap: () => ipcRenderer.invoke('hermes:bootstrap:cancel'),
+  getBootstrapState: () => ipcRenderer.invoke('hades:bootstrap:get'),
+  resetBootstrap: () => ipcRenderer.invoke('hades:bootstrap:reset'),
+  repairBootstrap: () => ipcRenderer.invoke('hades:bootstrap:repair'),
+  cancelBootstrap: () => ipcRenderer.invoke('hades:bootstrap:cancel'),
   onBootstrapEvent: callback => {
     const listener = (_event, payload) => callback(payload)
-    ipcRenderer.on('hermes:bootstrap:event', listener)
-    return () => ipcRenderer.removeListener('hermes:bootstrap:event', listener)
+    ipcRenderer.on('hades:bootstrap:event', listener)
+    return () => ipcRenderer.removeListener('hades:bootstrap:event', listener)
   },
-  getVersion: () => ipcRenderer.invoke('hermes:version'),
+  getVersion: () => ipcRenderer.invoke('hades:version'),
   uninstall: {
-    summary: () => ipcRenderer.invoke('hermes:uninstall:summary'),
-    run: mode => ipcRenderer.invoke('hermes:uninstall:run', { mode })
+    summary: () => ipcRenderer.invoke('hades:uninstall:summary'),
+    run: mode => ipcRenderer.invoke('hades:uninstall:run', { mode })
   },
   updates: {
-    check: () => ipcRenderer.invoke('hermes:updates:check'),
-    apply: opts => ipcRenderer.invoke('hermes:updates:apply', opts),
-    getBranch: () => ipcRenderer.invoke('hermes:updates:branch:get'),
-    setBranch: name => ipcRenderer.invoke('hermes:updates:branch:set', name),
+    check: () => ipcRenderer.invoke('hades:updates:check'),
+    apply: opts => ipcRenderer.invoke('hades:updates:apply', opts),
+    getBranch: () => ipcRenderer.invoke('hades:updates:branch:get'),
+    setBranch: name => ipcRenderer.invoke('hades:updates:branch:set', name),
     onProgress: callback => {
       const listener = (_event, payload) => callback(payload)
-      ipcRenderer.on('hermes:updates:progress', listener)
-      return () => ipcRenderer.removeListener('hermes:updates:progress', listener)
+      ipcRenderer.on('hades:updates:progress', listener)
+      return () => ipcRenderer.removeListener('hades:updates:progress', listener)
     }
   }
 })

@@ -1,21 +1,21 @@
-# nix/desktop.nix — Hermes Desktop (Electron) app build + wrapper
+# nix/desktop.nix — Hades Desktop (Electron) app build + wrapper
 #
-# `hermesAgent` is the fully-built `.#default` package — it ships the
-# `hermes` binary with the venv, runtime PATH, bundled skills/plugins, etc.
+# `hadesAgent` is the fully-built `.#default` package — it ships the
+# `hades` binary with the venv, runtime PATH, bundled skills/plugins, etc.
 # already wired up.  We point the desktop at it via the existing
-# `HERMES_DESKTOP_HERMES` override env var, so the desktop's resolver
-# uses our fully wrapped binary at step 4 ("existing Hermes CLI").
+# `HADES_DESKTOP_HADES` override env var, so the desktop's resolver
+# uses our fully wrapped binary at step 4 ("existing Hades CLI").
 # No reimplementation of the agent resolution in this wrapper.
-{ pkgs, lib, stdenv, makeWrapper, hermesNpmLib, electron, hermesAgent, ... }:
+{ pkgs, lib, stdenv, makeWrapper, hadesNpmLib, electron, hadesAgent, ... }:
 let
-  npm = hermesNpmLib.mkNpmPassthru { folder = "apps/desktop"; attr = "desktop"; pname = "hermes-desktop"; };
+  npm = hadesNpmLib.mkNpmPassthru { folder = "apps/desktop"; attr = "desktop"; pname = "hades-desktop"; };
 
   packageJson = builtins.fromJSON (builtins.readFile (npm.src + "/apps/desktop/package.json"));
   version = packageJson.version;
 
   # Build the renderer (dist/ + electron/ + package.json).
   renderer = pkgs.buildNpmPackage (npm // {
-    pname = "hermes-desktop-renderer";
+    pname = "hades-desktop-renderer";
     inherit version;
 
     doCheck = false;
@@ -67,7 +67,7 @@ in
 
 # Electron wrapper: nixpkgs' electron binary pointed at the renderer dir.
 stdenv.mkDerivation {
-  pname = "hermes-desktop";
+  pname = "hades-desktop";
   inherit version;
 
   dontUnpack = true;
@@ -78,18 +78,18 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/share/hermes-desktop $out/bin
-    cp -r ${renderer}/* $out/share/hermes-desktop/
+    mkdir -p $out/share/hades-desktop $out/bin
+    cp -r ${renderer}/* $out/share/hades-desktop/
 
     # Wrap the nixpkgs electron binary to launch our app.  Set
-    # HERMES_DESKTOP_HERMES to the absolute path of the nix-built `hermes`
-    # binary so the desktop's resolver step 4 ("existing Hermes CLI on
+    # HADES_DESKTOP_HADES to the absolute path of the nix-built `hades`
+    # binary so the desktop's resolver step 4 ("existing Hades CLI on
     # PATH") uses our fully wrapped binary — venv with all deps,
     # bundled skills/plugins, runtime PATH (ripgrep/git/ffmpeg/etc).
     # No reimplementation of the agent resolver in the wrapper.
-    makeWrapper ${lib.getExe electron} $out/bin/hermes-desktop \
-      --add-flags "$out/share/hermes-desktop" \
-      --set HERMES_DESKTOP_HERMES "${lib.getExe hermesAgent}" \
+    makeWrapper ${lib.getExe electron} $out/bin/hades-desktop \
+      --add-flags "$out/share/hades-desktop" \
+      --set HADES_DESKTOP_HADES "${lib.getExe hadesAgent}" \
       --set ELECTRON_IS_DEV 0
 
     runHook postInstall
@@ -100,10 +100,10 @@ stdenv.mkDerivation {
   };
 
   meta = with lib; {
-    description = "Native Electron desktop shell for Hermes Agent";
-    homepage = "https://github.com/NousResearch/hermes-agent";
+    description = "Native Electron desktop shell for Hades Agent";
+    homepage = "https://github.com/NousResearch/hades-agent";
     license = licenses.mit;
     platforms = platforms.unix;
-    mainProgram = "hermes-desktop";
+    mainProgram = "hades-desktop";
   };
 }

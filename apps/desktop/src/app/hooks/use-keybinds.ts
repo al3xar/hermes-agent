@@ -112,7 +112,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
       // selection from a prior action.
       $newChatProfile.set(null)
       deps.startFreshSession()
-      window.dispatchEvent(new CustomEvent('hermes:new-session-shortcut'))
+      window.dispatchEvent(new CustomEvent('hades:new-session-shortcut'))
     },
     'session.next': () => cycleSession(1),
     'session.prev': () => cycleSession(-1),

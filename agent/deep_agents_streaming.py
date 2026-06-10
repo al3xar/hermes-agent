@@ -1,6 +1,6 @@
-"""Bridge between DeepAgents/LangGraph streaming and Hermes callbacks.
+"""Bridge between DeepAgents/LangGraph streaming and Hades callbacks.
 
-Hermes uses callback-based progress notifications:
+Hades uses callback-based progress notifications:
   callback("tool.started", tool_name=..., preview=...)
   callback("tool.progress", tool_name=..., output=...)
   callback("tool.completed", tool_name=..., ...)
@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # Stream event bridge
 # ---------------------------------------------------------------------------
 
-class _HermesStreamingBridge:
-    """Converts LangGraph stream events to Hermes callback format."""
+class _HadesStreamingBridge:
+    """Converts LangGraph stream events to Hades callback format."""
 
     def __init__(self, callback, agent, task_id):
         self._callback = callback
@@ -77,7 +77,7 @@ class _HermesStreamingBridge:
             yield "raw_event", {"type": event_type, "data": str(data)[:200]}
 
     def _process_output(self, output):
-        """Process node output (the hermes_engine result)."""
+        """Process node output (the hades_engine result)."""
         if isinstance(output, dict):
             self._result = output
             yield "complete", {"result": output}

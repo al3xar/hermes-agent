@@ -1,4 +1,4 @@
-"""Tests for _HermesStreamingBridge and _shorten.
+"""Tests for _HadesStreamingBridge and _shorten.
 
 Covers: AIMessageChunk → message_delta, ToolCall → tool_start,
 ToolResult → tool_complete, unknown events, raw events, _process_output,
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.deep_agents_streaming import _HermesStreamingBridge, _shorten
+from agent.deep_agents_streaming import _HadesStreamingBridge, _shorten
 
 
 # ── _shorten ───────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ class TestShorten:
         assert result.endswith("...")
 
 
-# ── _HermesStreamingBridge – construction ──────────────────────────────────
+# ── _HadesStreamingBridge – construction ──────────────────────────────────
 
 
 class TestBridgeConstruction:
@@ -72,14 +72,14 @@ class TestBridgeConstruction:
     def test_defaults(self):
         """Bridge stores callback, agent, task_id; _result starts None."""
         mock_cb = lambda _e, **_k: None
-        bridge = _HermesStreamingBridge(mock_cb, "agent", "task-1")
+        bridge = _HadesStreamingBridge(mock_cb, "agent", "task-1")
         assert bridge._result is None
         assert bridge._events == []
 
     def test_attribute_isolation(self):
         """Different bridges get independent state."""
-        bridge_a = _HermesStreamingBridge(lambda _e, **_k: None, None, "task-a")
-        bridge_b = _HermesStreamingBridge(lambda _e, **_k: None, None, "task-b")
+        bridge_a = _HadesStreamingBridge(lambda _e, **_k: None, None, "task-a")
+        bridge_b = _HadesStreamingBridge(lambda _e, **_k: None, None, "task-b")
         bridge_a._result = {"foo": 1}
         assert bridge_b._result is None
 
@@ -91,7 +91,7 @@ class TestProcessSubEventAIMessageChunk:
 
     def test_yields_message_delta_for_content(self):
         """AIMessageChunk with content yields ('message_delta', ...)."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "AIMessageChunk",
             "data": {"content": "Hello"},
@@ -100,7 +100,7 @@ class TestProcessSubEventAIMessageChunk:
 
     def test_skips_empty_content(self):
         """AIMessageChunk with empty content yields nothing."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "AIMessageChunk",
             "data": {"content": ""},
@@ -109,7 +109,7 @@ class TestProcessSubEventAIMessageChunk:
 
     def test_skips_unset_content_key(self):
         """AIMessageChunk without 'content' key yields nothing."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "AIMessageChunk",
             "data": {},
@@ -118,7 +118,7 @@ class TestProcessSubEventAIMessageChunk:
 
     def test_empty_string_content_skipped(self):
         """AIMessageChunk with empty string content is skipped."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "AIMessageChunk",
             "data": {"content": ""},
@@ -133,7 +133,7 @@ class TestProcessSubEventToolCall:
 
     def test_yields_tool_start(self):
         """ToolCall event yields ('tool_start', ...) with name + str(args)."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "ToolCall",
             "data": {"name": "read_file", "args": {"path": "/foo.txt"}},
@@ -142,7 +142,7 @@ class TestProcessSubEventToolCall:
 
     def test_defaults_for_missing_fields(self):
         """ToolCall with missing name/args uses empty strings."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "ToolCall",
             "data": {},
@@ -157,7 +157,7 @@ class TestProcessSubEventToolResult:
 
     def test_yields_tool_complete_with_short_result(self):
         """Non-truncated results are stored as-is."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "ToolResult",
             "data": {"name": "read_file", "content": "short"},
@@ -166,7 +166,7 @@ class TestProcessSubEventToolResult:
 
     def test_yields_tool_complete_truncates_long_result(self):
         """Long results are truncated to 200 chars + '...'."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         long_content = "x" * 500
         events = list(bridge._process_sub_event({
             "type": "ToolResult",
@@ -179,7 +179,7 @@ class TestProcessSubEventToolResult:
 
     def test_truncated_text_is_not_triple_ellipsis(self):
         """If max_len=200, the preview ends with exactly one '...'."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "ToolResult",
             "data": {"name": "t", "content": "y" * 300},
@@ -188,7 +188,7 @@ class TestProcessSubEventToolResult:
 
     def test_missing_content_key(self):
         """ToolResult without content uses empty string."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "ToolResult",
             "data": {"name": "read_file"},
@@ -203,7 +203,7 @@ class TestProcessSubEventUnknownType:
 
     def test_yields_raw_event_for_unknown_type(self):
         """Unknown event_type yields ('raw_event', ...) with type + data."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "CustomNode",
             "data": {"key": "value", "count": 42},
@@ -212,7 +212,7 @@ class TestProcessSubEventUnknownType:
 
     def test_empty_type_yields_raw_event(self):
         """Empty type string still yields a raw_event."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event({
             "type": "",
             "data": {},
@@ -221,13 +221,13 @@ class TestProcessSubEventUnknownType:
 
     def test_non_dict_sub_event_rejected(self):
         """Passing a non-dict sub_event returns without yielding."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event("not a dict"))
         assert events == []
 
     def test_none_sub_event_rejected(self):
         """Passing None sub_event returns without yielding."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_sub_event(None))
         assert events == []
 
@@ -239,14 +239,14 @@ class TestProcessOutput:
 
     def test_dict_output_stored_and_yields_complete(self):
         dict_output = {"final_response": "done", "api_calls": 3}
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_output(dict_output))
         assert bridge._result == dict_output
         assert ("complete", {"result": dict_output}) in events
 
     def test_string_json_output_parsed(self):
         """JSON string is parsed, stored, and yielded."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         json_str = json.dumps({"done": True, "value": 42})
         events = list(bridge._process_output(json_str))
         assert bridge._result == {"done": True, "value": 42}
@@ -254,7 +254,7 @@ class TestProcessOutput:
 
     def test_string_non_json_output_stored_as_error(self):
         """Non-JSON string produces error dict with final_response."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_output("failed with error"))
         expected = {"final_response": "failed with error", "errors": ["failed with error"]}
         assert bridge._result == expected
@@ -262,13 +262,13 @@ class TestProcessOutput:
 
     def test_empty_string_becomes_error_dict(self):
         """Empty string fails JSON.parse → error dict."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_output(""))
         assert bridge._result == {"final_response": "", "errors": [""]}
 
     def test_non_dict_non_str_output_ignored(self):
         """Numbers, lists etc. produce no yields and no side effects."""
-        bridge = _HermesStreamingBridge(lambda _e, **_k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda _e, **_k: None, None, None)
         events = list(bridge._process_output(42))
         assert events == []
         assert bridge._result is None
@@ -281,7 +281,7 @@ class TestIterEvents:
 
     def test_processes_Events_key(self):
         """Streaming dict with 'events' keys is dispatched to _process_sub_event."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         stream = [
             {"events": [
                 {"type": "AIMessageChunk", "data": {"content": "hi"}},
@@ -295,7 +295,7 @@ class TestIterEvents:
 
     def test_processes_output_key(self):
         """Streaming dict with 'output' key delegates to _process_output."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         stream = [
             {"output": {"final_response": "done", "api_calls": 1}},
         ]
@@ -308,7 +308,7 @@ class TestIterEvents:
         captured = []
         def cb(**k):
             captured.append(k)
-        bridge = _HermesStreamingBridge(cb, None, None)
+        bridge = _HadesStreamingBridge(cb, None, None)
         stream = [
             {"output": json.dumps({"answer": "ok"})},
         ]
@@ -317,7 +317,7 @@ class TestIterEvents:
 
     def test_unknown_dict_yields_unknown(self):
         """Dict without 'events' or 'output' yields ('unknown', dict)."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         stream = [
             {"some_other_key": 123},
         ]
@@ -326,7 +326,7 @@ class TestIterEvents:
 
     def test_non_dict_event_yields_raw_event(self):
         """Non-dict items in the stream yield ('raw_event', {'data': ...})."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         stream = [
             SimpleNamespace(foo=1),
         ]
@@ -335,7 +335,7 @@ class TestIterEvents:
 
     def test_mixed_stream(self):
         """Mix of dict events, output events, and raw events all processed."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         stream = [
             {"events": [{"type": "AIMessageChunk", "data": {"content": "start"}}]},
             SimpleNamespace(heartbeat=True),
@@ -354,7 +354,7 @@ class TestIterEvents:
         callback_called = []
         def cb(event, **kw):
             callback_called.append((event, kw))
-        bridge = _HermesStreamingBridge(cb, None, None)
+        bridge = _HadesStreamingBridge(cb, None, None)
         stream = [
             {"events": [{"type": "AIMessageChunk", "data": {"content": "test"}}]},
         ]
@@ -373,14 +373,14 @@ class TestGetLatestToolEvent:
         event_a = ("tool_start", {"tool_name": "read_file", "args": "..."})
         event_b = ("message_delta", {"text": "hello"})
         event_c = ("tool_complete", {"tool_name": "read_file", "result_preview": "ok"})
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         bridge._events = [event_a, event_b, event_c]
         kind, data = bridge._get_latest_tool_event()
         assert kind == "tool_complete"
         assert data == {"tool_name": "read_file", "result_preview": "ok"}
 
     def test_returns_none_when_no_tool_events(self):
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         bridge._events = [
             ("message_delta", {"text": "hi"}),
             ("raw_event", {"type": "Custom", "data": ""}),
@@ -396,13 +396,13 @@ class TestGetLatestToolEvent:
 class TestFinalResult:
 
     def test_returns_result_when_set_as_dict(self):
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         bridge._result = {"final_response": "done", "api_calls": 3}
         result = bridge.final_result()
         assert result == {"final_response": "done", "api_calls": 3}
 
     def test_returns_default_when_result_is_none(self):
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         result = bridge.final_result()
         assert result == {
             "final_response": "",
@@ -414,14 +414,14 @@ class TestFinalResult:
 
     def test_returns_default_when_result_is_string(self):
         """Non-dict _result (e.g. parsed JSON string that was a list) → default."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         bridge._result = [1, 2, 3]  # not a dict
         result = bridge.final_result()
         assert result["completed"] is False
 
     def test_returns_default_when_result_is_empty_list(self):
         """Empty list is falsy → triggers default."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         bridge._result = []
         result = bridge.final_result()
         assert result == {
@@ -434,7 +434,7 @@ class TestFinalResult:
 
     def test_returns_default_when_result_is_empty_dict(self):
         """Empty dict is falsy → triggers default."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         bridge._result = {}
         result = bridge.final_result()
         assert result == {
@@ -447,7 +447,7 @@ class TestFinalResult:
 
     def test_non_dict_string_result(self):
         """Result that was set via _process_output with JSON string → returns parsed dict."""
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         json_data = json.dumps({"final_response": "ok", "api_calls": 1})
         bridge._result = json.loads(json_data)
         assert isinstance(bridge._result, dict)
@@ -474,7 +474,7 @@ class TestFullStreamIntegration:
             {"events": [{"type": "ToolResult", "data": {"name": "terminal", "content": "file1\nfile2\nfile3"}}]},
         ]
 
-        bridge = _HermesStreamingBridge(capture, "agent", "task-42")
+        bridge = _HadesStreamingBridge(capture, "agent", "task-42")
         yields = list(bridge.iter_events(stream))
 
         # Check yields contain expected events
@@ -499,7 +499,7 @@ class TestFullStreamIntegration:
             {"output": json.dumps({"final_response": "done", "api_calls": 2, "completed": True})},
         ]
 
-        bridge = _HermesStreamingBridge(capture, "agent", "task-99")
+        bridge = _HadesStreamingBridge(capture, "agent", "task-99")
         yields = list(bridge.iter_events(stream))
 
         result = bridge.final_result()
@@ -524,7 +524,7 @@ class TestFullStreamIntegration:
             {"output": json.dumps({"final_response": "ok"})},
         ]
 
-        bridge = _HermesStreamingBridge(
+        bridge = _HadesStreamingBridge(
             callback=capture,
             agent="agent",
             task_id="task-5",
@@ -549,7 +549,7 @@ class TestFullStreamIntegration:
             stream.append({"events": [{"type": "ToolCall", "data": {"name": f"tool{i}", "args": {"n": i}}}]})
             stream.append({"events": [{"type": "ToolResult", "data": {"name": f"tool{i}", "content": f"result{i}"}}]})
 
-        bridge = _HermesStreamingBridge(lambda *a, **k: None, None, None)
+        bridge = _HadesStreamingBridge(lambda *a, **k: None, None, None)
         yields = list(bridge.iter_events(stream))
 
         deltas = [y for y in yields if y[0] == "message_delta"]

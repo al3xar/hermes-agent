@@ -141,8 +141,8 @@ export interface Translations {
     starting: string;
     startedInBackground: string;
     stopped: string;
-    updateHermes: string;
-    updatingHermes: string;
+    updateHades: string;
+    updatingHades: string;
     waitingForOutput: string;
   };
 
@@ -548,7 +548,7 @@ export interface Translations {
     fontMono?: string;
   };
 
-  // ── Achievements plugin (plugins/hermes-achievements) ──
+  // ── Achievements plugin (plugins/hades-achievements) ──
   achievements: {
     hero: {
       kicker: string;

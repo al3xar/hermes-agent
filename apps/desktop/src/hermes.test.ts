@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { listAllProfileSessions, listSessions } from './hermes'
+import { listAllProfileSessions, listSessions } from './hades'
 
 const emptySessionsResponse = {
   limit: 0,
@@ -9,12 +9,12 @@ const emptySessionsResponse = {
   total: 0
 }
 
-describe('Hermes REST session helpers', () => {
+describe('Hades REST session helpers', () => {
   let api: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     api = vi.fn().mockResolvedValue(emptySessionsResponse)
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'hadesDesktop', {
       configurable: true,
       value: { api }
     })
@@ -22,7 +22,7 @@ describe('Hermes REST session helpers', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'hadesDesktop')
   })
 
   it('uses a longer timeout for the single-profile session list', async () => {

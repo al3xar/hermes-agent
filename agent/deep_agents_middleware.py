@@ -1,9 +1,9 @@
-"""Middleware that bridges DeepAgents/LangGraph to Hermes turn lifecycle.
+"""Middleware that bridges DeepAgents/LangGraph to Hades turn lifecycle.
 
 Provides:
-- _HermesMiddleware: a LangGraph AgentMiddleware that syncs Hermes memory
+- _HadesMiddleware: a LangGraph AgentMiddleware that syncs Hades memory
   and tracks interruptions across turns.
-- _HermesInterruptSignal: a lightweight interrupt signal that can be
+- _HadesInterruptSignal: a lightweight interrupt signal that can be
   set/cleared from the gateway/CLI.
 """
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 @dataclass
-class _HermesInterruptSignal:
+class _HadesInterruptSignal:
     """Thread-safe interrupt signal shared between gateway and agent."""
 
     _flag: bool = field(default=False, repr=False, compare=False)
@@ -50,7 +50,7 @@ class _HermesInterruptSignal:
 # Middleware
 # ---------------------------------------------------------------------------
 
-class _HermesMiddleware(AgentMiddleware):
+class _HadesMiddleware(AgentMiddleware):
     """LangGraph middleware that hooks into turn lifecycle.
 
     - ``before_agent``: preresolve memory context for this turn and set
@@ -59,15 +59,15 @@ class _HermesMiddleware(AgentMiddleware):
       the interrupt signal.
     """
 
-    def __init__(self, hermes_agent):
+    def __init__(self, hades_agent):
         """Store reference to the native AIAgent so we can read/write memory."""
-        self._agent = hermes_agent
-        self._interrupt = _HermesInterruptSignal()
+        self._agent = hades_agent
+        self._interrupt = _HadesInterruptSignal()
 
     async def before_agent(self, state: dict, **kwargs) -> dict:
         """Run before the model is called.
 
-        - Prefetch memory context (Hermes memory_manager).
+        - Prefetch memory context (Hades memory_manager).
         - Propagate any interrupt that was requested from the gateway.
         """
         agent = self._agent
@@ -116,5 +116,5 @@ class _HermesMiddleware(AgentMiddleware):
         self._interrupt.clear()
 
     @property
-    def interrupt_signal(self) -> _HermesInterruptSignal:
+    def interrupt_signal(self) -> _HadesInterruptSignal:
         return self._interrupt

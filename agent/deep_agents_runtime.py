@@ -1,4 +1,4 @@
-"""DeepAgents runtime - LangGraph-backed agent backed by Hermes internals.
+"""DeepAgents runtime - LangGraph-backed agent backed by Hades internals.
 
 Removes all child AIAgent instantiation. Config is accepted directly from
 the AIAgent facade parameters instead of delegating to a full runtime.
@@ -11,7 +11,7 @@ import logging
 import os
 from typing import Any, List, Optional
 
-from hermes_constants import get_hermes_home
+from hades_constants import get_hades_home
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ except ImportError as e:
 # Constants
 # ---------------------------------------------------------------------------
 
-_LANGCHAIN_FINAL_RESPONSE_KEY = "__hermes_final_response"
+_LANGCHAIN_FINAL_RESPONSE_KEY = "__hades_final_response"
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ _LANGCHAIN_FINAL_RESPONSE_KEY = "__hermes_final_response"
 # ---------------------------------------------------------------------------
 
 def _convert_messages_to_langchain(messages):
-    """Convert Hermes message list to LangChain messages."""
+    """Convert Hades message list to LangChain messages."""
     if not messages:
         return []
 
@@ -75,8 +75,8 @@ def _convert_messages_to_langchain(messages):
     return result
 
 
-def _convert_langchain_to_hermes(messages):
-    """Convert LangChain messages to Hermes message format."""
+def _convert_langchain_to_hades(messages):
+    """Convert LangChain messages to Hades message format."""
     result = []
     for msg in messages:
         if isinstance(msg, SystemMessage):
@@ -104,9 +104,9 @@ def _convert_langchain_to_hermes(messages):
 # ---------------------------------------------------------------------------
 
 def _parse_langgraph_result(result: dict, task_id: str = None) -> dict:
-    """Parse LangGraph agent result dict into Hermes result dict shape."""
+    """Parse LangGraph agent result dict into Hades result dict shape."""
     raw_messages = result.get("messages", [])
-    hermes_messages = _convert_langchain_to_hermes(raw_messages)
+    hades_messages = _convert_langchain_to_hades(raw_messages)
 
     final_response = ""
     last_reasoning = None
@@ -134,7 +134,7 @@ def _parse_langgraph_result(result: dict, task_id: str = None) -> dict:
 
     return {
         "final_response": final_response,
-        "messages": hermes_messages,
+        "messages": hades_messages,
         "api_calls": api_calls,
         "completed": completed,
         "failed": False,
@@ -168,7 +168,7 @@ def _inject_provider_env(provider, base_url, api_key):
     """Set provider-specific env vars for LangChain auto-loading.
 
     LangChain model bindings read API keys from env vars based on provider.
-    This maps Hermes' model/provider to the env var names LangChain expects.
+    This maps Hades' model/provider to the env var names LangChain expects.
     """
     env_map = {
         "": ("OPENAI_API_KEY", "OPENAI_API_BASE"),  # fallback to OpenAI
@@ -193,8 +193,8 @@ def _inject_provider_env(provider, base_url, api_key):
 # Tool Adapters
 # ---------------------------------------------------------------------------
 
-class _HermesToolAdapter:
-    """Adapts a Hermes tool to a LangChain StructuredTool.
+class _HadesToolAdapter:
+    """Adapts a Hades tool to a LangChain StructuredTool.
 
     Invokes handle_function_call from model_tools atomically.
     """
@@ -243,8 +243,8 @@ class _HermesToolAdapter:
         return self._entry.toolset
 
 
-def build_hermes_tools(enabled_toolsets, disabled_toolsets):
-    """Build LangChain StructuredTool list from Hermes tool definitions."""
+def build_hades_tools(enabled_toolsets, disabled_toolsets):
+    """Build LangChain StructuredTool list from Hades tool definitions."""
     from tools.registry import registry
 
     tools = []
@@ -260,7 +260,7 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets):
         tool_name = tool_def.get("name", "")
         entry = registry.get_entry(tool_name) if tool_name else None
         if entry:
-            adapter = _HermesToolAdapter(entry)
+            adapter = _HadesToolAdapter(entry)
             tools.append(adapter.langchain_tool)
     return tools
 
@@ -269,13 +269,13 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets):
 # Streaming Bridge
 # ---------------------------------------------------------------------------
 
-class _HermesStreamingBridge:
-    """Wires LangGraph stream events to Hermes callback forwarding.
+class _HadesStreamingBridge:
+    """Wires LangGraph stream events to Hades callback forwarding.
 
-    The bridge has access to all Hermes callbacks via the agent's
+    The bridge has access to all Hades callbacks via the agent's
     ``_get_cap`` mechanism (populated by the gateway via __setattr__).
     It translates LangGraph events (AIMessageChunk, ToolCall, ToolResult)
-    to the standard Hermes callback signatures so the gateway sees
+    to the standard Hades callback signatures so the gateway sees
     identical event streams regardless of runtime.
     """
 
@@ -297,7 +297,7 @@ class _HermesStreamingBridge:
         return self._stream_delta is not None or self._tool_progress is not None
 
     def process_event(self, event):
-        """Process a single LangGraph stream event and route to Hermes callbacks."""
+        """Process a single LangGraph stream event and route to Hades callbacks."""
         if not isinstance(event, dict):
             return
 
@@ -354,7 +354,7 @@ def _noop_cb(name):
 # ---------------------------------------------------------------------------
 
 class DeepAgentsAIAgent:
-    """Hermes agent backed by DeepAgents SDK (LangGraph).
+    """Hades agent backed by DeepAgents SDK (LangGraph).
 
     Accepts config directly — no child AIAgent instantiation.
     Public API matches run_agent.AIAgent:
@@ -416,8 +416,8 @@ class DeepAgentsAIAgent:
         self._langgraph_store = langgraph_store
         self._debug: bool = False
         self._langsmith_api_key: str | None = None
-        self._langsmith_project: str = "hermes"
-        self._langsmith_tags: list[str] = ["hermes"]
+        self._langsmith_project: str = "hades"
+        self._langsmith_tags: list[str] = ["hades"]
 
         # Resolve model string (LangChain format – no provider prefix)
         model_str = self._resolve_model(model)
@@ -443,7 +443,7 @@ class DeepAgentsAIAgent:
 
         DeepAgents uses ``create_deep_agent`` which internally calls
         LangChain's ``init_chat_model``.  That helper expects model names
-        without the Hermes provider prefix – e.g. ``"gpt-4o"`` not
+        without the Hades provider prefix – e.g. ``"gpt-4o"`` not
         ``"openai/gpt-4o"``.  The provider itself is injected via the
         ``_inject_provider_env`` side-channel (env vars).
 
@@ -470,8 +470,8 @@ class DeepAgentsAIAgent:
         self, model, enabled_toolsets, disabled_toolsets,
         skip_context_files, quiet_mode, skip_memory, system_prompt,
     ):
-        """Construct the DeepAgents LangGraph agent with Hermes tools."""
-        hermes_home = get_hermes_home()
+        """Construct the DeepAgents LangGraph agent with Hades tools."""
+        hades_home = get_hades_home()
 
         # Build system prompt lazily
         if system_prompt is None:
@@ -479,7 +479,7 @@ class DeepAgentsAIAgent:
                 from agent.system_prompt import get_system_prompt
                 system_prompt = get_system_prompt(
                     skip_context_files=skip_context_files,
-                    hermes_home=hermes_home,
+                    hades_home=hades_home,
                 )
             except Exception:
                 system_prompt = "You are a helpful AI assistant."
@@ -489,13 +489,13 @@ class DeepAgentsAIAgent:
         # User middleware is inserted between base and tail layers.
         middlewares = []
 
-        # Memory middleware (Hermes-provided)
+        # Memory middleware (Hades-provided)
         if not skip_memory:
-            from agent.deep_agents_middleware import _HermesMiddleware
-            middlewares.append(_HermesMiddleware(self))
+            from agent.deep_agents_middleware import _HadesMiddleware
+            middlewares.append(_HadesMiddleware(self))
 
-        # Build Hermes tools from registry
-        tools = build_hermes_tools(
+        # Build Hades tools from registry
+        tools = build_hades_tools(
             enabled_toolsets=enabled_toolsets,
             disabled_toolsets=disabled_toolsets,
         )
@@ -519,8 +519,8 @@ class DeepAgentsAIAgent:
 
         # --- LangSmith env setup ---------------------------------------------------
         ls_api_key = self._langsmith_api_key or os.environ.get("LANGSMITH_API_KEY")
-        ls_project = self._langsmith_project or "hermes"
-        ls_tags = self._langsmith_tags or ["hermes"]
+        ls_project = self._langsmith_project or "hades"
+        ls_tags = self._langsmith_tags or ["hades"]
 
         if ls_api_key:
             os.environ["LANGSMITH_API_KEY"] = ls_api_key
@@ -540,7 +540,7 @@ class DeepAgentsAIAgent:
             checkpointer=checkpointer,
             store=store,
             debug=bool(debug_val),
-            name="hermes-agent",
+            name="hades-agent",
         )
 
         # Store refs for per-call tracing hooks
@@ -626,7 +626,7 @@ class DeepAgentsAIAgent:
             config["tags"] = tags
 
         # Collect forwarded callbacks so the streaming bridge can invoke them
-        bridge = _HermesStreamingBridge(
+        bridge = _HadesStreamingBridge(
             self,
             stream_delta=self._get_cap("stream_delta_callback"),
             tool_progress=self._get_cap("tool_progress_callback"),
@@ -749,8 +749,8 @@ class DeepAgentsAIAgent:
         callers can inspect the active tracing configuration.
         """
         # read any gateway-set tracing values before returning
-        ls_project = self._get_cap("langsmith_project") or self._ls_project or "hermes"
-        ls_tags = self._get_cap("langsmith_tags") or self._ls_tags or ["hermes"]
+        ls_project = self._get_cap("langsmith_project") or self._ls_project or "hades"
+        ls_tags = self._get_cap("langsmith_tags") or self._ls_tags or ["hades"]
         ls_api = self._get_cap("langsmith_api_key") or self._ls_api_key
         if isinstance(ls_tags, str):
             ls_tags = [ls_tags]

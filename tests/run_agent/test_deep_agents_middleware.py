@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agent.deep_agents_middleware import _HermesInterruptSignal, _HermesMiddleware
+from agent.deep_agents_middleware import _HadesInterruptSignal, _HadesMiddleware
 
 
 @pytest.fixture
@@ -16,42 +16,42 @@ def agent_stub():
 
 
 # ---------------------------------------------------------------------------
-# _HermesInterruptSignal
+# _HadesInterruptSignal
 # ---------------------------------------------------------------------------
 
 
-class TestHermesInterruptSignal:
+class TestHadesInterruptSignal:
     """Tests for the thread-safe interrupt signal."""
 
     def test_is_set_returns_false_by_default(self):
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         assert signal.is_set() is False
 
     def test_set_makes_is_return_true(self):
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         signal.set()
         assert signal.is_set() is True
 
     def test_clear_makes_is_set_return_false(self):
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         signal.set()
         assert signal.is_set() is True
         signal.clear()
         assert signal.is_set() is False
 
     def test_clear_on_already_cleared_no_crash(self):
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         signal.clear()
 
     def test_set_multiple_times_no_error(self):
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         signal.set()
         signal.set()
         signal.set()
         assert signal.is_set() is True
 
     def test_clear_after_set_then_set_again(self):
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         signal.set()
         signal.clear()
         signal.set()
@@ -59,7 +59,7 @@ class TestHermesInterruptSignal:
 
     def test_thread_safety_basic_write_then_read(self):
         """Verify basic thread-safety: one thread sets, another reads."""
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
 
         def writer():
             import time
@@ -74,7 +74,7 @@ class TestHermesInterruptSignal:
 
     def test_concurrent_set_and_clear(self):
         """Stress test: many threads interleave set/clear."""
-        signal = _HermesInterruptSignal()
+        signal = _HadesInterruptSignal()
         errors = []
 
         def toggle(n):
@@ -98,41 +98,41 @@ class TestHermesInterruptSignal:
 
 
 # ---------------------------------------------------------------------------
-# _HermesMiddleware — interrupt API
+# _HadesMiddleware — interrupt API
 # ---------------------------------------------------------------------------
 
 
 class TestMiddlewareInterruptAPI:
 
     def test_constructs_with_interrupt_signal(self, agent_stub):
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         assert mw.interrupt_signal is not None
-        assert isinstance(mw.interrupt_signal, _HermesInterruptSignal)
+        assert isinstance(mw.interrupt_signal, _HadesInterruptSignal)
         assert mw.interrupt_signal.is_set() is False
 
     def test_request_interrupt_sets_signal(self, agent_stub):
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
         assert mw.interrupt_signal.is_set() is True
 
     def test_clear_interrupt_clears_signal(self, agent_stub):
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
         mw.clear_interrupt()
         assert mw.interrupt_signal.is_set() is False
 
     def test_request_interrupt_propagates_is_set(self, agent_stub):
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
         assert mw.interrupt_signal.is_set() is True
 
     def test_interrupt_signal_is_same_object(self, agent_stub):
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         assert mw.interrupt_signal is mw.interrupt_signal
 
 
 # ---------------------------------------------------------------------------
-# _HermesMiddleware — before_agent
+# _HadesMiddleware — before_agent
 # ---------------------------------------------------------------------------
 
 
@@ -143,7 +143,7 @@ class TestMiddlewareBeforeAgent:
         """When skip_memory=True, before_agent does NOT call get_memory_context."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {}
 
         result = await mw.before_agent(state)
@@ -157,7 +157,7 @@ class TestMiddlewareBeforeAgent:
         agent_stub.skip_memory = False
         agent_stub.get_memory_context.return_value = "cached recall"
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {}
 
         result = await mw.before_agent(state)
@@ -172,7 +172,7 @@ class TestMiddlewareBeforeAgent:
         agent_stub.skip_memory = False
         agent_stub.get_memory_context.return_value = None
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {}
 
         result = await mw.before_agent(state)
@@ -185,7 +185,7 @@ class TestMiddlewareBeforeAgent:
         agent_stub.skip_memory = False
         agent_stub.get_memory_context.return_value = "relevant memory fragments"
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {}
 
         result = await mw.before_agent(state)
@@ -197,7 +197,7 @@ class TestMiddlewareBeforeAgent:
         agent_stub.skip_memory = False
         agent_stub.get_memory_context.return_value = "new context"
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"memory": {"existing_key": "value"}}
 
         result = await mw.before_agent(state)
@@ -209,7 +209,7 @@ class TestMiddlewareBeforeAgent:
         """Other state keys are untouched when memory is added."""
         agent_stub.skip_memory = False
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {
             "messages": [],
             "__pregel_tasks": [],
@@ -227,7 +227,7 @@ class TestMiddlewareBeforeAgent:
         agent_stub.skip_memory = False
         agent_stub.get_memory_context.side_effect = RuntimeError("mem0 down")
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {}
 
         result = await mw.before_agent(state)
@@ -240,7 +240,7 @@ class TestMiddlewareBeforeAgent:
         """before_agent returns the same state dict reference."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"foo": "bar"}
 
         result = await mw.before_agent(state)
@@ -248,7 +248,7 @@ class TestMiddlewareBeforeAgent:
 
 
 # ---------------------------------------------------------------------------
-# _HermesMiddleware — after_agent
+# _HadesMiddleware — after_agent
 # ---------------------------------------------------------------------------
 
 
@@ -259,7 +259,7 @@ class TestMiddlewareAfterAgent:
         """When skip_memory=True, after_agent does NOT call save_memory."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"_messages": []}
 
         result = await mw.after_agent(state)
@@ -271,7 +271,7 @@ class TestMiddlewareAfterAgent:
         """When skip_memory=False and there are messages, save_memory is called."""
         agent_stub.skip_memory = False
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         msgs = [
             {"role": "user", "content": "hello"},
             {"role": "assistant", "content": "hi there"},
@@ -287,7 +287,7 @@ class TestMiddlewareAfterAgent:
         """When _messages is empty, save_memory is NOT called even if skip_memory=False."""
         agent_stub.skip_memory = False
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"_messages": []}
 
         result = await mw.after_agent(state)
@@ -299,7 +299,7 @@ class TestMiddlewareAfterAgent:
         """When _messages key is absent, save_memory is NOT called."""
         agent_stub.skip_memory = False
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {}
 
         result = await mw.after_agent(state)
@@ -311,7 +311,7 @@ class TestMiddlewareAfterAgent:
         """after_agent always clears the interrupt signal."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
 
         await mw.after_agent({"_messages": []})
@@ -323,7 +323,7 @@ class TestMiddlewareAfterAgent:
         """Interrupt is cleared regardless of whether memory path is taken."""
         agent_stub.skip_memory = False
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
 
         msgs = [{"role": "user", "content": "test"}]
@@ -337,7 +337,7 @@ class TestMiddlewareAfterAgent:
         agent_stub.skip_memory = False
         agent_stub.save_memory.side_effect = RuntimeError("sqlite error")
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
 
         msgs = [{"role": "user", "content": "test"}]
@@ -351,7 +351,7 @@ class TestMiddlewareAfterAgent:
         """after_agent returns the state dict with no structural changes."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"_messages": [], "__pregel_unpacked": True}
 
         result = await mw.after_agent(state)
@@ -361,7 +361,7 @@ class TestMiddlewareAfterAgent:
 
 
 # ---------------------------------------------------------------------------
-# _HermesMiddleware — end-to-end lifecycle
+# _HadesMiddleware — end-to-end lifecycle
 # ---------------------------------------------------------------------------
 
 
@@ -373,7 +373,7 @@ class TestMiddlewareLifecycle:
         agent_stub.skip_memory = False
         agent_stub.get_memory_context.return_value = "recall data"
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         msgs = [
             {"role": "user", "content": "what is 2+2?"},
             {"role": "assistant", "content": "4"},
@@ -391,7 +391,7 @@ class TestMiddlewareLifecycle:
         """before_agent puts memory context into state['memory']['context']."""
         agent_stub.get_memory_context.return_value = "context A"
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"_messages": [{"role": "user", "content": "hi"}]}
 
         await mw.before_agent(state)
@@ -403,7 +403,7 @@ class TestMiddlewareLifecycle:
         """Interrupt set before before_agent persists until after_agent clears it."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         mw.request_interrupt()
 
         before_state = await mw.before_agent({"_messages": []})
@@ -418,7 +418,7 @@ class TestMiddlewareLifecycle:
         """Even with no interrupt set, after_agent runs without error."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
 
         before_state = await mw.before_agent({"_messages": []})
         after_state = await mw.after_agent(before_state)
@@ -429,7 +429,7 @@ class TestMiddlewareLifecycle:
         """When skip_memory=True, neither get_memory_context nor save_memory is called."""
         agent_stub.skip_memory = True
 
-        mw = _HermesMiddleware(agent_stub)
+        mw = _HadesMiddleware(agent_stub)
         state = {"_messages": [{"role": "user", "content": "hi"}]}
 
         await mw.before_agent(state)
