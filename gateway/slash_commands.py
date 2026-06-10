@@ -2008,6 +2008,50 @@ class GatewaySlashCommandsMixin:
             return t("gateway.fast.saved", label=label)
         return t("gateway.fast.session_only", label=label)
 
+    async def _handle_runtime_command(self, event: MessageEvent) -> str:
+        """Handle /runtime — view or toggle agent runtime (native | deepagents)."""
+        from gateway.run import _hermes_home, _load_gateway_config
+        import yaml
+
+        args = event.get_command_args().strip().lower()
+        config_path = _hermes_home / "config.yaml"
+
+        def _save_config_key(key_path: str, value):
+            """Save a dot-separated key to config.yaml."""
+            try:
+                user_config = {}
+                if config_path.exists():
+                    with open(config_path, encoding="utf-8") as f:
+                        user_config = yaml.safe_load(f) or {}
+                keys = key_path.split(".")
+                current = user_config
+                for k in keys[:-1]:
+                    if k not in current or not isinstance(current[k], dict):
+                        current[k] = {}
+                    current = current[k]
+                current[keys[-1]] = value
+                atomic_yaml_write(config_path, user_config)
+                return True
+            except Exception as e:
+                logger.error("Failed to save config key %s: %s", key_path, e)
+                return False
+
+        current = self._deepagents_mode
+        if not args or args == "status":
+            state = "deep agents" if current else "native"
+            return f"Runtime: {state}"
+
+        valid = {"native", "deepagents"}
+        if args not in valid:
+            return f"Unknown value: {args}. Usage: /runtime [native|deepagents]"
+
+        saved = _save_config_key("gateway.deepagents_mode", args == "deepagents")
+        self._deepagents_mode = args == "deepagents"
+        state = "deep agents" if args == "deepagents" else "native"
+        if saved:
+            return f"Switched to {state} runtime (saved to config)"
+        return f"Switched to {state} runtime (session only)"
+
     async def _handle_yolo_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
         """Handle /yolo — toggle dangerous command approval bypass for this session only."""
         from tools.approval import (
