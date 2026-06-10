@@ -840,3 +840,21 @@ def _live_system_guard(request, monkeypatch):
         pass
 
     yield
+
+
+# ── DeepAgents runtime availability ──────────────────────────────────────────
+
+@pytest.fixture()
+def deepagents_available():
+    """Return True if DeepAgents SDK is installed, False otherwise.
+
+    Use this with pytest.mark.skipif when a test requires DeepAgents:
+
+        @pytest.mark.skipif(not deepagents_available, reason="DeepAgents not installed")
+        def test_deep_agents_feature(): ...
+    """
+    try:
+        from agent.deep_agents_runtime import DEEPAGENTS_AVAILABLE
+        return DEEPAGENTS_AVAILABLE
+    except ImportError:
+        return False
