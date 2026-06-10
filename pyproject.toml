@@ -196,7 +196,7 @@ azure-identity = ["azure-identity==1.25.3"]
 # conversation_loop.py (see docs/superpowers/plans/ for the migration plan).
 # Not in [all]: opt-in backend, lazy-installed at first use via
 # tools/lazy_deps.py to avoid breaking fresh installs if a release is quarantined.
-deepagents = ["deepagents>=0.6.8,<1"]
+deepagents = ["deepagents>=0.6.8,<1", "langchain-openai>=0.3,<1", "langchain-anthropic>=1.4,<2", "langchain-google-genai>=4.2,<5"]
 termux = [
   # Baseline Android / Termux path for reliable fresh installs.
   "python-telegram-bot[webhooks]==22.6",
@@ -241,7 +241,9 @@ youtube = [
 # transitively and pre-1.0.1 is the vulnerable range. See the mcp extra above.
 web = ["fastapi==0.133.1", "uvicorn[standard]==0.41.0", "starlette==1.0.1"]
 all = [
-  # Policy (2026-05-12): `[all]` includes only extras that genuinely
+   # DeepAgents runtime — LangGraph-based agent loop with streaming support
+   "hermes-agent[deepagents]",
+   # Policy (2026-05-12): `[all]` includes only extras that genuinely
   # CAN'T be lazy-installed via `tools/lazy_deps.py` — i.e. things every
   # session can use, things needed before the agent loop is alive
   # (terminal/CLI), and skill deps that packagers (Nix, AUR, Homebrew)

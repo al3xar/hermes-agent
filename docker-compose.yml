@@ -28,13 +28,24 @@
 #
 services:
   gateway:
-    image: localhost/hermes-agent:deepagents
+    image: al3xar/hermes-agent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: hermes
     restart: unless-stopped
     network_mode: host
+    # Volúmenes deshabilitados temporalmente: en Podman daban problemas de
+    # permisos de escritura. Todo corre dentro del contenedor por ahora; los
+    # datos en /opt/data NO persisten entre recreaciones del contenedor.
     volumes:
-      - ~/.hermes:/opt/data
-      - ./.hermes-config:/opt/data/.hermes:ro
+      #   - ~/.hermes:/opt/data
+      # Hermes lee el config en $HERMES_HOME/config.yaml (= /opt/data/config.yaml),
+      # NO en /opt/data/.hermes (ese montaje antiguo era una ruta muerta). Bind
+      # del fichero concreto, read-only: sombrea el config sembrado por defecto
+      # sin tocar el resto del home (volumen anónimo) y sin los problemas de
+      # permisos de escritura de Podman.
+      - ./.hermes-config/config.yaml:/opt/data/config.yaml:ro
     environment:
       - HERMES_UID=${HERMES_UID:-501}
       - HERMES_GID=${HERMES_GID:-20}
@@ -62,20 +73,38 @@ services:
     command: ["gateway", "run"]
 
   dashboard:
-    image: localhost/hermes-agent:deepagents
+    image: al3xar/hermes-agent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: hermes-dashboard
     restart: unless-stopped
-    network_mode: host
+    # Sin network_mode: host. En macOS + Podman, host networking bindea a la
+    # VM (no al Mac) e ignora el mapeo `ports`, dejando el dashboard
+    # inalcanzable desde localhost del host. Con red bridge + `ports` de abajo,
+    # gvproxy reenvía localhost:9119 del Mac → contenedor:9119.
     depends_on:
       - gateway
-    volumes:
-      - ./.hermes-config:/opt/data/.hermes:ro
+    # Volúmenes deshabilitados temporalmente (ver nota en el servicio gateway).
+    # volumes:
+    #   - ./.hermes-config:/opt/data/.hermes:ro
+    ports:
+      - 9119:9119
     environment:
       - HERMES_UID=${HERMES_UID:-501}
       - HERMES_GID=${HERMES_GID:-20}
       - HERMES_HOME=/tmp/hermes
       - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
-    # Localhost-only. For remote access, tunnel via `ssh -L 9119:localhost:9119`.
-
-volumes:
-  dashboard_data:
+    # Sin este `command`, la imagen arranca el agente interactivo por defecto,
+    # que muere al no haber TTY y entra en bucle de reinicio. `dashboard`
+    # levanta la web UI. La primera vez construye el bundle con npm (no hay
+    # dist pre-construido en la imagen), así que --skip-build no es viable.
+    # --no-open evita que intente abrir un navegador.
+    #
+    # --host 0.0.0.0 lo hace accesible desde fuera del contenedor; requiere
+    # --insecure (el dashboard se niega a bindear fuera de localhost sin él).
+    # ⚠ ATENCIÓN: el dashboard almacena API keys y NO tiene auth por defecto.
+    # Exponerlo en 0.0.0.0 lo deja accesible para cualquiera que alcance el
+    # puerto 9119. Úsalo solo en una red de confianza o detrás de un proxy
+    # con autenticación.
+    command: ["dashboard", "--no-open", "--host", "0.0.0.0", "--insecure"]
