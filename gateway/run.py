@@ -1931,6 +1931,9 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         self._reasoning_config = self._load_reasoning_config()
         self._service_tier = self._load_service_tier()
         self._show_reasoning = self._load_show_reasoning()
+        self._deepagents_mode = bool(
+            getattr(self.config, "deepagents_mode", False)
+        )
         self._busy_input_mode = self._load_busy_input_mode()
         self._busy_text_mode = self._load_busy_text_mode()
         self._restart_drain_timeout = self._load_restart_drain_timeout()
@@ -2731,6 +2734,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             )
 
         runtime_kwargs = _resolve_runtime_agent_kwargs()
+        runtime_kwargs["deepagents_mode"] = self._deepagents_mode
         runtime_model = runtime_kwargs.pop("model", None)
         if runtime_model:
             logger.info(
@@ -2807,7 +2811,10 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             "args": list(runtime_kwargs.get("args") or []),
             "credential_pool": runtime_kwargs.get("credential_pool"),
             "max_tokens": runtime_kwargs.get("max_tokens"),
+            "deepagents_mode": runtime_kwargs.pop("deepagents_mode", False),
         }
+        if route["runtime"].get("deepagents_mode"):
+            route["runtime"]["runtime"] = "deepagents"
         route = {
             "model": model,
             "runtime": runtime,
@@ -2822,14 +2829,17 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         }
 
         service_tier = getattr(self, "_service_tier", None)
+        if service_tier:
+            try:
+                overrides = resolve_fast_mode_overrides(route["model"])
+            except Exception:
+                overrides = None
+        else:
+            overrides = None
         if not service_tier:
             route["request_overrides"] = {}
             return route
 
-        try:
-            overrides = resolve_fast_mode_overrides(route["model"])
-        except Exception:
-            overrides = None
         route["request_overrides"] = overrides or {}
         return route
 
@@ -12003,6 +12013,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
                 runtime.get("base_url", ""),
                 runtime.get("provider", ""),
                 runtime.get("api_mode", ""),
+                runtime.get("deepagents_mode", False),
                 sorted(enabled_toolsets) if enabled_toolsets else [],
                 # reasoning_config excluded — it's set per-message on the
                 # cached agent and doesn't affect system prompt or tools.

@@ -410,80 +410,190 @@ class AIAgent:
         checkpoint_max_total_size_mb: int = 500,
         checkpoint_max_file_size_mb: int = 10,
         pass_session_id: bool = False,
+        runtime: str = "native",  # "native" | "deepagents"
     ):
-        """Forwarder — see ``agent.agent_init.init_agent``."""
-        from agent.agent_init import init_agent
-        init_agent(
-            self,
+        if runtime == "deepagents":
+            self._init_deepagents(
+                base_url=base_url,
+                api_key=api_key,
+                provider=provider,
+                model=model,
+                max_iterations=max_iterations,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                quiet_mode=quiet_mode,
+                skip_memory=skip_memory,
+                skip_context_files=skip_context_files,
+                session_id=session_id,
+                platform=platform,
+            )
+        else:
+            """Forwarder — see ``agent.agent_init.init_agent``."""
+            from agent.agent_init import init_agent
+            init_agent(
+                self,
+                base_url=base_url,
+                api_key=api_key,
+                provider=provider,
+                api_mode=api_mode,
+                acp_command=acp_command,
+                acp_args=acp_args,
+                command=command,
+                args=args,
+                model=model,
+                max_iterations=max_iterations,
+                tool_delay=tool_delay,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                save_trajectories=save_trajectories,
+                verbose_logging=verbose_logging,
+                quiet_mode=quiet_mode,
+                tool_progress_mode=tool_progress_mode,
+                ephemeral_system_prompt=ephemeral_system_prompt,
+                log_prefix_chars=log_prefix_chars,
+                log_prefix=log_prefix,
+                providers_allowed=providers_allowed,
+                providers_ignored=providers_ignored,
+                providers_order=providers_order,
+                provider_sort=provider_sort,
+                provider_require_parameters=provider_require_parameters,
+                provider_data_collection=provider_data_collection,
+                openrouter_min_coding_score=openrouter_min_coding_score,
+                session_id=session_id,
+                tool_progress_callback=tool_progress_callback,
+                tool_start_callback=tool_start_callback,
+                tool_complete_callback=tool_complete_callback,
+                thinking_callback=thinking_callback,
+                reasoning_callback=reasoning_callback,
+                clarify_callback=clarify_callback,
+                step_callback=step_callback,
+                stream_delta_callback=stream_delta_callback,
+                interim_assistant_callback=interim_assistant_callback,
+                tool_gen_callback=tool_gen_callback,
+                status_callback=status_callback,
+                notice_callback=notice_callback,
+                notice_clear_callback=notice_clear_callback,
+                max_tokens=max_tokens,
+                reasoning_config=reasoning_config,
+                service_tier=service_tier,
+                request_overrides=request_overrides,
+                prefill_messages=prefill_messages,
+                platform=platform,
+                user_id=user_id,
+                user_id_alt=user_id_alt,
+                user_name=user_name,
+                chat_id=chat_id,
+                chat_name=chat_name,
+                chat_type=chat_type,
+                thread_id=thread_id,
+                gateway_session_key=gateway_session_key,
+                skip_context_files=skip_context_files,
+                load_soul_identity=load_soul_identity,
+                skip_memory=skip_memory,
+                session_db=session_db,
+                parent_session_id=parent_session_id,
+                iteration_budget=iteration_budget,
+                fallback_model=fallback_model,
+                credential_pool=credential_pool,
+                checkpoints_enabled=checkpoints_enabled,
+                checkpoint_max_snapshots=checkpoint_max_snapshots,
+                checkpoint_max_total_size_mb=checkpoint_max_total_size_mb,
+                checkpoint_max_file_size_mb=checkpoint_max_file_size_mb,
+                pass_session_id=pass_session_id,
+            )
+
+    def _init_deepagents(
+        self,
+        base_url, api_key, provider, model, max_iterations,
+        enabled_toolsets, disabled_toolsets,
+        quiet_mode, skip_memory, skip_context_files,
+        session_id, platform,
+        # Gateway extras:
+        reasoning_config=None, service_tier=None, request_overrides=None,
+        prefill_messages=None, ephemeral_system_prompt=None,
+        credential_pool=None, checkpoints_enabled=False,
+        checkpoint_max_snapshots=20, checkpoint_max_total_size_mb=500,
+        checkpoint_max_file_size_mb=10, pass_session_id=False,
+        user_id=None, user_id_alt=None, user_name=None,
+        chat_id=None, chat_name=None, chat_type=None, thread_id=None,
+        gateway_session_key=None, session_db=None,
+        fallback_model=None,
+        parent_session_id=None, iteration_budget=None,
+    ):
+        """Initialize as DeepAgents-backed runtime."""
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        self._runtime_mode = "deepagents"
+        self._deep_agents_impl = DeepAgentsAIAgent(
             base_url=base_url,
             api_key=api_key,
             provider=provider,
-            api_mode=api_mode,
-            acp_command=acp_command,
-            acp_args=acp_args,
-            command=command,
-            args=args,
             model=model,
             max_iterations=max_iterations,
-            tool_delay=tool_delay,
             enabled_toolsets=enabled_toolsets,
             disabled_toolsets=disabled_toolsets,
-            save_trajectories=save_trajectories,
-            verbose_logging=verbose_logging,
             quiet_mode=quiet_mode,
-            tool_progress_mode=tool_progress_mode,
-            ephemeral_system_prompt=ephemeral_system_prompt,
-            log_prefix_chars=log_prefix_chars,
-            log_prefix=log_prefix,
-            providers_allowed=providers_allowed,
-            providers_ignored=providers_ignored,
-            providers_order=providers_order,
-            provider_sort=provider_sort,
-            provider_require_parameters=provider_require_parameters,
-            provider_data_collection=provider_data_collection,
-            openrouter_min_coding_score=openrouter_min_coding_score,
+            skip_memory=skip_memory,
+            skip_context_files=skip_context_files,
             session_id=session_id,
-            tool_progress_callback=tool_progress_callback,
-            tool_start_callback=tool_start_callback,
-            tool_complete_callback=tool_complete_callback,
-            thinking_callback=thinking_callback,
-            reasoning_callback=reasoning_callback,
-            clarify_callback=clarify_callback,
-            step_callback=step_callback,
-            stream_delta_callback=stream_delta_callback,
-            interim_assistant_callback=interim_assistant_callback,
-            tool_gen_callback=tool_gen_callback,
-            status_callback=status_callback,
-            notice_callback=notice_callback,
-            notice_clear_callback=notice_clear_callback,
-            max_tokens=max_tokens,
+            platform=platform,
             reasoning_config=reasoning_config,
             service_tier=service_tier,
             request_overrides=request_overrides,
             prefill_messages=prefill_messages,
-            platform=platform,
-            user_id=user_id,
-            user_id_alt=user_id_alt,
-            user_name=user_name,
-            chat_id=chat_id,
-            chat_name=chat_name,
-            chat_type=chat_type,
-            thread_id=thread_id,
-            gateway_session_key=gateway_session_key,
-            skip_context_files=skip_context_files,
-            load_soul_identity=load_soul_identity,
-            skip_memory=skip_memory,
-            session_db=session_db,
-            parent_session_id=parent_session_id,
-            iteration_budget=iteration_budget,
-            fallback_model=fallback_model,
+            ephemeral_system_prompt=ephemeral_system_prompt,
             credential_pool=credential_pool,
             checkpoints_enabled=checkpoints_enabled,
             checkpoint_max_snapshots=checkpoint_max_snapshots,
             checkpoint_max_total_size_mb=checkpoint_max_total_size_mb,
             checkpoint_max_file_size_mb=checkpoint_max_file_size_mb,
             pass_session_id=pass_session_id,
+            user_id=user_id, user_id_alt=user_id_alt,
+            user_name=user_name,
+            chat_id=chat_id, chat_name=chat_name,
+            chat_type=chat_type, thread_id=thread_id,
+            gateway_session_key=gateway_session_key,
+            session_db=session_db,
+            fallback_model=fallback_model,
+            parent_session_id=parent_session_id,
         )
+        # Expose gateway-facing attrs via _deep_agents_impl forwarders
+        self.reasoning_config = reasoning_config
+        self.service_tier = service_tier
+        self.request_overrides = request_overrides
+        self.model = model
+
+    # Callback forwarding for deepagents runtime mode: gateway sets
+    # ``agent.tool_progress_callback = cb`` etc. These must reach
+    # self._deep_agents_impl (which has __setattr__ forwarding of its own).
+    def __setattr__(self, name, value):
+        if name == "_deep_agents_impl" or name == "_runtime_mode":
+            # These are set in __init__ — allow normally.
+            object.__setattr__(self, name, value)
+            return
+        try:
+            _mode = object.__getattribute__(self, "_runtime_mode")
+        except AttributeError:
+            _mode = "native"  # __init__ hasn't finished
+        if _mode == "deepagents" and hasattr(self, "_deep_agents_impl"):
+            from agent.deep_agents_runtime import DeepAgentsAIAgent
+            if name in DeepAgentsAIAgent._CAPTURED_NAMES:
+                self._deep_agents_impl.__setattr__(name, value)
+                return
+        object.__setattr__(self, name, value)
+
+    def __getattr__(self, name):
+        # Forward attribute reads to _deep_agents_impl when in deepagents mode.
+        try:
+            _mode = object.__getattribute__(self, "_runtime_mode")
+        except AttributeError:
+            _mode = "native"
+        if _mode == "deepagents" and hasattr(self, "_deep_agents_impl"):
+            try:
+                return getattr(self._deep_agents_impl, name)
+            except AttributeError:
+                pass
+        raise AttributeError(f"'{type(self).__name__}' object has no attr '{name}'")
 
     def _get_session_db_for_recall(self):
         """Return a SessionDB for recall, lazily creating it if an entrypoint forgot.
@@ -5098,9 +5208,21 @@ class AIAgent:
         stream_callback: Optional[callable] = None,
         persist_user_message: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Forwarder — see ``agent.conversation_loop.run_conversation``."""
-        from agent.conversation_loop import run_conversation
-        return run_conversation(self, user_message, system_message, conversation_history, task_id, stream_callback, persist_user_message)
+        """Run a conversation turn using the selected runtime."""
+        if hasattr(self, "_deep_agents_impl"):
+            return self._deep_agents_impl.run_conversation(
+                user_message=user_message,
+                system_message=system_message,
+                conversation_history=conversation_history,
+                task_id=task_id,
+                stream_callback=stream_callback,
+            )
+        else:
+            from agent.conversation_loop import run_conversation
+            return run_conversation(
+                self, user_message, system_message, conversation_history,
+                task_id, stream_callback, persist_user_message,
+            )
 
     def chat(self, message: str, stream_callback: Optional[callable] = None) -> str:
         """

@@ -28,16 +28,17 @@
 #
 services:
   gateway:
-    build: .
-    image: hermes-agent
+    image: localhost/hermes-agent:deepagents
     container_name: hermes
     restart: unless-stopped
     network_mode: host
     volumes:
       - ~/.hermes:/opt/data
+      - ./.hermes-config:/opt/data/.hermes:ro
     environment:
-      - HERMES_UID=${HERMES_UID:-10000}
-      - HERMES_GID=${HERMES_GID:-10000}
+      - HERMES_UID=${HERMES_UID:-501}
+      - HERMES_GID=${HERMES_GID:-20}
+      - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
       # To expose the OpenAI-compatible API server beyond localhost,
       # uncomment BOTH lines (API_SERVER_KEY is mandatory for auth):
       # - API_SERVER_HOST=0.0.0.0
@@ -61,16 +62,20 @@ services:
     command: ["gateway", "run"]
 
   dashboard:
-    image: hermes-agent
+    image: localhost/hermes-agent:deepagents
     container_name: hermes-dashboard
     restart: unless-stopped
     network_mode: host
     depends_on:
       - gateway
     volumes:
-      - ~/.hermes:/opt/data
+      - ./.hermes-config:/opt/data/.hermes:ro
     environment:
-      - HERMES_UID=${HERMES_UID:-10000}
-      - HERMES_GID=${HERMES_GID:-10000}
+      - HERMES_UID=${HERMES_UID:-501}
+      - HERMES_GID=${HERMES_GID:-20}
+      - HERMES_HOME=/tmp/hermes
+      - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
     # Localhost-only. For remote access, tunnel via `ssh -L 9119:localhost:9119`.
-    command: ["dashboard", "--host", "127.0.0.1", "--no-open"]
+
+volumes:
+  dashboard_data:
