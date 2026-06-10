@@ -23,14 +23,20 @@ try:
         ToolMessage,
     )
     from langchain_core.tools import StructuredTool
+    from langgraph.checkpoint.memory import MemorySaver
+    from langgraph.store.memory import InMemoryStore
     from deepagents.graph import create_deep_agent
     from deepagents.middleware.filesystem import FilesystemMiddleware
+    from deepagents.backends import langsmith
 
     DEEPAGENTS_AVAILABLE = True
 except ImportError as e:
     logger.warning("DeepAgents SDK not available: %s", e)
     DEEPAGENTS_AVAILABLE = False
     FilesystemMiddleware = None  # type: ignore[misc,assignment]
+    langsmith = None  # type: ignore[misc,assignment]
+    MemorySaver = None  # type: ignore[misc,assignment]
+    InMemoryStore = None  # type: ignore[misc,assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -369,6 +375,8 @@ class DeepAgentsAIAgent:
         "notice_clear_callback",
         "reasoning_config", "service_tier",
         "request_overrides", "background_review_callback",
+        # Tracing / observability
+        "debug", "langsmith_api_key", "langsmith_project", "langsmith_tags",
     ))
 
     def __init__(
@@ -386,7 +394,14 @@ class DeepAgentsAIAgent:
         session_id: str = None,
         platform: str = None,
         runtime: str = "deepagents",
-        **kwargs,  # unused but accepted for facade compatibility
+        langgraph_checkpointer: bool = False,  # Enable checkpointing / tracing
+        langgraph_store: bool = False,         # Enable LangGraph store
+        # (The gateway / AIAgent facade also passes the following via __setattr__)
+        # - debug                               # Enable debug-level runnable traces
+        # - langsmith_api_key                   # LangSmith project key (env)
+        # - langsmith_project                   # LangSmith project name
+        # - langsmith_tags                      # LangSmith tags list
+        **kwargs,
     ):
         self.mode = "deepagents"
         self._quiet_mode = quiet_mode
@@ -397,6 +412,12 @@ class DeepAgentsAIAgent:
         self.provider = provider or ""
         self._base_url = base_url
         self._api_key = api_key
+        self._langgraph_checkpointer = langgraph_checkpointer
+        self._langgraph_store = langgraph_store
+        self._debug: bool = False
+        self._langsmith_api_key: str | None = None
+        self._langsmith_project: str = "hermes"
+        self._langsmith_tags: list[str] = ["hermes"]
 
         # Resolve model string (LangChain format – no provider prefix)
         model_str = self._resolve_model(model)
@@ -479,14 +500,56 @@ class DeepAgentsAIAgent:
             disabled_toolsets=disabled_toolsets,
         )
 
+        # Optional: LangGraph checkpointer for tracing / state persistence
+        checkpointer = None
+        if self._langgraph_checkpointer:
+            checkpointer = MemorySaver()
+            logger.info("checkpointer enabled")
+
+        # Optional: LangGraph store for persistent memory
+        store = None
+        if self._langgraph_store:
+            store = InMemoryStore()
+            logger.info("store enabled")
+
+        # Enable debug / LangSmith tracing if configured
+        debug_val = self._get_cap("debug") or False
+        if debug_val is True:
+            logger.info("debug traces enabled")
+
+        # --- LangSmith env setup ---------------------------------------------------
+        ls_api_key = self._langsmith_api_key or os.environ.get("LANGSMITH_API_KEY")
+        ls_project = self._langsmith_project or "hermes"
+        ls_tags = self._langsmith_tags or ["hermes"]
+
+        if ls_api_key:
+            os.environ["LANGSMITH_API_KEY"] = ls_api_key
+            os.environ.setdefault("LANGSMITH_TRACING_V2", "true")
+            os.environ.setdefault("LANGSMITH_PROJECT", ls_project)
+            logger.info("LangSmith tracing enabled (project='%s')", ls_project)
+        else:
+            ls_tags = []
+            ls_project = ""
+
         # Create the LangGraph agent (recursion_limit set per-call via config)
         agent = create_deep_agent(
             model=model,
             tools=tools,
             system_prompt=system_prompt,
             middleware=middlewares,
+            checkpointer=checkpointer,
+            store=store,
+            debug=bool(debug_val),
             name="hermes-agent",
         )
+
+        # Store refs for per-call tracing hooks
+        self._checkpointer = checkpointer
+        self._store = store
+        self._ls_api_key = ls_api_key
+        self._ls_project = ls_project
+        self._ls_tags = ls_tags
+
         return agent
     # ------------------------------------------------------------------
     # Callback forwarding (__setattr__ / _get_cap / __getattr__)
@@ -551,6 +614,16 @@ class DeepAgentsAIAgent:
                 "task_id": task_id or "",
             },
         }
+
+        # Add LangSmith tracing tags / metadata when tracing is enabled
+        if self._ls_api_key:
+            tags = list(self._ls_tags or [])
+            if task_id:
+                tags.append(f"task:{task_id}")
+            if self._platform:
+                metadata = {"platform": self._platform, "session_id": config["configurable"].get("session_id", "")}
+                config["metadata"] = metadata
+            config["tags"] = tags
 
         # Collect forwarded callbacks so the streaming bridge can invoke them
         bridge = _HermesStreamingBridge(
@@ -650,6 +723,46 @@ class DeepAgentsAIAgent:
     @property
     def max_iterations(self):
         return self._max_iterations
+
+    @property
+    def has_checkpointer(self):
+        """Return True if a LangGraph checkpointer is active."""
+        return self._checkpointer is not None
+
+    @property
+    def has_store(self):
+        """Return True if a LangGraph store is active."""
+        return self._store is not None
+
+    @property
+    def has_langsmith_tracing(self):
+        """Return True if LangSmith tracing is configured."""
+        # Check both direct and callback-set values
+        direct = self._ls_api_key or ""
+        cb_key = self._get_cap("langsmith_api_key") or ""
+        return bool(direct) or bool(cb_key) or bool(os.environ.get("LANGSMITH_API_KEY"))
+
+    def get_tracing_config(self) -> dict:
+        """Return the current tracing / observability config.
+
+        Returns a dict of all tracing-related settings so gateway / external
+        callers can inspect the active tracing configuration.
+        """
+        # read any gateway-set tracing values before returning
+        ls_project = self._get_cap("langsmith_project") or self._ls_project or "hermes"
+        ls_tags = self._get_cap("langsmith_tags") or self._ls_tags or ["hermes"]
+        ls_api = self._get_cap("langsmith_api_key") or self._ls_api_key
+        if isinstance(ls_tags, str):
+            ls_tags = [ls_tags]
+
+        return {
+            "checkpointer": self._langgraph_checkpointer,
+            "store": self._langgraph_store,
+            "debug": self._debug is True,
+            "langsmith_project": ls_project,
+            "langsmith_tags": list(ls_tags),
+            "langsmith_enabled": bool(ls_api),
+        }
 
     # ------------------------------------------------------------------
     # Memory delegation (pass-through)
