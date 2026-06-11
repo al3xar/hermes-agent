@@ -168,7 +168,7 @@ def _sanitize_env_file_if_needed(path: Path) -> None:
     with ``ValueError: embedded null byte`` — typically introduced by
     copy-pasting API keys from terminals or rich-text editors.
 
-    We delegate to ``has_cli.config._sanitize_env_lines`` which
+    We delegate to ``hades_cli.config._sanitize_env_lines`` which
     already knows all valid Hades env-var names and can split
     concatenated lines correctly.
     """

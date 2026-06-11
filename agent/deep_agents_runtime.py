@@ -38,6 +38,24 @@ except ImportError as e:
     MemorySaver = None  # type: ignore[misc,assignment]
     InMemoryStore = None  # type: ignore[misc,assignment]
 
+# Langfuse (SDK v3) — optional, lazy-installed via the ``deepagents`` extra.
+# In v3 the LangChain ``CallbackHandler`` carries no credentials: they live on
+# a ``Langfuse`` client (singleton), and the handler reads from it. Both are
+# imported at module level (not inside the method) so tests can patch
+# ``Langfuse`` / ``CallbackHandler`` / ``LANGFUSE_AVAILABLE`` and so handler
+# construction is gated on a single, inspectable flag. The langchain
+# integration also needs the ``langchain`` package present, not just
+# ``langchain-core``.
+try:
+    from langfuse import Langfuse
+    from langfuse.langchain import CallbackHandler
+
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    Langfuse = None  # type: ignore[misc,assignment]
+    CallbackHandler = None  # type: ignore[misc,assignment]
+    LANGFUSE_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -377,6 +395,9 @@ class DeepAgentsAIAgent:
         "request_overrides", "background_review_callback",
         # Tracing / observability
         "debug", "langsmith_api_key", "langsmith_project", "langsmith_tags",
+        # Langfuse credentials — set by the gateway (or seeded from
+        # HADES_LANGFUSE_* env at init) and read by _get_langfuse_handler.
+        "langfuse_public_key", "langfuse_secret_key", "langfuse_base_url",
     ))
 
     # Attributes initialized during __init__ that must not raise
@@ -388,7 +409,7 @@ class DeepAgentsAIAgent:
         "_langsmith_api_key", "_langsmith_project", "_langsmith_tags",
         "_ls_api_key", "_ls_project", "_ls_tags",
         "_checkpointer", "_store", "_agent",
-        "_callbacks",
+        "_callbacks", "_langfuse_handler", "_debug",
     ))
 
     def __init__(
@@ -431,7 +452,10 @@ class DeepAgentsAIAgent:
         self._langsmith_project: str = "hades"
         self._langsmith_tags: list[str] = ["hades"]
 
-        # Resolve model string (LangChain format – no provider prefix)
+        # Resolve model string (LangChain format – no provider prefix).
+        # Keep the raw name too: OpenAI-compatible endpoints (vLLM) serve
+        # models under their full id (e.g. "nvidia/Qwen…"), prefix included.
+        self._model_raw = model or ""
         model_str = self._resolve_model(model)
         if not model_str:
             model_str = self._default_model()
@@ -444,6 +468,15 @@ class DeepAgentsAIAgent:
         self._ls_api_key = None
         self._ls_project = "hades"
         self._ls_tags = ["hades"]
+
+        # Langfuse tracing: memoized handler (None = not yet built,
+        # False = checked-and-unavailable, otherwise the CallbackHandler).
+        self._langfuse_handler = None
+        # Seed credentials from env so the Docker / gateway path works
+        # out of the box. The gateway may still override these afterwards
+        # via attribute assignment (captured into _callbacks). Unit tests
+        # bypass __init__, so the handler logic itself never reads env.
+        self._seed_langfuse_from_env()
 
         # Build the LangGraph agent
         self._agent = self._build_langgraph_agent(
@@ -549,6 +582,23 @@ class DeepAgentsAIAgent:
             ls_tags = []
             ls_project = ""
 
+        # Custom / OpenAI-compatible endpoints (vLLM, llama.cpp, …) can't be
+        # inferred by LangChain's ``init_chat_model`` from the bare model
+        # name — build the ChatOpenAI client explicitly against the
+        # configured base_url instead of passing a string through.
+        if isinstance(model, str) and self._base_url:
+            _p = (self.provider or "").lower()
+            if _p in ("", "custom", "openai"):
+                from langchain_openai import ChatOpenAI
+
+                model = ChatOpenAI(
+                    # The endpoint serves the model under its full id
+                    # (prefix included) — don't use the stripped name.
+                    model=getattr(self, "_model_raw", None) or model,
+                    base_url=self._base_url,
+                    api_key=self._api_key or "EMPTY",
+                )
+
         # Create the LangGraph agent (recursion_limit set per-call via config)
         agent = create_deep_agent(
             model=model,
@@ -580,7 +630,10 @@ class DeepAgentsAIAgent:
     def __setattr__(self, name, value):
         """Forward known callback/config attributes to a stored dict."""
         if name in self._CAPTURED_NAMES:
-            if not hasattr(self, "_callbacks"):
+            # ``hasattr`` is True even before initialization: ``_callbacks``
+            # is in _DEFAULT_ATTRS, so __getattr__ returns None instead of
+            # raising — check for None explicitly.
+            if getattr(self, "_callbacks", None) is None:
                 object.__setattr__(self, "_callbacks", {})
             self._callbacks[name] = value
         else:
@@ -635,6 +688,18 @@ class DeepAgentsAIAgent:
             },
         }
 
+        # Langfuse tracing: the plugin hooks in conversation_loop.py never
+        # fire under this runtime, so tracing rides LangChain's callback
+        # system instead. Inert without Langfuse credentials. In v3 the
+        # session is grouped via config metadata (``langfuse_session_id``),
+        # which the CallbackHandler reads — the handler constructor no longer
+        # accepts a session id.
+        _lf_handler = self._get_langfuse_handler()
+        if _lf_handler is not None:
+            config["callbacks"] = [_lf_handler]
+            if self._session_id:
+                config.setdefault("metadata", {})["langfuse_session_id"] = self._session_id
+
         # Add LangSmith tracing tags / metadata when tracing is enabled
         if self._ls_api_key:
             tags = list(self._ls_tags or [])
@@ -654,22 +719,106 @@ class DeepAgentsAIAgent:
             step=self._get_cap("step_callback"),
         )
 
+        # Tracing for the DeepAgents runtime rides LangChain's callback system
+        # (the Langfuse CallbackHandler wired into ``config["callbacks"]`` above),
+        # which is the v2-compatible path and captures tool calls + token usage
+        # natively. The conversation_loop.py plugin hooks are intentionally NOT
+        # emitted here: the bundled langfuse plugin targets the Langfuse v3 SDK
+        # API, so it would no-op on the pinned v2 SDK while risking duplicate
+        # traces alongside the CallbackHandler.
         if bridge.any_callbacks_set():
-            return self._run_streamed(messages, config, task_id, bridge)
+            result = self._run_streamed(messages, config, task_id, bridge)
         elif stream_callback:
-            return self._run_streamed(messages, config, task_id, bridge)
+            result = self._run_streamed(messages, config, task_id, bridge)
         else:
-            return self._run_sync(messages, config, task_id)
+            result = self._run_sync(messages, config, task_id)
+
+        return result
+
+    def _seed_langfuse_from_env(self):
+        """Populate Langfuse credential callbacks from ``HADES_LANGFUSE_*`` env.
+
+        This is the env/Docker sourcing layer: it runs only from ``__init__``
+        (bypassed by unit tests). The handler logic in ``_get_langfuse_handler``
+        reads exclusively from these captured callbacks, never from env, so it
+        stays deterministic and injectable in tests.
+        """
+        public_key = (
+            os.environ.get("HADES_LANGFUSE_PUBLIC_KEY")
+            or os.environ.get("LANGFUSE_PUBLIC_KEY")
+        )
+        secret_key = (
+            os.environ.get("HADES_LANGFUSE_SECRET_KEY")
+            or os.environ.get("LANGFUSE_SECRET_KEY")
+        )
+        host = (
+            os.environ.get("HADES_LANGFUSE_BASE_URL")
+            or os.environ.get("LANGFUSE_BASE_URL")
+        )
+        if public_key:
+            self.langfuse_public_key = public_key
+        if secret_key:
+            self.langfuse_secret_key = secret_key
+        if host:
+            self.langfuse_base_url = host
+
+    def _get_langfuse_handler(self):
+        """Return a memoized Langfuse ``CallbackHandler``, or ``None``.
+
+        Credentials come from gateway-set callbacks (``langfuse_public_key`` /
+        ``langfuse_secret_key`` / ``langfuse_base_url``), seeded from
+        ``HADES_LANGFUSE_*`` env at init. Built once per agent (session-scoped)
+        and cached; ``False`` marks "checked and unavailable" so construction
+        is never retried.
+
+        Langfuse v3: the credentials live on a ``Langfuse`` client (a process
+        singleton); the LangChain ``CallbackHandler`` takes no creds and reads
+        from that client. The client is what flushes (the handler has no
+        ``flush``), so we keep a reference on ``self._langfuse_client``. session
+        grouping is applied per-call via config metadata (``langfuse_session_id``
+        in ``run_conversation``), not the constructor.
+        """
+        cached = getattr(self, "_langfuse_handler", None)
+        if cached is not None:
+            return cached or None
+
+        handler = False
+        self._langfuse_client = None
+        public_key = self._get_cap("langfuse_public_key")
+        secret_key = self._get_cap("langfuse_secret_key")
+        if LANGFUSE_AVAILABLE and public_key and secret_key:
+            host = self._get_cap("langfuse_base_url") or "https://cloud.langfuse.com"
+            try:
+                self._langfuse_client = Langfuse(
+                    public_key=public_key,
+                    secret_key=secret_key,
+                    host=host,
+                )
+                handler = CallbackHandler()
+                logger.info("Langfuse tracing enabled (host=%s)", host)
+            except Exception as e:
+                logger.warning("Langfuse callback unavailable: %s", e)
+                handler = False
+                self._langfuse_client = None
+
+        self._langfuse_handler = handler
+        return handler or None
 
     def _run_sync(self, messages, config, task_id):
         """Sync invocation."""
+        result = None
+        _flushed = False
         try:
             cfg = {**config, "recursion_limit": self._max_iterations}
             result = self._agent.invoke(
                 {"messages": messages}, config=cfg
             )
+            self._maybe_flush_langfuse()
+            _flushed = True
             return _parse_langgraph_result(result, task_id)
         except Exception as e:
+            if not _flushed:
+                self._maybe_flush_langfuse()
             logger.error("DeepAgents invoke failed: %s", e, exc_info=True)
             return _parse_error_result(e)
 
@@ -683,24 +832,80 @@ class DeepAgentsAIAgent:
             subgraphs=False,
         )
 
+        # Accumulate messages from the streamed updates as we go. The stream is
+        # the only reliable result source when no checkpointer is configured —
+        # ``get_state()`` requires one. We prefer the streamed messages and fall
+        # back to ``get_state()`` only when the stream surfaced no message
+        # updates (a checkpointer IS configured, or a custom stream shape).
+        streamed_messages: list = []
         for event in stream_result:
             bridge.process_event(event)
+            if isinstance(event, dict):
+                for node_update in event.values():
+                    if isinstance(node_update, dict):
+                        msgs = node_update.get("messages") or []
+                        streamed_messages.extend(
+                            m for m in msgs if m is not None
+                        )
 
-        # After streaming, parse final result from last AIMessage
+        # After streaming, parse final result from the last AIMessage.
         try:
-            raw = self._agent.get_state(config).values.get("messages", [])
-            return _parse_langgraph_result(
+            raw = streamed_messages
+            if not raw:
+                try:
+                    raw = self._agent.get_state(config).values.get("messages", [])
+                except Exception:
+                    raw = []
+            r = _parse_langgraph_result(
                 {"messages": raw if isinstance(raw, list) else list(raw)}
             )
+            self._maybe_flush_langfuse()
+            return r
         except Exception:
-            return _parse_error_result(
+            if streamed_messages:
+                try:
+                    r = _parse_langgraph_result({"messages": streamed_messages})
+                    self._maybe_flush_langfuse()
+                    return r
+                except Exception:
+                    pass
+            r = _parse_error_result(
                 Exception("Failed to get streaming final result")
             )
+            self._maybe_flush_langfuse()
+            return r
 
     def chat(self, message: str) -> str:
         """Simple chat interface — returns final response string."""
         result = self.run_conversation(message)
         return result.get("final_response", "")
+
+    # ------------------------------------------------------------------
+    # Observability — Langfuse tracing for deep agents.
+    #
+    # The deep agents runtime doesn't use run_agent.py or
+    # conversation_loop.py, so the Hades plugin hooks on `pre_api_request` /
+    # `post_api_request` never fire here. Tracing instead rides LangChain's
+    # native callback system: the Langfuse ``CallbackHandler`` is built from
+    # the captured credentials and injected into ``config['callbacks']`` in
+    # ``run_conversation``, capturing generations and tool spans directly from
+    # LangGraph. This is the Langfuse v2-compatible path (the bundled
+    # langfuse plugin targets the v3 SDK API, which is not installed).
+    # ------------------------------------------------------------------
+
+    def _maybe_flush_langfuse(self):
+        """Flush the Langfuse client if tracing is active.
+
+        v3 flushes on the ``Langfuse`` client, not the ``CallbackHandler``
+        (which has no ``flush``). ``_langfuse_client`` is set alongside the
+        handler in :meth:`_get_langfuse_handler`.
+        """
+        try:
+            client = getattr(self, "_langfuse_client", None)
+            if client is not None and hasattr(client, "flush"):
+                client.flush()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Compatibility forwarders (matching run_agent.AIAgent attrs)
@@ -762,6 +967,11 @@ class DeepAgentsAIAgent:
         cb_key = self._get_cap("langsmith_api_key") or ""
         return bool(direct) or bool(cb_key) or bool(os.environ.get("LANGSMITH_API_KEY"))
 
+    @property
+    def has_langfuse_tracing(self):
+        """Return True if Langfuse tracing is active (a handler was built)."""
+        return self._get_langfuse_handler() is not None
+
     def get_tracing_config(self) -> dict:
         """Return the current tracing / observability config.
 
@@ -782,6 +992,7 @@ class DeepAgentsAIAgent:
             "langsmith_project": ls_project,
             "langsmith_tags": list(ls_tags),
             "langsmith_enabled": bool(ls_api),
+            "langfuse_enabled": self.has_langfuse_tracing,
         }
 
     # ------------------------------------------------------------------

@@ -230,7 +230,7 @@ def _get_default_hades_home() -> Path:
     In Docker/custom deployments where HADES_HOME is outside ``~/.hades``
     (e.g. ``/opt/data``), returns HADES_HOME directly.
     """
-    from has_constants import get_default_hades_root
+    from hades_constants import get_default_hades_root
     return get_default_hades_root()
 
 
@@ -775,7 +775,7 @@ def create_profile(
     if clone_from is not None or clone_all or clone_config:
         if clone_from is None:
             # Default: clone from active profile
-            from has_constants import get_hades_home
+            from hades_constants import get_hades_home
             source_dir = get_hades_home()
         else:
             clone_from = normalize_profile_name(clone_from)
@@ -1294,7 +1294,7 @@ def get_active_profile_name() -> str:
     Returns the profile name if HADES_HOME points into ``~/.hades/profiles/<name>``.
     Returns ``"custom"`` if HADES_HOME is set to an unrecognized path.
     """
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
     hades_home = get_hades_home()
     resolved = hades_home.resolve()
 

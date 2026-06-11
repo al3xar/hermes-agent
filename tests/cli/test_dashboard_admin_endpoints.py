@@ -15,8 +15,8 @@ def _client():
         from starlette.testclient import TestClient
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
-    import has_state
-    from has_constants import get_hades_home
+    import hades_state
+    from hades_constants import get_hades_home
     from hades_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
     client = TestClient(app)
@@ -144,7 +144,7 @@ class TestMemoryEndpoints:
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hades_home):
         self.client, _ = _client()
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         (get_hades_home() / "memories").mkdir(parents=True, exist_ok=True)
 
@@ -161,7 +161,7 @@ class TestMemoryEndpoints:
         assert r.status_code == 400
 
     def test_reset_targets(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         mem = get_hades_home() / "memories"
         (mem / "MEMORY.md").write_text("notes")
@@ -314,7 +314,7 @@ class TestSessionManagementEndpoints:
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hades_home):
         self.client, _ = _client()
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         db.create_session(session_id="sess-x", source="cli")
@@ -740,7 +740,7 @@ class TestDebugShareEndpoint:
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hades_home):
         self.client, self.header = _client()
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         logs = get_hades_home() / "logs"
         logs.mkdir(parents=True, exist_ok=True)

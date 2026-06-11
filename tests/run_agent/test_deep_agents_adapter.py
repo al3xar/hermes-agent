@@ -455,7 +455,7 @@ class TestBuildHadesTools:
             [{"name": "tool_a"}, {"name": "tool_b"}],
             lambda n: {"tool_a": ea, "tool_b": eb}.get(n),
         )
-        saved = sys.modules["tools.registry"]
+        saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
             tools = build_hades_tools(
@@ -465,7 +465,10 @@ class TestBuildHadesTools:
                 len(tools) == 2 and all(isinstance(t, StructuredTool) for t in tools)
             )
         finally:
-            sys.modules["tools.registry"] = saved
+            if saved is not None:
+                sys.modules["tools.registry"] = saved
+            else:
+                sys.modules.pop("tools.registry", None)
 
     def test_handles_missing_tool_entries(self):
         from agent.deep_agents_runtime import build_hades_tools
@@ -475,7 +478,7 @@ class TestBuildHadesTools:
             [{"name": "present"}, {"name": "missing"}],
             lambda n: ep if n == "present" else None,
         )
-        saved = sys.modules["tools.registry"]
+        saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
             assert (
@@ -483,20 +486,26 @@ class TestBuildHadesTools:
                 == 1
             )
         finally:
-            sys.modules["tools.registry"] = saved
+            if saved is not None:
+                sys.modules["tools.registry"] = saved
+            else:
+                sys.modules.pop("tools.registry", None)
 
     def test_handles_empty_definitions(self):
         from agent.deep_agents_runtime import build_hades_tools
 
         mock_reg = self._mock_reg([], None)
-        saved = sys.modules["tools.registry"]
+        saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
             assert (
                 build_hades_tools(enabled_toolsets=[], disabled_toolsets=[]) == []
             )
         finally:
-            sys.modules["tools.registry"] = saved
+            if saved is not None:
+                sys.modules["tools.registry"] = saved
+            else:
+                sys.modules.pop("tools.registry", None)
 
     def test_returns_empty_list_on_registry_error(self):
         from agent.deep_agents_runtime import build_hades_tools
@@ -505,28 +514,34 @@ class TestBuildHadesTools:
         mock_reg.get_definitions.side_effect = ImportError(
             "registry unavailable"
         )
-        saved = sys.modules["tools.registry"]
+        saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
             assert (
                 build_hades_tools(enabled_toolsets=["ts"], disabled_toolsets=[]) == []
             )
         finally:
-            sys.modules["tools.registry"] = saved
+            if saved is not None:
+                sys.modules["tools.registry"] = saved
+            else:
+                sys.modules.pop("tools.registry", None)
 
     def test_empty_name_tool_skipped(self):
         from agent.deep_agents_runtime import build_hades_tools
 
         mock_reg = self._mock_reg([{"name": ""}], None)
         mock_reg.get_entry.return_value = None
-        saved = sys.modules["tools.registry"]
+        saved = sys.modules.get("tools.registry")
         try:
             sys.modules["tools.registry"] = mock_reg
             assert (
                 build_hades_tools(enabled_toolsets=[], disabled_toolsets=[]) == []
             )
         finally:
-            sys.modules["tools.registry"] = saved
+            if saved is not None:
+                sys.modules["tools.registry"] = saved
+            else:
+                sys.modules.pop("tools.registry", None)
 
 
 class TestHadesStreamingBridge:

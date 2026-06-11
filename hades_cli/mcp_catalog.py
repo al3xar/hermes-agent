@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from has_constants import get_hades_home, get_optional_mcps_dir
+from hades_constants import get_hades_home, get_optional_mcps_dir
 from hades_cli.colors import Colors, color
 from hades_cli.config import (
     load_config,

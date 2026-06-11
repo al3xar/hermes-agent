@@ -553,7 +553,7 @@ def get_container_exec_info() -> Optional[dict]:
     if os.environ.get("HADES_DEV") == "1":
         return None
 
-    from has_constants import is_container
+    from hades_constants import is_container
     if is_container():
         return None
 
@@ -588,8 +588,8 @@ def get_container_exec_info() -> Optional[dict]:
 # Config paths
 # =============================================================================
 
-# Re-export from has_constants — canonical definition lives there.
-from has_constants import get_hades_home  # noqa: F811,E402
+# Re-export from hades_constants — canonical definition lives there.
+from hades_constants import get_hades_home  # noqa: F811,E402
 from utils import atomic_replace
 
 def get_config_path() -> Path:
@@ -3933,7 +3933,7 @@ def get_custom_provider_context_length(
     used by:
       * ``AIAgent.__init__`` (startup resolution)
       * ``AIAgent.switch_model`` (mid-session ``/model`` switch)
-      * ``has_cli.model_switch.resolve_display_context_length`` (``/model`` confirmation display)
+      * ``hades_cli.model_switch.resolve_display_context_length`` (``/model`` confirmation display)
       * ``gateway.run._format_session_info`` (``/info`` display)
       * ``agent.model_metadata.get_model_context_length`` (when custom_providers is threaded through)
 

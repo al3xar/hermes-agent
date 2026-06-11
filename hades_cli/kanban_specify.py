@@ -38,7 +38,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from has_cli import kanban_db as kb
+from hades_cli import kanban_db as kb
 
 from utils import env_int
 
@@ -130,7 +130,7 @@ def _extract_json_blob(raw: str) -> Optional[dict]:
 
 
 def _profile_author() -> str:
-    """Mirror of ``has_cli.kanban._profile_author``. Kept local to
+    """Mirror of ``hades_cli.kanban._profile_author``. Kept local to
     avoid a circular import when kanban.py imports this module."""
     return (
         os.environ.get("HADES_PROFILE")

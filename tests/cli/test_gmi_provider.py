@@ -355,7 +355,7 @@ class TestGmiMainFlow:
             _model_flow_api_key_provider(load_config(), "gmi", "old-model")
 
         import yaml
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         config = yaml.safe_load((get_hades_home() / "config.yaml").read_text()) or {}
         model_cfg = config.get("model")

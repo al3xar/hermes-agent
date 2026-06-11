@@ -319,9 +319,9 @@ def _scan_gateway_pids(exclude_pids: set[int], all_profiles: bool = False) -> li
     exclude_pids = exclude_pids | _get_ancestor_pids()
     pids: list[int] = []
     patterns = [
-        "has_cli.main gateway",
-        "has_cli.main --profile",
-        "has_cli.main -p",
+        "hades_cli.main gateway",
+        "hades_cli.main --profile",
+        "hades_cli.main -p",
         "hades_cli/main.py gateway",
         "hades_cli/main.py --profile",
         "hades_cli/main.py -p",
@@ -612,7 +612,7 @@ def find_profile_gateway_processes(
 
 
 def _gateway_run_args_for_profile(profile: str) -> list[str]:
-    args = [get_python_path(), "-m", "has_cli.main"]
+    args = [get_python_path(), "-m", "hades_cli.main"]
     if profile != "default":
         args.extend(["--profile", profile])
     args.extend(["gateway", "run", "--replace"])
@@ -1088,7 +1088,7 @@ def get_gateway_runtime_snapshot(system: bool = False) -> GatewayRuntimeSnapshot
             gateway_pids=gateway_pids,
         )
 
-    from has_constants import is_container
+    from hades_constants import is_container
 
     if is_linux() and is_container():
         # Phase 4: report s6 supervision when running under our /init.
@@ -1305,7 +1305,7 @@ def is_linux() -> bool:
     return sys.platform.startswith("linux")
 
 
-from has_constants import is_container, is_termux, is_wsl
+from hades_constants import is_container, is_termux, is_wsl
 
 
 def _wsl_systemd_operational() -> bool:
@@ -1411,7 +1411,7 @@ def _profile_suffix() -> str:
     """
     import hashlib
     import re
-    from has_constants import get_default_hades_root
+    from hades_constants import get_default_hades_root
 
     home = get_hades_home().resolve()
     default = get_default_hades_root().resolve()
@@ -1442,7 +1442,7 @@ def _profile_arg(hades_home: str | None = None) -> str:
             service definition for a different user (e.g. system service).
     """
     import re
-    from has_constants import get_default_hades_root
+    from hades_constants import get_default_hades_root
 
     home = Path(hades_home or str(get_hades_home())).resolve()
     default = get_default_hades_root().resolve()
@@ -1735,7 +1735,7 @@ _LEGACY_SERVICE_NAMES: tuple[str, ...] = ("hades.service",)
 # ExecStart content markers that identify a unit as running our gateway.
 # A legacy unit is only flagged when its file contains one of these.
 _LEGACY_UNIT_EXECSTART_MARKERS: tuple[str, ...] = (
-    "has_cli.main gateway",
+    "hades_cli.main gateway",
     "hades_cli/main.py gateway",
     "gateway/run.py",
     " hades gateway ",
@@ -3108,7 +3108,7 @@ def _gateway_run_command() -> list[str]:
     Profile-aware: honors the active HADES_HOME via `_profile_arg()` so the
     detached fallback launches into the same profile as the CLI invocation.
     """
-    cmd = [get_python_path(), "-m", "has_cli.main"]
+    cmd = [get_python_path(), "-m", "hades_cli.main"]
     profile_arg = _profile_arg()
     if profile_arg:
         cmd.extend(profile_arg.split())
@@ -3157,7 +3157,7 @@ def _launchd_fallback_to_detached(reason: str, *, exit_on_failure: bool = True) 
     launched, prints the manual workaround and (by default) exits non-zero so
     the failure surfaces instead of silently doing nothing.
     """
-    from has_constants import display_hades_home as _dhh
+    from hades_constants import display_hades_home as _dhh
 
     print(f"⚠ launchd cannot manage the gateway on this macOS version ({reason}).")
     if _spawn_detached_gateway():
@@ -3212,7 +3212,7 @@ def generate_launchd_plist() -> str:
     prog_args = [
         f"<string>{python_path}</string>",
         "<string>-m</string>",
-        "<string>has_cli.main</string>",
+        "<string>hades_cli.main</string>",
     ]
     if profile_arg:
         for part in profile_arg.split():
@@ -3350,7 +3350,7 @@ def launchd_install(force: bool = False):
     print()
     print("Next steps:")
     print("  hades gateway status             # Check status")
-    from has_constants import display_hades_home as _dhh
+    from hades_constants import display_hades_home as _dhh
 
     print(f"  tail -f {_dhh()}/logs/gateway.log  # View logs")
 
@@ -3747,7 +3747,7 @@ def run_gateway(verbose: int = 0, quiet: bool = False, replace: bool = False):
         if os.environ.get("HADES_GATEWAY_EXIT_DIAG", "1") != "1":
             return
         try:
-            from has_constants import get_hades_home as _ghh
+            from hades_constants import get_hades_home as _ghh
 
             log_dir = _ghh() / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
@@ -5621,7 +5621,7 @@ def _setup_signal():
 def _builtin_setup_fn(key: str):
     """Resolve the interactive setup function for a built-in platform key.
 
-    Late-bound to avoid a circular import with ``has_cli.setup`` (which
+    Late-bound to avoid a circular import with ``hades_cli.setup`` (which
     imports from this module for the remaining bespoke flows).
     """
     from hades_cli import setup as _s
@@ -5934,7 +5934,7 @@ def gateway_setup():
                     "  To enable systemd: add systemd=true to /etc/wsl.conf, then 'wsl --shutdown'"
                 )
             elif is_termux():
-                from has_constants import display_hades_home as _dhh
+                from hades_constants import display_hades_home as _dhh
 
                 print_info("  Termux does not use systemd/launchd services.")
                 print_info("  Run in foreground: hades gateway run")
@@ -5968,7 +5968,7 @@ def _dispatch_via_service_manager_if_s6(
     The s6 service slot was created either by the Phase 4 profile-create
     hook or by the container-boot reconciler (cont-init.d/02-…). If it
     doesn't exist or s6 returns an error, the named errors from
-    :mod:`has_cli.service_manager` are caught and surfaced as
+    :mod:`hades_cli.service_manager` are caught and surfaced as
     actionable CLI messages (no raw ``CalledProcessError`` traceback).
     """
     from hades_cli.service_manager import (

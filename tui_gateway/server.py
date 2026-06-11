@@ -1329,7 +1329,11 @@ def _resolve_model() -> str:
         return env
     m = _load_cfg().get("model", "")
     if isinstance(m, dict):
-        return str(m.get("default", "") or "").strip()
+        # Mirror gateway._resolve_gateway_model: configs may key the model
+        # under "default" OR "model" (e.g. a custom/vLLM provider block).
+        # Reading only "default" yields an empty model, which the deepagents
+        # runtime then falls back to "gpt-4o" — wrong endpoint/model (#gpt-4o-404).
+        return str(m.get("default") or m.get("model") or "").strip()
     if isinstance(m, str) and m:
         return m.strip()
     return "anthropic/claude-sonnet-4"
@@ -2877,6 +2881,21 @@ def _make_agent(
             requested=requested_provider,
             target_model=model or None,
         )
+    # Honor gateway.deepagents_mode (or top-level deepagents_mode) from
+    # config.yaml — same precedence as api_server._create_agent — so the
+    # TUI / dashboard runs the same runtime as the gateway platforms.
+    # Without this the TUI defaults to runtime="native", diverging from the
+    # gateway and skipping the DeepAgents/LangGraph runtime (and its Langfuse
+    # CallbackHandler tracing).
+    _gw_section = cfg.get("gateway")
+    _deepagents_raw = (
+        _gw_section.get("deepagents_mode") if isinstance(_gw_section, dict) else None
+    )
+    if _deepagents_raw is None:
+        _deepagents_raw = cfg.get("deepagents_mode")
+    _runtime_kwargs: dict = {}
+    if str(_deepagents_raw).strip().lower() in {"true", "1", "yes", "on"}:
+        _runtime_kwargs["runtime"] = "deepagents"
     return AIAgent(
         model=model,
         max_iterations=_cfg_max_turns(cfg, 90),
@@ -2906,6 +2925,7 @@ def _make_agent(
         skip_memory=is_truthy_value(os.environ.get("HADES_IGNORE_RULES")),
         fallback_model=_load_fallback_model(),
         **_agent_cbs(sid),
+        **_runtime_kwargs,
     )
 
 

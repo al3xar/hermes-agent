@@ -8,7 +8,7 @@ import shlex
 import shutil
 import subprocess
 
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 
 
 DEFAULT_BROWSER_CDP_PORT = 9222

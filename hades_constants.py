@@ -109,7 +109,7 @@ def get_hades_home() -> Path:
 
 
 def get_default_hades_root() -> Path:
-    """Return the root Hades directory for profile-level operations.
+    r"""Return the root Hades directory for profile-level operations.
 
     In standard deployments this is the platform-native Hades home
     (``~/.hades`` on POSIX, ``%LOCALAPPDATA%\.hades`` on native Windows).

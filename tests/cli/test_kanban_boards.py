@@ -55,7 +55,7 @@ def fresh_home(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     # Also reset hades_constants cache so get_default_hades_root() re-reads.
     try:
-        import has_constants
+        import hades_constants
         hades_constants._cached_default_hades_root = None  # type: ignore[attr-defined]
     except Exception:
         pass

@@ -768,7 +768,7 @@ _nous_recommended_cache: dict[str, tuple[dict[str, Any], float]] = {}
 
 def _nous_recommended_disk_path() -> "Path":
     """Disk path for the persisted recommended-models cache."""
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
     return get_hades_home() / "cache" / "nous_recommended_cache.json"
 
 
@@ -1911,7 +1911,7 @@ def normalize_provider(provider: Optional[str]) -> str:
     """Normalize provider aliases to Hades' canonical provider ids.
 
     Note: ``"auto"`` passes through unchanged — use
-    ``has_cli.auth.resolve_provider()`` to resolve it to a concrete
+    ``hades_cli.auth.resolve_provider()`` to resolve it to a concrete
     provider based on credentials and environment.
     """
     normalized = (provider or "openrouter").strip().lower()
@@ -2352,7 +2352,7 @@ _PROVIDER_MODELS_CACHE_TTL = 3600  # 1h
 
 
 def _provider_models_cache_path() -> Path:
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
     return get_hades_home() / "provider_models_cache.json"
 
 
@@ -2389,7 +2389,7 @@ def _credential_fingerprint(provider: str) -> str:
 
     # OAuth / external-file mtimes that change on re-auth
     try:
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         for rel in ("auth.json", "credentials.json"):
             p = get_hades_home() / rel
             try:
@@ -3392,7 +3392,7 @@ def _strip_ollama_cloud_suffix(model_id: str) -> str:
 
 def _ollama_cloud_cache_path() -> Path:
     """Return the path for the Ollama Cloud model cache."""
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
     return get_hades_home() / "ollama_cloud_models_cache.json"
 
 

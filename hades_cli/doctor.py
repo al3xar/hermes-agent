@@ -12,7 +12,7 @@ from pathlib import Path
 
 from hades_cli.config import get_project_root, get_hades_home, get_env_path
 from hades_cli.env_loader import load_hades_dotenv
-from has_constants import display_hades_home
+from hades_constants import display_hades_home
 
 PROJECT_ROOT = get_project_root()
 HADES_HOME = get_hades_home()
@@ -24,7 +24,7 @@ load_hades_dotenv(hades__env_path.parent, project_env=PROJECT_ROOT / ".env")
 
 from hades_cli.colors import Colors, color
 from hades_cli.models import _HADES_USER_AGENT
-from has_constants import OPENROUTER_MODELS_URL
+from hades_constants import OPENROUTER_MODELS_URL
 from utils import base_url_host_matches
 
 
@@ -54,7 +54,7 @@ _PROVIDER_ENV_HINTS = (
 )
 
 
-from has_constants import is_termux as _is_termux
+from hades_constants import is_termux as _is_termux
 
 
 def _python_install_cmd() -> str:
@@ -1275,7 +1275,7 @@ def run_doctor(args):
     # Docker (optional)
     terminal_env = os.getenv("TERMINAL_ENV", "local")
     try:
-        from has_constants import is_container as _is_container
+        from hades_constants import is_container as _is_container
         running_in_container = _is_container()
     except Exception:
         running_in_container = False

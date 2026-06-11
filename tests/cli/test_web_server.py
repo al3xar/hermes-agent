@@ -51,7 +51,7 @@ def _install_example_plugin(_isolate_hades_home):
     all). User plugins are first in the discovery search order, so
     laying down the fixture here is enough.
     """
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
     from hades_cli import web_server
 
     user_plugins_dir = get_hades_home() / "plugins"
@@ -226,8 +226,8 @@ class TestWebServerEndpoints:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import has_state
-        from has_constants import get_hades_home
+        import hades_state
+        from hades_constants import get_hades_home
         from hades_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(hades_state, "DEFAULT_DB_PATH", get_hades_home() / "state.db")
@@ -247,7 +247,7 @@ class TestWebServerEndpoints:
 
     def test_get_media_serves_image_in_root(self):
         """An image under the gateway's images dir is returned as a data URL."""
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         img_dir = get_hades_home() / "images"
         img_dir.mkdir(parents=True, exist_ok=True)
@@ -267,7 +267,7 @@ class TestWebServerEndpoints:
         assert resp.status_code == 403
 
     def test_get_media_rejects_non_image_extension(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         img_dir = get_hades_home() / "images"
         img_dir.mkdir(parents=True, exist_ok=True)
@@ -278,7 +278,7 @@ class TestWebServerEndpoints:
         assert resp.status_code == 415
 
     def test_get_media_404_for_missing_file(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         missing = get_hades_home() / "images" / "nope.png"
         resp = self.client.get("/api/media", params={"path": str(missing)})
@@ -363,7 +363,7 @@ class TestWebServerEndpoints:
         /api/sessions should reflect per-session DB state, not process/global
         cwd settings, so workspace grouping stays stable and deterministic.
         """
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         monkeypatch.setenv("TERMINAL_CWD", "/tmp/global-default")
 
@@ -414,7 +414,7 @@ class TestWebServerEndpoints:
     def test_rename_session_updates_title(self):
         """PATCH /api/sessions/{id} renames a session (regression: the route
         was missing entirely, so the desktop rename dialog got a 405)."""
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -433,7 +433,7 @@ class TestWebServerEndpoints:
             db.close()
 
     def test_rename_session_clears_title_when_empty(self):
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -458,7 +458,7 @@ class TestWebServerEndpoints:
 
     def test_archive_session_via_patch(self):
         """PATCH archived=true soft-hides a session; archived=false restores it."""
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -484,7 +484,7 @@ class TestWebServerEndpoints:
 
     def test_patch_session_without_fields_is_400(self):
         """An existing session + empty body is a bad request, not a 404."""
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -498,7 +498,7 @@ class TestWebServerEndpoints:
     def test_profiles_sessions_tags_default_profile(self):
         """The cross-profile aggregator returns the default profile's rows
         tagged profile="default" (single-profile parity with /api/sessions)."""
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -532,7 +532,7 @@ class TestWebServerEndpoints:
         first page by recency, listed under its live continuation id."""
         import time as _time
 
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -573,7 +573,7 @@ class TestWebServerEndpoints:
         so the sidebar stops showing the same chat several times."""
         import time as _time
 
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -610,7 +610,7 @@ class TestWebServerEndpoints:
         branch instead of being collapsed back to the parent/root."""
         import time as _time
 
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -643,7 +643,7 @@ class TestWebServerEndpoints:
         live continuation, matching /resume behavior."""
         import time as _time
 
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -670,7 +670,7 @@ class TestWebServerEndpoints:
         assert [m["content"] for m in payload["messages"]] == ["after compression"]
 
     def test_get_sessions_archived_is_boolean(self):
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -684,7 +684,7 @@ class TestWebServerEndpoints:
 
     def test_rename_response_omits_archived_when_not_set(self):
         """Title-only PATCH keeps its legacy {ok, title} response shape."""
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -2051,8 +2051,8 @@ class TestNewEndpoints:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import has_state
-        from has_constants import get_hades_home
+        import hades_state
+        from hades_constants import get_hades_home
         from hades_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(hades_state, "DEFAULT_DB_PATH", get_hades_home() / "state.db")
@@ -2084,7 +2084,7 @@ class TestNewEndpoints:
     # --- Profiles ---
 
     def test_profiles_list_includes_default(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         get_hades_home().mkdir(parents=True, exist_ok=True)
 
         resp = self.client.get("/api/profiles")
@@ -2093,7 +2093,7 @@ class TestNewEndpoints:
         assert "default" in names
 
     def test_profiles_list_falls_back_when_profile_listing_fails(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.profiles as profiles_mod
 
         hades_home = get_hades_home()
@@ -2148,7 +2148,7 @@ class TestNewEndpoints:
         assert "test-prof-2" not in names
 
     def test_profile_setup_command_uses_named_profile_wrapper(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         (get_hades_home() / "profiles" / "coder").mkdir(parents=True)
 
@@ -2158,7 +2158,7 @@ class TestNewEndpoints:
         assert resp.json()["command"] == "coder setup"
 
     def test_profile_setup_command_uses_hades_for_default_profile(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
 
         get_hades_home().mkdir(parents=True, exist_ok=True)
 
@@ -2185,7 +2185,7 @@ class TestNewEndpoints:
         assert wrapper_path.read_text() == '#!/bin/sh\nexec hades -p writer "$@"\n'
 
     def test_profiles_create_with_clone_from_default_copies_default_skills(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.profiles as profiles_mod
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
@@ -2205,7 +2205,7 @@ class TestNewEndpoints:
         assert profiles["cloned"]["skill_count"] == 1
 
     def test_profiles_create_with_clone_from_duplicates_source(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.profiles as profiles_mod
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
@@ -2229,7 +2229,7 @@ class TestNewEndpoints:
         assert cloned_skill.exists()
 
     def test_profiles_create_without_clone_seeds_bundled_skills(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.profiles as profiles_mod
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
@@ -2254,7 +2254,7 @@ class TestNewEndpoints:
         assert profiles["fresh"]["skill_count"] == 1
 
     def test_profile_open_terminal_uses_macos_terminal(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.web_server as web_server
 
         (get_hades_home() / "profiles" / "coder").mkdir(parents=True)
@@ -2270,7 +2270,7 @@ class TestNewEndpoints:
         assert "coder setup" in " ".join(calls[0])
 
     def test_profile_open_terminal_uses_windows_cmd(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.web_server as web_server
 
         (get_hades_home() / "profiles" / "coder").mkdir(parents=True)
@@ -2324,7 +2324,7 @@ class TestNewEndpoints:
     # --- New profiles endpoints: active / description / model / describe-auto ---
 
     def test_profiles_active_defaults(self):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         get_hades_home().mkdir(parents=True, exist_ok=True)
 
         resp = self.client.get("/api/profiles/active")
@@ -2374,7 +2374,7 @@ class TestNewEndpoints:
         assert resp.status_code == 404
 
     def test_profile_model_round_trip(self, monkeypatch):
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         import hades_cli.profiles as profiles_mod
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
@@ -2739,7 +2739,7 @@ class TestNewEndpoints:
         }
 
     def test_analytics_usage_includes_skill_breakdown(self):
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -3615,8 +3615,8 @@ class TestBulkDeleteSessionsEndpoint:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import has_state
-        from has_constants import get_hades_home
+        import hades_state
+        from hades_constants import get_hades_home
         from hades_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
@@ -3628,7 +3628,7 @@ class TestBulkDeleteSessionsEndpoint:
         self.auth_client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
     def _seed(self, ids):
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -3642,7 +3642,7 @@ class TestBulkDeleteSessionsEndpoint:
         assert resp.status_code == 401
 
     def test_deletes_listed_sessions_only(self):
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         self._seed(["a", "b", "c"])
         resp = self.auth_client.post(
@@ -3739,8 +3739,8 @@ class TestDeleteEmptySessionsEndpoint:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import has_state
-        from has_constants import get_hades_home
+        import hades_state
+        from hades_constants import get_hades_home
         from hades_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         # Pin the SessionDB to the isolated HADES_HOME so each test
@@ -3761,7 +3761,7 @@ class TestDeleteEmptySessionsEndpoint:
         * ``live``    — un-ended, empty → must survive (active)
         * ``archived``— ended, empty, archived → must survive
         """
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         try:
@@ -3809,7 +3809,7 @@ class TestDeleteEmptySessionsEndpoint:
         """DELETE returns the deleted count and removes only the
         empty-ended-unarchived rows — same shape contract as the
         DB-level method's unit tests."""
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         self._seed()
         resp = self.auth_client.delete("/api/sessions/empty")
@@ -3875,8 +3875,8 @@ class TestPluginAPIAuth:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        import has_state
-        from has_constants import get_hades_home
+        import hades_state
+        from hades_constants import get_hades_home
         from hades_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(hades_state, "DEFAULT_DB_PATH", get_hades_home() / "state.db")

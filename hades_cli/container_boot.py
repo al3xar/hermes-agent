@@ -63,7 +63,7 @@ def reconcile_profile_gateways(
 
     Always registers a ``gateway-default`` slot for the root profile
     (the implicit profile that lives at the top of ``$HADES_HOME``,
-    not under ``profiles/``). The dispatcher in ``has_cli.gateway``
+    not under ``profiles/``). The dispatcher in ``hades_cli.gateway``
     maps an empty profile suffix to ``gateway-default``, so this slot
     is what ``hades gateway start`` (no ``-p``) targets. Without it,
     bare ``hades gateway start`` inside the container would land on

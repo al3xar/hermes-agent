@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 from hades_cli.config import cfg_get
 from hades_cli.secret_prompt import masked_secret_prompt
 
@@ -256,7 +256,7 @@ def _prompt_plugin_env_vars(manifest: dict, console) -> None:
         return
 
     from hades_cli.config import get_env_value, save_env_value  # noqa: F811
-    from has_constants import display_hades_home
+    from hades_constants import display_hades_home
 
     # Normalise to list-of-dicts
     env_specs: list[dict] = []

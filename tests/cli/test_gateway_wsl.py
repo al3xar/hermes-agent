@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock, mock_open
 import pytest
 
 import hades_cli.gateway as gateway
-import has_constants
+import hades_constants
 
 
 # =============================================================================

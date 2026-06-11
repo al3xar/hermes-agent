@@ -43,21 +43,21 @@ Usage:
     hades claw migrate --dry-run  # Preview migration without changes
 """
 
-# IMPORTANT: has_bootstrap must be the very first import — it sets up
+# IMPORTANT: hades_bootstrap must be the very first import — it sets up
 # UTF-8 stdio on Windows so print()/subprocess children don't hit
 # UnicodeEncodeError with non-ASCII characters.  No-op on POSIX.
 #
-# Guarded against ModuleNotFoundError because ``has_bootstrap`` is a
+# Guarded against ModuleNotFoundError because ``hades_bootstrap`` is a
 # top-level module registered via pyproject.toml's ``py-modules`` list.
 # When the user upgrades code via ``git pull`` (or ``hades update``
 # crashes between ``git reset --hard`` and ``uv pip install -e .``), the
-# new code references ``has_bootstrap`` but the editable install's
+# new code references ``hades_bootstrap`` but the editable install's
 # ``.pth`` file still points at the old set of top-level modules.  Without
 # this guard, hades crashes on import and the user can't run
 # ``hades update`` to recover.  Missing the bootstrap means UTF-8 stdio
 # setup is skipped on Windows — degraded, not broken.  POSIX is unaffected.
 try:
-    import has_bootstrap  # noqa: F401
+    import hades_bootstrap  # noqa: F401
 except ModuleNotFoundError:
     pass
 
@@ -378,7 +378,7 @@ def _apply_profile_override() -> None:
     # 2. If no flag, check active_profile in the hades root
     if profile_name is None:
         try:
-            import has_constants get_default_hades_root
+            from hades_constants import get_default_hades_root
 
             active_path = get_default_hades_root() / "active_profile"
             if active_path.exists():
@@ -464,7 +464,7 @@ except Exception:
 # Dashboard entrypoints bootstrap with GUI mode so gui.log is always present
 # during GUI testing, including pre-dispatch startup failures.
 try:
-    from has_logging import setup_logging as _setup_logging
+    from hades_logging import setup_logging as _setup_logging
 
     _setup_logging(
         mode=(
@@ -482,7 +482,7 @@ except Exception:
 # this just calls the toggle without a redundant load_config() round trip.
 if _FORCE_IPV4_EARLY:
     try:
-        import has_constants apply_ipv4_preference as _apply_ipv4
+        from hades_constants import apply_ipv4_preference as _apply_ipv4
 
         _apply_ipv4(force=True)
     except Exception:
@@ -497,7 +497,7 @@ from hades_cli import __version__, __release_date__
 
 # Provider model-selection wizard flows extracted to hades_cli/model_setup_flows.py
 # (god-file decomposition Phase 2). Re-imported here so select_provider_and_model and
-# existing test monkeypatches (has_cli.main._model_flow_*) keep resolving unchanged.
+# existing test monkeypatches (hades_cli.main._model_flow_*) keep resolving unchanged.
 from hades_cli.model_setup_flows import (
     _model_flow_openrouter,
     _model_flow_nous,
@@ -1036,7 +1036,7 @@ def _resolve_last_session(source: str = "cli") -> Optional[str]:
     """Look up the most recently-used session ID for a source."""
     db = None
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         sessions = db.search_sessions(source=source, limit=1)
@@ -1175,7 +1175,7 @@ def _resolve_session_by_name_or_id(name_or_id: str) -> Optional[str]:
       resumed at the live tip instead of a stale parent with no messages.
     """
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
 
@@ -1228,7 +1228,7 @@ def _print_tui_exit_summary(
 
     db = None
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
 
         db = SessionDB()
         session = db.get_session(target)
@@ -2988,7 +2988,7 @@ def _all_aux_tasks() -> list[tuple[str, str, str]]:
     Built-in tasks come first (preserving order), followed by plugin tasks
     sorted by key. Used by ``_aux_config_menu``, ``_reset_aux_to_auto``, and
     display-name lookups so plugin-registered tasks (registered via
-    :meth:`has_cli.plugins.PluginContext.register_auxiliary_task`) appear
+    :meth:`hades_cli.plugins.PluginContext.register_auxiliary_task`) appear
     in the same surfaces as built-in ones without core knowing about them.
     """
     tasks = list(_AUX_TASKS)
@@ -3631,7 +3631,7 @@ def _remove_custom_provider(config):
 
 
 # Lazy-export the model catalog at module level. Tests and a handful of
-# downstream call sites read `has_cli.main._PROVIDER_MODELS` directly,
+# downstream call sites read `hades_cli.main._PROVIDER_MODELS` directly,
 # so the symbol needs to be reachable as a module attribute. But importing
 # the catalog eagerly costs ~55ms on every `hades` invocation — including
 # fast paths like `hades --version` and slash-command dispatch that never
@@ -3888,7 +3888,7 @@ def _run_anthropic_oauth_flow(save_env_value):
         ):
             use_anthropic_claude_code_credentials(save_fn=save_env_value)
             print("  ✓ Claude Code credentials linked.")
-            import has_constants display_hades_home as _dhh_fn
+            from hades_constants import display_hades_home as _dhh_fn
 
             print(
                 f"    Hades will use Claude's credential store directly instead of copying a setup-token into {_dhh_fn()}/.env."
@@ -4226,7 +4226,7 @@ _UPDATE_CRITICAL_FILES = (
     "run_agent.py",
     "model_tools.py",
     "toolsets.py",
-    "has_constants.py",
+    "hades_constants.py",
 )
 
 
@@ -4299,7 +4299,7 @@ def _gateway_prompt(prompt_text: str, default: str = "", timeout: float = 300.0)
     """
     import json as _json
     import uuid as _uuid
-    import has_constants get_hades_home
+    from hades_constants import get_hades_home
 
     home = get_hades_home()
     prompt_path = home / ".update_prompt.json"
@@ -4349,7 +4349,7 @@ def _web_ui_build_needed(web_dir: Path) -> bool:
     has the newest mtime of any build output.
     """
     project_root = web_dir.parent.parent if web_dir.parent.name == "apps" else web_dir.parent
-    dist_dir = project_root / "has_cli" / "web_dist"
+    dist_dir = project_root / "hades_cli" / "web_dist"
     sentinel = dist_dir / ".vite" / "manifest.json"
     if not sentinel.exists():
         sentinel = dist_dir / "index.html"
@@ -4394,7 +4394,7 @@ def _run_with_idle_timeout(
     WSL2 with the default 4 GB cap) the build can stall or sit silent for
     minutes; users see a frozen terminal, assume the update is hung, and
     reboot — leaving the editable install in a half-state with the
-    ``hades`` launcher present but ``has_cli`` not importable.
+    ``hades`` launcher present but ``hades_cli`` not importable.
 
     This helper fixes both halves: stdout is streamed (so the user sees
     progress), and if no bytes have appeared on stdout/stderr for
@@ -4673,7 +4673,7 @@ def _build_web_ui(web_dir: Path, *, fatal: bool = False) -> bool:
         stderr_preview = build_output.strip()
         stderr_tail = "\n  ".join(stderr_preview.splitlines()[-10:]) if stderr_preview else ""
         project_root = web_dir.parent.parent if web_dir.parent.name == "apps" else web_dir.parent
-        dist_dir = project_root / "has_cli" / "web_dist"
+        dist_dir = project_root / "hades_cli" / "web_dist"
         dist_index = dist_dir / "index.html"
 
         # If a stale dist exists, serve it as a fallback instead of failing.
@@ -4785,7 +4785,7 @@ def _compute_desktop_content_hash(project_root: Path) -> str:
 
 def _desktop_stamp_path() -> Path:
     """Return the path to the desktop build stamp file under $HADES_HOME."""
-    import has_constants get_hades_home
+    from hades_constants import get_hades_home
     return get_hades_home() / "desktop-build-stamp.json"
 
 
@@ -5120,7 +5120,7 @@ def cmd_gui(args: argparse.Namespace):
         sys.exit(1)
 
     try:
-        from has_logging import setup_logging as _setup_logging_gui
+        from hades_logging import setup_logging as _setup_logging_gui
         _setup_logging_gui(mode="gui")
     except Exception:
         pass
@@ -5312,7 +5312,7 @@ def _find_stale_dashboard_pids(
     """
     patterns = [
         "hades dashboard",
-        "has_cli.main dashboard",
+        "hades_cli.main dashboard",
         "hades_cli/main.py dashboard",
     ]
     self_pid = os.getpid()
@@ -5356,7 +5356,7 @@ def _find_stale_dashboard_pids(
             # Linux / macOS: scan the process table via ps and match against
             # the same explicit patterns list used on Windows.  Using ps
             # (rather than `pgrep -f "hades.*dashboard"`) keeps us consistent
-            # with `has_cli.gateway._scan_gateway_pids` and avoids the
+            # with `hades_cli.gateway._scan_gateway_pids` and avoids the
             # greedy regex matching unrelated cmdlines that merely contain
             # both words (e.g. a chat session discussing "dashboard").
             result = subprocess.run(
@@ -6161,7 +6161,7 @@ def _count_commits_between(git_cmd: list[str], cwd: Path, base: str, head: str) 
 
 def _should_skip_upstream_prompt() -> bool:
     """Check if user previously declined to add upstream."""
-    import has_constants get_hades_home
+    from hades_constants import get_hades_home
 
     return (get_hades_home() / SKIP_UPSTREAM_PROMPT_FILE).exists()
 
@@ -6169,7 +6169,7 @@ def _should_skip_upstream_prompt() -> bool:
 def _mark_skip_upstream_prompt():
     """Create marker file to skip future upstream prompts."""
     try:
-        import has_constants get_hades_home
+        from hades_constants import get_hades_home
 
         (get_hades_home() / SKIP_UPSTREAM_PROMPT_FILE).touch()
     except Exception:
@@ -6318,7 +6318,7 @@ def _invalidate_update_cache():
     """
     homes = []
     # Default profile home (Docker-aware — uses /opt/data in Docker)
-    import has_constants get_default_hades_root
+    from hades_constants import get_default_hades_root
 
     default_home = get_default_hades_root()
     homes.append(default_home)
@@ -7734,7 +7734,7 @@ def _run_pre_update_backup(args) -> None:
 
     # Render path using display_hades_home so the user sees ~/.hades/...
     try:
-        import has_constants get_hades_home, display_hades_home
+        from hades_constants import get_hades_home, display_hades_home
 
         home = get_hades_home()
         try:
@@ -8366,7 +8366,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         has_desktop_app = _desktop_packaged_executable(desktop_dir) is not None or _desktop_dist_exists(desktop_dir)
         if (desktop_dir / "package.json").exists() and shutil.which("npm") and has_desktop_app:
             print("→ Checking if desktop app needs rebuilding...")
-            _desktop_build_cmd = [sys.executable, "-m", "has_cli.main", "desktop", "--build-only"]
+            _desktop_build_cmd = [sys.executable, "-m", "hades_cli.main", "desktop", "--build-only"]
             # Stream the build output live (long Electron builds otherwise
             # look hung). On the rare nonzero exit, retry once after waiting
             # again for the venv — this covers a still-settling rebuild window
@@ -8402,7 +8402,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         # attributes like display_hades_home() added since the last release.
         try:
             import importlib
-            import has_constants as _hc
+            import hades_constants as _hc
 
             importlib.reload(_hc)
         except Exception:
@@ -8792,7 +8792,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
             # systemd units without SIGUSR1 wiring this wait just times out
             # and we fall back to ``systemctl restart`` (the old behaviour).
             try:
-                import has_constants (
+                from hades_constants import (
                     DEFAULT_GATEWAY_RESTART_DRAIN_TIMEOUT as _DEFAULT_DRAIN,
                 )
             except Exception:
@@ -9354,7 +9354,7 @@ def cmd_profile(args):
         _is_wrapper_dir_in_path,
         _get_wrapper_dir,
     )
-    import has_constants display_hades_home
+    from hades_constants import display_hades_home
 
     action = getattr(args, "profile_action", None)
 
@@ -9586,7 +9586,7 @@ def cmd_profile(args):
         if name and not text_value and not auto_flag:
             try:
                 if _profiles_mod.normalize_profile_name(name) == "default":
-                    import has_constants get_hades_home as _hh
+                    from hades_constants import get_hades_home as _hh
                     profile_dir = Path(_hh())
                 else:
                     profile_dir = _profiles_mod.get_profile_dir(name)
@@ -9609,7 +9609,7 @@ def cmd_profile(args):
         if text_value:
             try:
                 if _profiles_mod.normalize_profile_name(name) == "default":
-                    import has_constants get_hades_home as _hh
+                    from hades_constants import get_hades_home as _hh
                     profile_dir = Path(_hh())
                 else:
                     profile_dir = _profiles_mod.get_profile_dir(name)
@@ -10036,7 +10036,7 @@ def cmd_dashboard(args):
     # Attach gui.log early so dashboard startup/build failures are captured in
     # the same logs directory as every other Hades surface.
     try:
-        from has_logging import setup_logging as _setup_logging_gui
+        from hades_logging import setup_logging as _setup_logging_gui
         _setup_logging_gui(mode="gui")
     except Exception:
         pass
@@ -10071,7 +10071,7 @@ def cmd_dashboard(args):
         _dist_root = (
             Path(os.environ["HADES_WEB_DIST"])
             if "HADES_WEB_DIST" in os.environ
-            else PROJECT_ROOT / "has_cli" / "web_dist"
+            else PROJECT_ROOT / "hades_cli" / "web_dist"
         )
         if not (_dist_root / "index.html").exists():
             print(f"✗ --skip-build was passed but no web dist found at: {_dist_root}")
@@ -10502,7 +10502,7 @@ def cmd_memory(args):
         print("\n  ✓ Memory provider: built-in only")
         print("  Saved to config.yaml\n")
     elif sub == "reset":
-        import has_constants get_hades_home, display_hades_home
+        from hades_constants import get_hades_home, display_hades_home
 
         mem_dir = get_hades_home() / "memories"
         target = getattr(args, "target", "all")
@@ -10594,7 +10594,7 @@ def cmd_tools(args):
 
 def cmd_insights(args):
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
         from agent.insights import InsightsEngine
 
         db = SessionDB()
@@ -11196,7 +11196,7 @@ def main():
         import json as _json
 
         try:
-            from has_state import SessionDB
+            from hades_state import SessionDB
 
             db = SessionDB()
         except Exception as e:

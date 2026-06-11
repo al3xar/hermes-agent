@@ -280,7 +280,7 @@ def kanban_home() -> Path:
     override = os.environ.get("HADES_KANBAN_HOME", "").strip()
     if override:
         return Path(override).expanduser()
-    from has_constants import get_default_hades_root
+    from hades_constants import get_default_hades_root
     return get_default_hades_root()
 
 
@@ -1460,7 +1460,7 @@ def connect(
                 # WAL doesn't work on network filesystems (NFS/SMB/FUSE). Shared helper
                 # falls back to DELETE with one WARNING so kanban stays usable there.
                 # See hades_state._WAL_INCOMPAT_MARKERS for detection logic.
-                from has_state import apply_wal_with_fallback
+                from hades_state import apply_wal_with_fallback
                 apply_wal_with_fallback(conn, db_label=f"kanban.db ({path.name})")
                 # FULL (was NORMAL): fsync before each checkpoint to narrow the
                 # crash window that can leave a b-tree page header torn.
@@ -6496,10 +6496,10 @@ def _rotate_worker_log(
 
 def _module_hades_argv() -> list[str]:
     """Return the interpreter-bound Hades CLI invocation."""
-    # ``has_cli.main`` is the console-script target declared in
+    # ``hades_cli.main`` is the console-script target declared in
     # pyproject.toml, NOT a top-level ``hades`` package — there is no
     # ``hades`` package to import.
-    return [sys.executable, "-m", "has_cli.main"]
+    return [sys.executable, "-m", "hades_cli.main"]
 
 
 def _absolute_hades_path(path: str) -> str:
@@ -6590,7 +6590,7 @@ def _resolve_hades_argv() -> list[str]:
        interpreter so the result is independent of ``$PATH``.
 
     Mirrors ``gateway.run._resolve_hades_bin`` for the same reason. Kept
-    local (not imported from gateway) because ``has_cli`` sits below
+    local (not imported from gateway) because ``hades_cli`` sits below
     ``gateway`` in the dependency order.
     """
     import shutil
@@ -7537,11 +7537,11 @@ def list_profiles_on_disk() -> list[str]:
     - the implicit ``default`` profile when the default Hades root exists
 
     Reads profile paths directly so this module has no import dependency on
-    ``has_cli.profiles`` (which pulls in a large chunk of the CLI startup
+    ``hades_cli.profiles`` (which pulls in a large chunk of the CLI startup
     path).
     """
     try:
-        from has_constants import get_default_hades_root
+        from hades_constants import get_default_hades_root
         default_root = get_default_hades_root()
         profiles_dir = default_root / "profiles"
     except Exception:

@@ -1,8 +1,8 @@
 """Windows ConPTY bridge for the `hades dashboard` chat tab.
 
-Drop-in counterpart to ``has_cli.pty_bridge.PtyBridge`` for native
+Drop-in counterpart to ``hades_cli.pty_bridge.PtyBridge`` for native
 Windows. Mirrors the exact public surface the ``/api/pty`` WebSocket
-handler in ``has_cli.web_server`` consumes: ``spawn``, ``read``,
+handler in ``hades_cli.web_server`` consumes: ``spawn``, ``read``,
 ``write``, ``resize``, ``close``, ``is_available``, plus the
 ``PtyUnavailableError`` type.
 

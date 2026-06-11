@@ -11,7 +11,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 # rich and prompt_toolkit are imported lazily (inside the functions that use

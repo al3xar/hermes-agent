@@ -3,7 +3,7 @@
 Wraps a child process behind a pseudo-terminal so its ANSI output can be
 streamed to a browser-side terminal emulator (xterm.js) and typed
 keystrokes can be fed back in.  The only caller today is the
-``/api/pty`` WebSocket endpoint in ``has_cli.web_server``.
+``/api/pty`` WebSocket endpoint in ``hades_cli.web_server``.
 
 Design constraints:
 

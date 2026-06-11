@@ -5,3 +5,8 @@ model:
   context_length: 262144
 terminal:
   backend: local
+gateway:
+  deepagents_mode: true
+plugins:
+  enabled:
+    - observability/langfuse

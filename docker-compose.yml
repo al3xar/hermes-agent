@@ -34,43 +34,28 @@ services:
       dockerfile: Dockerfile
     container_name: hades
     restart: unless-stopped
-    network_mode: host
-    # Volúmenes deshabilitados temporalmente: en Podman daban problemas de
-    # permisos de escritura. Todo corre dentro del contenedor por ahora; los
-    # datos en /opt/data NO persisten entre recreaciones del contenedor.
+    ports:
+      - 127.0.0.1:8080:8080
+    networks:
+      - hades-net
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
-      #   - ~/.hades:/opt/data
-      # Hades lee el config en $HADES_HOME/config.yaml (= /opt/data/config.yaml),
-      # NO en /opt/data/.hades (ese montaje antiguo era una ruta muerta). Bind
-      # del fichero concreto, read-only: sombrea el config sembrado por defecto
-      # sin tocar el resto del home (volumen anónimo) y sin los problemas de
-      # permisos de escritura de Podman.
       - ./.hades-config/config.yaml:/opt/data/config.yaml:ro
     environment:
+      - HADES_HOME=/opt/data
       - HADES_UID=${HADES_UID:-501}
       - HADES_GID=${HADES_GID:-20}
       - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
-      # To expose the OpenAI-compatible API server beyond localhost,
-      # uncomment BOTH lines (API_SERVER_KEY is mandatory for auth):
-      # - API_SERVER_HOST=0.0.0.0
-      # - API_SERVER_KEY=${API_SERVER_KEY}
-      # Microsoft Teams — uncomment and fill in to enable Teams gateway.
-      # Register your bot at https://dev.botframework.com/ to get these values.
-      # - TEAMS_CLIENT_ID=${TEAMS_CLIENT_ID}
-      # - TEAMS_CLIENT_SECRET=${TEAMS_CLIENT_SECRET}
-      # - TEAMS_TENANT_ID=${TEAMS_TENANT_ID}
-      # - TEAMS_ALLOWED_USERS=${TEAMS_ALLOWED_USERS}
-      # - TEAMS_PORT=${TEAMS_PORT:-3978}
-      # Google Chat — uncomment and fill in to enable the Google Chat gateway.
-      # See website/docs/user-guide/messaging/google_chat.md for the full setup.
-      # The SA JSON path must point to a file mounted into the container —
-      # add a volume entry above (e.g. ``- ~/.hades/google-chat-sa.json:/secrets/google-chat-sa.json:ro``)
-      # then set GOOGLE_CHAT_SERVICE_ACCOUNT_JSON to that mount path.
-      # - GOOGLE_CHAT_PROJECT_ID=${GOOGLE_CHAT_PROJECT_ID}
-      # - GOOGLE_CHAT_SUBSCRIPTION_NAME=${GOOGLE_CHAT_SUBSCRIPTION_NAME}
-      # - GOOGLE_CHAT_SERVICE_ACCOUNT_JSON=${GOOGLE_CHAT_SERVICE_ACCOUNT_JSON}
-      # - GOOGLE_CHAT_ALLOWED_USERS=${GOOGLE_CHAT_ALLOWED_USERS}
-    command: ["gateway", "run"]
+      - HADES_LANGFUSE_PUBLIC_KEY=${HADES_LANGFUSE_PUBLIC_KEY:-pk-lf-dev}
+      - HADES_LANGFUSE_SECRET_KEY=${HADES_LANGFUSE_SECRET_KEY:-sk-lf-dev}
+      - HADES_LANGFUSE_BASE_URL=${HADES_LANGFUSE_BASE_URL:-http://langfuse-web:3000}
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_PORT=8080
+      - API_SERVER_KEY=dev-key-change-me
+      - HADES_GATEWAY_BOOTSTRAP_STATE=running
+      - GATEWAY_ALLOW_ALL_USERS=true
+    command: ["sleep", "infinity"]
 
   dashboard:
     image: al3xar/hades-agent:latest
@@ -79,32 +64,199 @@ services:
       dockerfile: Dockerfile
     container_name: hades-dashboard
     restart: unless-stopped
-    # Sin network_mode: host. En macOS + Podman, host networking bindea a la
-    # VM (no al Mac) e ignora el mapeo `ports`, dejando el dashboard
-    # inalcanzable desde localhost del host. Con red bridge + `ports` de abajo,
-    # gvproxy reenvía localhost:9119 del Mac → contenedor:9119.
+    networks:
+      - hades-net
     depends_on:
       - gateway
-    # Volúmenes deshabilitados temporalmente (ver nota en el servicio gateway).
-    # volumes:
-    #   - ./.hades-config:/opt/data/.hades:ro
+    volumes:
+      - ./.hades-config/config.yaml:/opt/data/config.yaml:ro
     ports:
       - 9119:9119
     environment:
       - HADES_UID=${HADES_UID:-501}
       - HADES_GID=${HADES_GID:-20}
-      - HADES_HOME=/tmp/hades
+      - HADES_HOME=/opt/data
+      - HADES_DASHBOARD=1
+      - HADES_DASHBOARD_INSECURE=1
       - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
-    # Sin este `command`, la imagen arranca el agente interactivo por defecto,
-    # que muere al no haber TTY y entra en bucle de reinicio. `dashboard`
-    # levanta la web UI. La primera vez construye el bundle con npm (no hay
-    # dist pre-construido en la imagen), así que --skip-build no es viable.
-    # --no-open evita que intente abrir un navegador.
-    #
-    # --host 0.0.0.0 lo hace accesible desde fuera del contenedor; requiere
-    # --insecure (el dashboard se niega a bindear fuera de localhost sin él).
-    # ⚠ ATENCIÓN: el dashboard almacena API keys y NO tiene auth por defecto.
-    # Exponerlo en 0.0.0.0 lo deja accesible para cualquiera que alcance el
-    # puerto 9119. Úsalo solo en una red de confianza o detrás de un proxy
-    # con autenticación.
-    command: ["dashboard", "--no-open", "--host", "0.0.0.0", "--insecure"]
+      - HADES_LANGFUSE_PUBLIC_KEY=${HADES_LANGFUSE_PUBLIC_KEY:-pk-lf-dev}
+      - HADES_LANGFUSE_SECRET_KEY=${HADES_LANGFUSE_SECRET_KEY:-sk-lf-dev}
+      - HADES_LANGFUSE_BASE_URL=${HADES_LANGFUSE_BASE_URL:-http://langfuse-web:3000}
+    command: ["sleep", "infinity"]
+
+  # Langfuse v3
+  # UI: http://localhost:3000 — login con LANGFUSE_INIT_USER_EMAIL /
+  # LANGFUSE_INIT_USER_PASSWORD.
+  langfuse-web:
+    image: langfuse/langfuse:3
+    container_name: langfuse
+    restart: unless-stopped
+    networks:
+      - hades-net
+    depends_on:
+      - langfuse-db
+      - langfuse-clickhouse
+      - langfuse-redis
+      - langfuse-minio
+    ports:
+      - 127.0.0.1:3000:3000
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/postgres
+      - SALT=devsalt
+      - ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+      - NEXTAUTH_SECRET=secret
+      - NEXTAUTH_URL=http://langfuse-web:3000
+      - TELEMETRY_ENABLED=false
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse-clickhouse:9000
+      - CLICKHOUSE_URL=http://langfuse-clickhouse:8123
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=langfuse-redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=myredissecret
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://langfuse-minio:9000
+      - LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID=minio
+      - LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=miniosecret
+      - LANGFUSE_S3_MEDIA_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://langfuse-minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minio
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=miniosecret
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
+      - LANGFUSE_S3_MEDIA_UPLOAD_REGION=us-east-1
+      - LANGFUSE_INIT_ORG_ID=org-hades
+      - LANGFUSE_INIT_ORG_NAME=Hades
+      - LANGFUSE_INIT_PROJECT_ID=hades-agent
+      - LANGFUSE_INIT_PROJECT_NAME=Hades Agent
+      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=${HADES_LANGFUSE_PUBLIC_KEY:-pk-lf-dev}
+      - LANGFUSE_INIT_PROJECT_SECRET_KEY=${HADES_LANGFUSE_SECRET_KEY:-sk-lf-dev}
+      - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-admin@hades.local}
+      - LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME:-Hades Admin}
+      - LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_INIT_USER_PASSWORD:-hades-admin-change-me}
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    restart: unless-stopped
+    networks:
+      - hades-net
+    depends_on:
+      - langfuse-db
+      - langfuse-clickhouse
+      - langfuse-redis
+      - langfuse-minio
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/postgres
+      - SALT=devsalt
+      - ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse-clickhouse:9000
+      - CLICKHOUSE_URL=http://langfuse-clickhouse:8123
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=langfuse-redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=myredissecret
+      - TELEMETRY_ENABLED=false
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://langfuse-minio:9000
+      - LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID=minio
+      - LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=miniosecret
+      - LANGFUSE_S3_MEDIA_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://langfuse-minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minio
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=miniosecret
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
+      - LANGFUSE_S3_MEDIA_UPLOAD_REGION=us-east-1
+
+  langfuse-db:
+    image: postgres:17
+    container_name: langfuse-db
+    restart: unless-stopped
+    networks:
+      - hades-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - TZ=UTC
+      - PGTZ=UTC
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: langfuse-clickhouse
+    restart: unless-stopped
+    networks:
+      - hades-net
+    user: "101:101"
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+    ports:
+      - 127.0.0.1:8123:8123
+      - 127.0.0.1:9000:9000
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    container_name: langfuse-minio
+    restart: unless-stopped
+    networks:
+      - hades-net
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=miniosecret
+    ports:
+      - 9090:9000
+    volumes:
+      - langfuse-minio-data:/data
+
+  langfuse-redis:
+    image: redis:7
+    container_name: langfuse-redis
+    restart: unless-stopped
+    networks:
+      - hades-net
+    command: >
+      --requirepass myredissecret
+      --maxmemory-policy noeviction
+    ports:
+      - 127.0.0.1:6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+networks:
+  hades-net:
+    driver: bridge
+
+volumes:
+  langfuse-db-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-minio-data:

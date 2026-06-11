@@ -27,7 +27,7 @@ def curator_env(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("HADES_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-    import has_constants
+    import hades_constants
     importlib.reload(hades_constants)
     from agent import curator
     importlib.reload(curator)

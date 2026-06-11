@@ -1,12 +1,12 @@
-"""Tests for has_constants module."""
+"""Tests for hades_constants module."""
 
 import os
 from pathlib import Path
 
 import pytest
 
-import has_constants
-from has_constants import (
+import hades_constants
+from hades_constants import (
     VALID_REASONING_EFFORTS,
     get_default_hades_root,
     get_hades_home,
@@ -75,7 +75,7 @@ class TestGetDefaultHadesRoot:
         monkeypatch.delenv("HADES_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
-        monkeypatch.setattr(has_constants.sys, "platform", "win32")
+        monkeypatch.setattr(hades_constants.sys, "platform", "win32")
 
         assert get_default_hades_root() == local_appdata / "hades"
 
@@ -85,7 +85,7 @@ class TestGetDefaultHadesRoot:
         monkeypatch.delenv("HADES_HOME", raising=False)
         monkeypatch.delenv("LOCALAPPDATA", raising=False)
         monkeypatch.setattr(Path, "home", lambda: home)
-        monkeypatch.setattr(has_constants.sys, "platform", "win32")
+        monkeypatch.setattr(hades_constants.sys, "platform", "win32")
 
         assert get_default_hades_root() == home / "AppData" / "Local" / "hades"
 
@@ -99,8 +99,8 @@ class TestGetHadesHome:
         monkeypatch.delenv("HADES_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
-        monkeypatch.setattr(has_constants.sys, "platform", "win32")
-        monkeypatch.setattr(has_constants, "_profile_fallback_warned", False)
+        monkeypatch.setattr(hades_constants.sys, "platform", "win32")
+        monkeypatch.setattr(hades_constants, "_profile_fallback_warned", False)
 
         assert get_hades_home() == local_appdata / "hades"
 
@@ -110,7 +110,7 @@ class TestIsContainer:
 
     def _reset_cache(self, monkeypatch):
         """Reset the cached detection result before each test."""
-        monkeypatch.setattr(has_constants, "_container_detected", None)
+        monkeypatch.setattr(hades_constants, "_container_detected", None)
 
     def test_detects_dockerenv(self, monkeypatch, tmp_path):
         """/.dockerenv triggers container detection."""
@@ -148,7 +148,7 @@ class TestIsContainer:
 
     def test_caches_result(self, monkeypatch):
         """Second call uses cached value without re-probing."""
-        monkeypatch.setattr(has_constants, "_container_detected", True)
+        monkeypatch.setattr(hades_constants, "_container_detected", True)
         assert is_container() is True
         # Even if we make os.path.exists return False, cached value wins
         monkeypatch.setattr(os.path, "exists", lambda p: False)

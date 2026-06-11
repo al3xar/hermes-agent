@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from hades_cli.config import get_hades_home, get_config_path, load_config, save_config
-from has_constants import get_optional_skills_dir
+from hades_constants import get_optional_skills_dir
 from hades_cli.setup import (
     Colors,
     color,

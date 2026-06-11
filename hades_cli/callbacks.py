@@ -12,7 +12,7 @@ import time as _time
 from hades_cli.banner import cprint, _DIM, _RST
 from hades_cli.config import save_env_value_secure
 from hades_cli.secret_prompt import masked_secret_prompt
-from has_constants import display_hades_home
+from hades_constants import display_hades_home
 
 
 def clarify_callback(cli, question, choices):

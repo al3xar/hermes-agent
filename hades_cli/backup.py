@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from has_constants import get_default_hades_root, get_hades_home, display_hades_home
+from hades_constants import get_default_hades_root, get_hades_home, display_hades_home
 
 logger = logging.getLogger(__name__)
 

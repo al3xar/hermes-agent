@@ -256,38 +256,36 @@ const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
 
 export const DARK_THEME: Theme = {
   color: {
-    primary: '#FFD700',
-    accent: '#FFBF00',
-    border: '#CD7F32',
-    text: '#FFF8DC',
-    muted: '#CC9B1F',
-    // Bumped from the old `#B8860B` darkgoldenrod (~53% luminance) which
-    // read as barely-visible on dark terminals for long body text.  The
-    // new value sits ~60% luminance — readable without losing the "muted /
-    // secondary" semantic.  Field labels still use `label` (65%) which
+    primary: '#DC143C',
+    accent: '#8B0000',
+    border: '#8B0000',
+    text: '#FFD6DC',
+    muted: '#8B4557',
+    // Same ~60% luminance as the old golds — readable without losing the
+    // "muted / secondary" semantic.  Field labels still use `label` which
     // stays brighter so hierarchy holds.
     completionBg: '#1a1a2e',
     completionCurrentBg: '#333355',
     completionMetaBg: '#1a1a2e',
     completionMetaCurrentBg: '#333355',
 
-    label: '#DAA520',
+    label: '#B3405E',
     ok: '#4caf50',
     error: '#ef5350',
-    warn: '#ffa726',
+    warn: '#c62828',
 
-    prompt: '#FFF8DC',
+    prompt: '#FFD6DC',
     // sessionLabel/sessionBorder intentionally track the `dim` value — they
     // are "same role, same colour" by design.  fromSkin's banner_dim fallback
     // relies on this pairing (#11300).
-    sessionLabel: '#CC9B1F',
-    sessionBorder: '#CC9B1F',
+    sessionLabel: '#8B4557',
+    sessionBorder: '#8B4557',
 
     statusBg: '#1a1a2e',
     statusFg: '#C0C0C0',
     statusGood: '#8FBC8F',
-    statusWarn: '#FFD700',
-    statusBad: '#FF8C00',
+    statusWarn: '#DC143C',
+    statusBad: '#B3405E',
     statusCritical: '#FF6B6B',
     selectionBg: '#3a3a55',
 
@@ -304,37 +302,37 @@ export const DARK_THEME: Theme = {
   bannerHero: ''
 }
 
-// Light-terminal palette: darker golds/ambers that stay legible on white
+// Light-terminal palette: darker reds/burgundies that stay legible on white
 // backgrounds. Same shape as DARK_THEME so `fromSkin` still layers on top
 // cleanly (#11300).
 export const LIGHT_THEME: Theme = {
   color: {
-    primary: '#8B6914',
-    accent: '#A0651C',
-    border: '#7A4F1F',
-    text: '#3D2F13',
-    muted: '#7A5A0F',
+    primary: '#6B1A2E',
+    accent: '#800020',
+    border: '#5C1025',
+    text: '#3D1318',
+    muted: '#703040',
     completionBg: '#F5F5F5',
-    completionCurrentBg: mix('#F5F5F5', '#A0651C', 0.25),
+    completionCurrentBg: mix('#F5F5F5', '#800020', 0.25),
     completionMetaBg: '#F5F5F5',
-    completionMetaCurrentBg: mix('#F5F5F5', '#A0651C', 0.25),
+    completionMetaCurrentBg: mix('#F5F5F5', '#800020', 0.25),
 
-    label: '#7A5A0F',
+    label: '#703040',
     ok: '#2E7D32',
     error: '#C62828',
-    warn: '#E65100',
+    warn: '#B71C1C',
 
-    prompt: '#2B2014',
-    sessionLabel: '#7A5A0F',
-    sessionBorder: '#7A5A0F',
+    prompt: '#3D1318',
+    sessionLabel: '#703040',
+    sessionBorder: '#703040',
 
     statusBg: '#F5F5F5',
     statusFg: '#333333',
     statusGood: '#2E7D32',
-    statusWarn: '#8B6914',
-    statusBad: '#D84315',
+    statusWarn: '#6B1A2E',
+    statusBad: '#703040',
     statusCritical: '#B71C1C',
-    selectionBg: '#D4E4F7',
+    selectionBg: '#F0D4D7',
 
     diffAdded: 'rgb(200,240,200)',
     diffRemoved: 'rgb(240,200,200)',

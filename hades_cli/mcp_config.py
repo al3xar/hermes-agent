@@ -24,7 +24,7 @@ from hades_cli.config import (
     get_hades_home,  # noqa: F401 — used by test mocks
 )
 from hades_cli.colors import Colors, color
-from has_constants import display_hades_home
+from hades_constants import display_hades_home
 from tools.mcp_tool import _ENV_VAR_PATTERN
 
 logger = logging.getLogger(__name__)

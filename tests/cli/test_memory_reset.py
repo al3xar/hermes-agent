@@ -36,7 +36,7 @@ def _run_memory_reset(target="all", yes=False, monkeypatch=None, confirm_input="
 
     Simulates what happens when `hades memory reset` is run.
     """
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
 
     mem_dir = get_hades_home() / "memories"
     files_to_reset = []

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from hades_cli.config import get_hades_home, get_env_path, get_project_root, load_config
 from hades_cli.env_loader import load_hades_dotenv
-from has_constants import display_hades_home
+from hades_constants import display_hades_home
 from agent.skill_utils import is_excluded_skill_path
 
 

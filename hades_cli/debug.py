@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 from utils import atomic_replace
 
 logger = logging.getLogger(__name__)

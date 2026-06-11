@@ -828,6 +828,12 @@ def load_gateway_config() -> GatewayConfig:
             if "max_concurrent_sessions" in yaml_cfg:
                 gw_data["max_concurrent_sessions"] = yaml_cfg["max_concurrent_sessions"]
 
+            if isinstance(gateway_section, dict) and "deepagents_mode" in gateway_section:
+                gw_data["deepagents_mode"] = gateway_section["deepagents_mode"]
+
+            if "deepagents_mode" in yaml_cfg:
+                gw_data["deepagents_mode"] = yaml_cfg["deepagents_mode"]
+
             streaming_cfg = yaml_cfg.get("streaming")
             if not isinstance(streaming_cfg, dict):
                 # Fall back to nested gateway.streaming written by

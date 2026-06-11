@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 
 from hades_cli.colors import Colors, color
 
@@ -107,9 +107,9 @@ def remove_wrapper_script():
     for wrapper in wrapper_paths:
         if wrapper.exists():
             try:
-                # Check if it's our wrapper (contains has_cli reference)
+                # Check if it's our wrapper (contains hades_cli reference)
                 content = wrapper.read_text()
-                if 'has_cli' in content or 'hades-agent' in content:
+                if 'hades_cli' in content or 'hades-agent' in content:
                     wrapper.unlink()
                     removed.append(wrapper)
             except Exception as e:
@@ -421,7 +421,7 @@ def _is_windows() -> bool:
 def _is_default_hades_home(hades_home: Path) -> bool:
     """Return True when ``hades_home`` points at the default (non-profile) root."""
     try:
-        from has_constants import get_default_hades_root
+        from hades_constants import get_default_hades_root
         return hades_home.resolve() == get_default_hades_root().resolve()
     except Exception:
         return False
@@ -459,7 +459,7 @@ def _uninstall_profile(profile) -> None:
     # 1. Stop and remove this profile's gateway service.
     #    Use `python -m .hades_cli.main` so we don't depend on a `hades`
     #    wrapper that may be half-removed mid-uninstall.
-    hades_invocation = [_sys.executable, "-m", "has_cli.main", "--profile", name]
+    hades_invocation = [_sys.executable, "-m", "hades_cli.main", "--profile", name]
     for subcmd in ("stop", "uninstall"):
         try:
             subprocess.run(
@@ -901,10 +901,10 @@ def main(argv=None) -> int:
     venv that contains the running ``python.exe`` — and a running .exe is
     mandatory-locked, so doing that from the venv's own interpreter half-fails.
     The desktop launches this with the system Python + ``PYTHONPATH=<agentRoot>``
-    so ``import has_cli`` resolves from source while the venv is torn down.
+    so ``import hades_cli`` resolves from source while the venv is torn down.
 
-    This module imports only stdlib + ``hades_constants`` + ``has_cli.colors``
-    (and lazily ``has_cli.gui_uninstall``), so it runs fine under a bare
+    This module imports only stdlib + ``hades_constants`` + ``hades_cli.colors``
+    (and lazily ``hades_cli.gui_uninstall``), so it runs fine under a bare
     system Python with no site-packages from the venv.
     """
     import argparse

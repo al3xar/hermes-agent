@@ -9,13 +9,13 @@ functions are the interactive provider-setup branches dispatched by
 Behavior-neutral: each function is lifted verbatim. ``select_provider_and_model``
 in main.py re-imports them (``from hades_cli.model_setup_flows import *``-style
 explicit import) so existing call sites — and test monkeypatches that target
-``has_cli.main._model_flow_*`` — keep resolving against main.py's namespace.
+``hades_cli.main._model_flow_*`` — keep resolving against main.py's namespace.
 
 main.py-internal helpers the flows call (``_prompt_api_key``, ``_save_custom_provider``,
 the reasoning-effort/stepfun/qwen helpers, ``_run_anthropic_oauth_flow``, …) are
 imported lazily inside the flows (``from hades_cli.main import ...`` resolves at
 call time, when main.py is fully loaded) so this module never imports
-``has_cli.main`` at import time -> no import cycle.
+``hades_cli.main`` at import time -> no import cycle.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import subprocess
 def _model_flow_openrouter(config, current_model=""):
     """OpenRouter provider: ensure API key, then pick model."""
     from hades_cli.main import _prompt_api_key
-    from has_constants import OPENROUTER_BASE_URL
+    from hades_constants import OPENROUTER_BASE_URL
     from hades_cli.auth import (
         ProviderConfig,
         _prompt_model_selection,

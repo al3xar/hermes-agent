@@ -116,7 +116,7 @@ def _prefix(request: Request) -> str:
     Local indirection so the routes pass a consistent value to the
     cookie helpers (cookie name + Path attribute) and the gate's
     redirect builders (login_url construction). See
-    ``has_cli.dashboard_auth.prefix`` for the normalisation rules.
+    ``hades_cli.dashboard_auth.prefix`` for the normalisation rules.
     """
     from hades_cli.dashboard_auth.prefix import prefix_from_request
     return prefix_from_request(request)

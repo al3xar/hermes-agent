@@ -9,7 +9,7 @@ before invoking them.
 
 Host-side call sites (setup wizard, uninstall, status) continue to use
 the existing module-level functions in .hades_cli.gateway and
-has_cli.gateway_windows directly. This protocol is a thin facade
+hades_cli.gateway_windows directly. This protocol is a thin facade
 used by new code that needs to be backend-agnostic — specifically the
 profile create/delete hooks (Phase 4) and the s6 dispatch path in
 ``hades gateway start/stop/restart`` when running inside a container.
@@ -100,7 +100,7 @@ def detect_service_manager() -> ServiceManagerKind:
     # Imports deferred so importing this module doesn't drag in the
     # whole gateway dependency graph for callers that only need the
     # Protocol type or validate_profile_name().
-    from has_constants import is_container
+    from hades_constants import is_container
     from hades_cli.gateway import (
         is_macos,
         is_windows,
@@ -155,7 +155,7 @@ def _s6_running() -> bool:
 # Backend wrappers
 #
 # These adapters are thin facades over the existing module-level functions
-# in ``has_cli.gateway`` (systemd/launchd) and ``has_cli.gateway_windows``
+# in ``hades_cli.gateway`` (systemd/launchd) and ``hades_cli.gateway_windows``
 # (Windows Scheduled Tasks). The protocol's ``name`` parameter is currently
 # unused for host backends — they operate on whichever profile is currently
 # active (set via the ``hades -p <profile>`` flag before the call). This
@@ -242,7 +242,7 @@ class LaunchdServiceManager(_RegistrationUnsupportedMixin):
 
 
 class WindowsServiceManager(_RegistrationUnsupportedMixin):
-    """Thin wrapper around ``has_cli.gateway_windows`` (Scheduled Task /
+    """Thin wrapper around ``hades_cli.gateway_windows`` (Scheduled Task /
     Startup-folder fallback).
 
     The native Windows backend uses a Scheduled Task rather than a true
@@ -580,7 +580,7 @@ class S6ServiceManager:
         the top of $HADES_HOME, not under profiles/). It must be
         spelled this way because ``_profile_suffix()`` returns the
         empty string for the root profile, and the dispatcher in
-        ``has_cli.gateway`` maps that empty string to the
+        ``hades_cli.gateway`` maps that empty string to the
         ``gateway-default`` service slot. Passing ``-p default`` here
         would instead look up ``$HADES_HOME/profiles/default/`` — a
         completely different (and almost always nonexistent) profile.
@@ -591,7 +591,7 @@ class S6ServiceManager:
         ``port`` parameter that was passed in but never substituted
         into the rendered script (it was carried in for "API parity"
         with a deterministic SHA-256 allocator in
-        ``has_cli.profiles._allocate_gateway_port``). PR #30136
+        ``hades_cli.profiles._allocate_gateway_port``). PR #30136
         review item I5 retired both the allocator and the parameter
         because they were dead code through the entire stack.
         """

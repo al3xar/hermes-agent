@@ -21,7 +21,7 @@ from hades_cli.nous_account import (
 )
 from hades_cli.nous_subscription import get_nous_subscription_features
 from hades_cli.runtime_provider import resolve_requested_provider
-from has_constants import OPENROUTER_MODELS_URL
+from hades_constants import OPENROUTER_MODELS_URL
 from tools.tool_backend_helpers import managed_nous_tools_enabled
 
 def check_mark(ok: bool) -> str:
@@ -86,7 +86,7 @@ def _effective_provider_label() -> str:
     return provider_label(effective)
 
 
-from has_constants import is_termux as _is_termux
+from hades_constants import is_termux as _is_termux
 
 
 def show_status(args):

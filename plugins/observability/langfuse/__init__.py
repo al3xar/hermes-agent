@@ -34,7 +34,12 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 try:
-    from langfuse import Langfuse, propagate_attributes
+    from langfuse import Langfuse
+
+    try:
+        from langfuse import propagate_attributes
+    except ImportError:
+        propagate_attributes = None
 except Exception:  # pragma: no cover - fail-open when optional dep is missing
     Langfuse = None
     propagate_attributes = None
@@ -197,7 +202,7 @@ def _get_langfuse() -> Optional[Langfuse]:
     kwargs: Dict[str, Any] = {
         "public_key": public_key,
         "secret_key": secret_key,
-        "base_url": base_url,
+        "host": base_url,
     }
     if environment:
         kwargs["environment"] = environment

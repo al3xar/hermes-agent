@@ -3,7 +3,7 @@ import sys
 
 def test_sessions_delete_accepts_unique_id_prefix(monkeypatch, capsys):
     import hades_cli.main as main_mod
-    import has_state
+    import hades_state
 
     captured = {}
 
@@ -39,7 +39,7 @@ def test_sessions_delete_accepts_unique_id_prefix(monkeypatch, capsys):
 
 def test_sessions_delete_reports_not_found_when_prefix_is_unknown(monkeypatch, capsys):
     import hades_cli.main as main_mod
-    import has_state
+    import hades_state
 
     class FakeDB:
         def resolve_session_id(self, session_id):
@@ -67,7 +67,7 @@ def test_sessions_delete_reports_not_found_when_prefix_is_unknown(monkeypatch, c
 def test_sessions_delete_handles_eoferror_on_confirm(monkeypatch, capsys):
     """sessions delete should not crash when stdin is closed (non-TTY)."""
     import hades_cli.main as main_mod
-    import has_state
+    import hades_state
 
     class FakeDB:
         def resolve_session_id(self, session_id):
@@ -95,7 +95,7 @@ def test_sessions_delete_handles_eoferror_on_confirm(monkeypatch, capsys):
 def test_sessions_prune_handles_eoferror_on_confirm(monkeypatch, capsys):
     """sessions prune should not crash when stdin is closed (non-TTY)."""
     import hades_cli.main as main_mod
-    import has_state
+    import hades_state
 
     class FakeDB:
         def prune_sessions(self, **kwargs):

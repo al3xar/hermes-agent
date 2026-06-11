@@ -861,6 +861,27 @@ def test_resolve_model_strips_config_model(monkeypatch):
     assert server._resolve_model() == "nous/hades-test"
 
 
+def test_resolve_model_reads_model_subkey_when_no_default(monkeypatch):
+    """A model block keyed under "model" (e.g. a custom/vLLM provider) must
+    resolve, not fall through to an empty model — which the deepagents runtime
+    would otherwise replace with "gpt-4o" and send to the wrong endpoint."""
+    monkeypatch.delenv("HADES_MODEL", raising=False)
+    monkeypatch.delenv("HADES_INFERENCE_MODEL", raising=False)
+    monkeypatch.setattr(
+        server,
+        "_load_cfg",
+        lambda: {
+            "model": {
+                "provider": "custom",
+                "model": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+                "base_url": "https://vllm.example/v1",
+            }
+        },
+    )
+
+    assert server._resolve_model() == "nvidia/Qwen3.6-35B-A3B-NVFP4"
+
+
 def test_startup_runtime_uses_tui_provider_env(monkeypatch):
     monkeypatch.setenv("HADES_MODEL", "nous/hades-test")
     monkeypatch.setenv("HADES_TUI_PROVIDER", "nous")

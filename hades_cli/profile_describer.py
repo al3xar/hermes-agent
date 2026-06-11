@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from has_cli import profiles as profiles_mod
+from hades_cli import profiles as profiles_mod
 from agent.skill_utils import is_excluded_skill_path
 
 logger = logging.getLogger(__name__)
@@ -179,7 +179,7 @@ def describe_profile(
 
     try:
         if canon == "default":
-            from has_constants import get_hades_home  # type: ignore
+            from hades_constants import get_hades_home  # type: ignore
             profile_dir = Path(get_hades_home())
         else:
             profile_dir = profiles_mod.get_profile_dir(canon)

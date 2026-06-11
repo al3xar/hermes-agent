@@ -1037,6 +1037,18 @@ class APIServerAdapter(BasePlatformAdapter):
         user_config = _load_gateway_config()
         enabled_toolsets = sorted(_get_platform_tools(user_config, "api_server"))
 
+        # Honor gateway.deepagents_mode (or top-level deepagents_mode) from
+        # config.yaml — same precedence as GatewayConfig.from_dict — so the
+        # API server runs the same runtime as the messaging platforms.
+        _gw_section = user_config.get("gateway")
+        _deepagents_raw = (
+            _gw_section.get("deepagents_mode") if isinstance(_gw_section, dict) else None
+        )
+        if _deepagents_raw is None:
+            _deepagents_raw = user_config.get("deepagents_mode")
+        if str(_deepagents_raw).strip().lower() in {"true", "1", "yes", "on"}:
+            runtime_kwargs["runtime"] = "deepagents"
+
         max_iterations = int(os.getenv("HADES_MAX_ITERATIONS", "90"))
 
         # Load fallback provider chain so the API server platform has the

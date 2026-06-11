@@ -64,7 +64,7 @@ class _HadesMiddleware(AgentMiddleware):
         self._agent = hades_agent
         self._interrupt = _HadesInterruptSignal()
 
-    async def before_agent(self, state: dict, **kwargs) -> dict:
+    def before_agent(self, state: dict, **kwargs) -> dict:
         """Run before the model is called.
 
         - Prefetch memory context (Hades memory_manager).
@@ -87,7 +87,7 @@ class _HadesMiddleware(AgentMiddleware):
 
         return state
 
-    async def after_agent(self, state: dict, **kwargs) -> dict:
+    def after_agent(self, state: dict, **kwargs) -> dict:
         """Run after the model is called.
 
         - Save new context to memory.

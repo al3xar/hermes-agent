@@ -40,7 +40,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 
 from hades_cli.colors import Colors, color
 
@@ -161,7 +161,7 @@ def agent_is_installed(hades_home: Path) -> bool:
     agent_root = _agent_root(hades_home)
     # A real install has the package source + a venv. Either signal alone is
     # enough — a source checkout without a venv is still "the agent is here".
-    if (agent_root / "has_cli").is_dir():
+    if (agent_root / "hades_cli").is_dir():
         return True
     if (agent_root / "venv").is_dir() or (agent_root / ".venv").is_dir():
         return True
@@ -234,7 +234,7 @@ def uninstall_gui(hades_home: "Path | None" = None, *, remove_userdata: bool = T
         system package manager and are reported, not force-removed)
       - the Electron ``userData`` directory (unless ``remove_userdata=False``)
 
-    Never touches ``hades-agent/has_cli`` (agent source), ``venv/``, or any
+    Never touches ``hades-agent/hades_cli`` (agent source), ``venv/``, or any
     config / sessions / .env under ``$HADES_HOME``.
 
     Returns the list of paths actually removed.

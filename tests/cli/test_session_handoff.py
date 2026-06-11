@@ -16,7 +16,7 @@ import time
 
 import pytest
 
-from has_state import SessionDB
+from hades_state import SessionDB
 
 
 class TestHandoffStateDB:

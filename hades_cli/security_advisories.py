@@ -326,7 +326,7 @@ _BANNER_REPEAT_HOURS = 24
 
 def _banner_cache_path() -> Optional[Path]:
     try:
-        from has_constants import get_hades_home
+        from hades_constants import get_hades_home
         cache_dir = Path(get_hades_home()) / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir / _BANNER_CACHE_FILE

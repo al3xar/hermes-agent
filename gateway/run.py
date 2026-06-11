@@ -2811,10 +2811,12 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             "args": list(runtime_kwargs.get("args") or []),
             "credential_pool": runtime_kwargs.get("credential_pool"),
             "max_tokens": runtime_kwargs.get("max_tokens"),
-            "deepagents_mode": runtime_kwargs.pop("deepagents_mode", False),
         }
-        if route["runtime"].get("deepagents_mode"):
-            route["runtime"]["runtime"] = "deepagents"
+        # ``runtime`` is splatted into AIAgent(**...), whose signature has no
+        # ``deepagents_mode`` kwarg — map the flag onto the ``runtime``
+        # selector instead of forwarding it.
+        if runtime_kwargs.pop("deepagents_mode", False):
+            runtime["runtime"] = "deepagents"
         route = {
             "model": model,
             "runtime": runtime,
@@ -12013,7 +12015,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
                 runtime.get("base_url", ""),
                 runtime.get("provider", ""),
                 runtime.get("api_mode", ""),
-                runtime.get("deepagents_mode", False),
+                runtime.get("runtime", "native"),
                 sorted(enabled_toolsets) if enabled_toolsets else [],
                 # reasoning_config excluded — it's set per-message on the
                 # cached agent and doesn't affect system prompt or tools.

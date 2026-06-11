@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 from typing import Dict
 
-from has_constants import display_hades_home
+from hades_constants import display_hades_home
 from utils import atomic_replace
 from hades_cli.config import cfg_get
 
@@ -29,7 +29,7 @@ _SUBSCRIPTIONS_FILE_MODE = 0o600
 
 
 def _hades_home() -> Path:
-    from has_constants import get_hades_home
+    from hades_constants import get_hades_home
     return get_hades_home()
 
 

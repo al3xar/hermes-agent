@@ -211,7 +211,7 @@ app.add_middleware(
 # Endpoints that do NOT require the session token.  Everything else under
 # /api/ is gated by the auth middleware below.
 #
-# This list is defined in ``has_cli.dashboard_auth.public_paths`` so the
+# This list is defined in ``hades_cli.dashboard_auth.public_paths`` so the
 # OAuth gate middleware can honour the same allowlist — keeping the two
 # gates in lockstep avoids drift like the wildcard-subdomain regression
 # where ``/api/status`` was public under the legacy gate but 401'd under
@@ -936,7 +936,7 @@ async def get_status():
 
     active_sessions = 0
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
         db = SessionDB()
         try:
             sessions = db.list_sessions_rich(limit=50)
@@ -1310,7 +1310,7 @@ def _record_completed_action(name: str, message: str, exit_code: int = 1) -> Non
 def _spawn_hades_action(subcommand: List[str], name: str) -> subprocess.Popen:
     """Spawn ``hades <subcommand>`` detached and record the Popen handle.
 
-    Uses the running interpreter's ``has_cli.main`` module so the action
+    Uses the running interpreter's ``hades_cli.main`` module so the action
     inherits the same venv/PYTHONPATH the web server is using.
     """
     log_file_name = _ACTION_LOG_FILES[name]
@@ -1321,7 +1321,7 @@ def _spawn_hades_action(subcommand: List[str], name: str) -> subprocess.Popen:
         f"\n=== {name} started {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n".encode()
     )
 
-    cmd = [sys.executable, "-m", "has_cli.main", *subcommand]
+    cmd = [sys.executable, "-m", "hades_cli.main", *subcommand]
 
     popen_kwargs: Dict[str, Any] = {
         "cwd": str(PROJECT_ROOT),
@@ -1799,7 +1799,7 @@ async def get_sessions(
             detail="order must be one of: created, recent",
         )
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
         db = SessionDB()
         try:
             min_message_count = max(0, min_messages)
@@ -1869,7 +1869,7 @@ async def get_profiles_sessions(
     if order not in ("created", "recent"):
         raise HTTPException(status_code=400, detail="order must be one of: created, recent")
 
-    from has_state import SessionDB
+    from hades_state import SessionDB
     from hades_cli import profiles as profiles_mod
 
     targets: List[Tuple[str, Path]] = []
@@ -1978,7 +1978,7 @@ async def search_sessions(q: str = "", limit: int = 20):
     if not q or not q.strip():
         return {"results": []}
     try:
-        from has_state import SessionDB
+        from hades_state import SessionDB
         db = SessionDB()
         try:
             safe_limit = max(1, min(int(limit or 20), 100))
@@ -5264,7 +5264,7 @@ def _session_latest_descendant(session_id: str):
     /model may create child sessions. Dashboard refresh should continue the
     newest child instead of reopening the old parent.
     """
-    from has_state import SessionDB
+    from hades_state import SessionDB
 
     def row_get(row, key, index):
         if isinstance(row, dict):
@@ -5391,7 +5391,7 @@ async def bulk_delete_sessions_endpoint(body: BulkDeleteSessions):
             status_code=400,
             detail="ids must contain at most 500 entries",
         )
-    from has_state import SessionDB
+    from hades_state import SessionDB
     db = SessionDB()
     try:
         deleted = db.delete_sessions(body.ids)
@@ -5408,7 +5408,7 @@ async def count_empty_sessions_endpoint():
     UI hides the affordance so users aren't presented with a button
     that does nothing. Cheap, single-COUNT query.
     """
-    from has_state import SessionDB
+    from hades_state import SessionDB
     db = SessionDB()
     try:
         return {"count": db.count_empty_sessions()}
@@ -5436,7 +5436,7 @@ async def delete_empty_sessions_endpoint():
     prune-on-startup pass. Matching that pre-existing trade-off keeps
     the two delete endpoints' DB-vs-disk behaviour consistent.
     """
-    from has_state import SessionDB
+    from hades_state import SessionDB
     db = SessionDB()
     try:
         deleted = db.delete_empty_sessions()
@@ -5452,7 +5452,7 @@ async def get_session_stats():
     Registered before ``/api/sessions/{session_id}`` so the literal ``stats``
     path isn't captured as a session id by the parameterized route.
     """
-    from has_state import SessionDB
+    from hades_state import SessionDB
 
     db = SessionDB()
     try:
@@ -5486,7 +5486,7 @@ def _open_session_db_for_profile(profile: Optional[str]):
     ``state.db`` directly so the primary backend can serve cross-profile reads
     (transcripts, detail) without spawning that profile's backend.
     """
-    from has_state import SessionDB
+    from hades_state import SessionDB
     if not profile:
         return SessionDB()
     _name, home = _cron_profile_home(profile)
@@ -5594,7 +5594,7 @@ async def rename_session_endpoint(session_id: str, body: SessionRename):
 @app.get("/api/sessions/{session_id}/export")
 async def export_session_endpoint(session_id: str):
     """Export a single session (metadata + messages) as JSON."""
-    from has_state import SessionDB
+    from hades_state import SessionDB
 
     db = SessionDB()
     try:
@@ -5619,7 +5619,7 @@ async def prune_sessions_endpoint(body: SessionPrune):
     """Delete ended sessions older than N days (mirrors `hades sessions prune`)."""
     if body.older_than_days < 1:
         raise HTTPException(status_code=400, detail="older_than_days must be >= 1")
-    from has_state import SessionDB
+    from hades_state import SessionDB
 
     db = SessionDB()
     try:
@@ -5657,7 +5657,7 @@ async def get_logs(
         return {"file": file, "lines": []}
 
     try:
-        from has_logging import COMPONENT_PREFIXES
+        from hades_logging import COMPONENT_PREFIXES
     except ImportError:
         COMPONENT_PREFIXES = {}
 
@@ -5971,7 +5971,7 @@ async def delete_cron_job(job_id: str, profile: Optional[str] = None):
 # ---------------------------------------------------------------------------
 # MCP server endpoints — list / add / remove / test.
 #
-# Wraps the same config data layer the CLI uses (has_cli.mcp_config), so
+# Wraps the same config data layer the CLI uses (hades_cli.mcp_config), so
 # servers managed here show up under `hades mcp list` and vice versa.  Secrets
 # in stdio `env` blocks are redacted on read; the agent picks them up from
 # config.yaml at session start exactly as with CLI-added servers.
@@ -6300,7 +6300,7 @@ async def clear_pending_pairing():
 # ---------------------------------------------------------------------------
 # Webhook subscription endpoints — list / subscribe / remove.
 #
-# Wraps the same JSON store the CLI uses (has_cli.webhook); the webhook
+# Wraps the same JSON store the CLI uses (hades_cli.webhook); the webhook
 # adapter hot-reloads it without a gateway restart.  Per-route HMAC secrets
 # are redacted on read and surfaced once on create.
 # ---------------------------------------------------------------------------
@@ -6339,7 +6339,7 @@ def _webhook_route_summary(name: str, route: Dict[str, Any], base_url: str) -> D
 
 @app.get("/api/webhooks")
 async def list_webhooks():
-    import .hades_cli.webhook as wh
+    import hades_cli.webhook as wh
 
     base_url = wh._get_webhook_base_url()
     subs = wh._load_subscriptions()
@@ -6358,7 +6358,7 @@ async def create_webhook(body: WebhookCreate):
     import re as _re
     import secrets as _secrets
     import time as _time
-    import .hades_cli.webhook as wh
+    import hades_cli.webhook as wh
 
     if not wh._is_webhook_enabled():
         raise HTTPException(
@@ -6407,7 +6407,7 @@ async def create_webhook(body: WebhookCreate):
 
 @app.delete("/api/webhooks/{name}")
 async def delete_webhook(name: str):
-    import .hades_cli.webhook as wh
+    import hades_cli.webhook as wh
 
     key = (name or "").strip().lower()
     subs = wh._load_subscriptions()
@@ -6431,7 +6431,7 @@ async def set_webhook_enabled(name: str, body: WebhookEnabledToggle):
     gateway hot-reloads the subscriptions file, so this takes effect on the
     next event without a restart.
     """
-    import .hades_cli.webhook as wh
+    import hades_cli.webhook as wh
 
     key = (name or "").strip().lower()
     subs = wh._load_subscriptions()
@@ -7474,7 +7474,7 @@ def _write_profile_model(profile_dir: Path, provider: str, model: str) -> None:
     Clears any stale ``base_url`` / ``context_length`` the same way
     ``POST /api/model/set`` does, since the new model may differ.
     """
-    from has_constants import set_hades_home_override, reset_hades_home_override
+    from hades_constants import set_hades_home_override, reset_hades_home_override
 
     token = set_hades_home_override(str(profile_dir))
     try:
@@ -8114,7 +8114,7 @@ async def update_config_raw(body: RawConfigUpdate):
 
 @app.get("/api/analytics/usage")
 async def get_usage_analytics(days: int = 30):
-    from has_state import SessionDB
+    from hades_state import SessionDB
     from agent.insights import InsightsEngine
 
     db = SessionDB()
@@ -8188,7 +8188,7 @@ async def get_models_analytics(days: int = 30):
     Returns token/cost/session breakdown per model plus capability metadata
     from models.dev (context window, vision, tools, reasoning, etc.).
     """
-    from has_state import SessionDB
+    from hades_state import SessionDB
 
     db = SessionDB()
     try:
@@ -8557,7 +8557,7 @@ def _resolve_chat_argv(
     so nothing has to build Node or the TUI bundle.
 
     Session resume is propagated via the ``HADES_TUI_RESUME`` env var —
-    matching what ``has_cli.main._launch_tui`` does for the CLI path.
+    matching what ``hades_cli.main._launch_tui`` does for the CLI path.
     Appending ``--resume <id>`` to argv doesn't work because ``ui-tui`` does
     not parse its argv.
 
@@ -8955,7 +8955,7 @@ async def events_ws(ws: WebSocket) -> None:
 def _normalise_prefix(raw: Optional[str]) -> str:
     """Normalise an X-Forwarded-Prefix header value.
 
-    Thin re-export of :func:`has_cli.dashboard_auth.prefix.normalise_prefix`
+    Thin re-export of :func:`hades_cli.dashboard_auth.prefix.normalise_prefix`
     — the single source of truth lives in the dashboard_auth package so
     the gate middleware, the OAuth routes, the cookie helpers, and the
     SPA mount all agree on validation rules.

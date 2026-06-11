@@ -12,7 +12,7 @@ import sys
 import shlex
 from pathlib import Path
 
-from has_constants import get_hades_home
+from hades_constants import get_hades_home
 from hades_cli.secret_prompt import masked_secret_prompt
 
 

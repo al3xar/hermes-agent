@@ -27,9 +27,9 @@ from agent.credential_pool import (
     list_custom_pool_providers,
     load_pool,
 )
-import .hades_cli.auth as auth_mod
+import hades_cli.auth as auth_mod
 from hades_cli.auth import PROVIDER_REGISTRY
-from has_constants import OPENROUTER_BASE_URL
+from hades_constants import OPENROUTER_BASE_URL
 from hades_cli.secret_prompt import masked_secret_prompt
 
 

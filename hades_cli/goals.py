@@ -216,8 +216,8 @@ def _get_session_db() -> Optional[Any]:
     non-standard launchers can still use the GoalManager.
     """
     try:
-        from has_constants import get_hades_home
-        from has_state import SessionDB
+        from hades_constants import get_hades_home
+        from hades_state import SessionDB
 
         home = str(get_hades_home())
     except Exception as exc:  # pragma: no cover

@@ -73,6 +73,7 @@ class TestLangfuseInjection:
         )
         with (
             patch("agent.deep_agents_runtime.LANGFUSE_AVAILABLE", True),
+            patch("agent.deep_agents_runtime.Langfuse", MagicMock()),
             patch(
                 "agent.deep_agents_runtime.CallbackHandler",
                 return_value=fake_handler,
@@ -113,6 +114,7 @@ class TestLangfuseInjection:
         )
         with (
             patch("agent.deep_agents_runtime.LANGFUSE_AVAILABLE", True),
+            patch("agent.deep_agents_runtime.Langfuse", MagicMock()),
             patch(
                 "agent.deep_agents_runtime.CallbackHandler",
                 side_effect=RuntimeError("boom"),
@@ -133,6 +135,7 @@ class TestLangfuseInjection:
         )
         with (
             patch("agent.deep_agents_runtime.LANGFUSE_AVAILABLE", True),
+            patch("agent.deep_agents_runtime.Langfuse", MagicMock()) as mock_client,
             patch(
                 "agent.deep_agents_runtime.CallbackHandler",
                 return_value=object(),
@@ -141,7 +144,9 @@ class TestLangfuseInjection:
             agent._get_langfuse_handler()
             agent._get_langfuse_handler()
 
+        # Both the v3 client and the handler are constructed exactly once.
         assert mock_ctor.call_count == 1
+        assert mock_client.call_count == 1
 
     def test_langsmith_path_unaffected_without_langfuse(self):
         """Existing LangSmith tags path still works when no Langfuse keys set."""
@@ -174,3 +179,55 @@ class TestLangfuseProperties:
         )
         cfg = agent.get_tracing_config()
         assert cfg["langfuse_enabled"] is True
+
+
+class TestLangfuseEnvSeeding:
+    """The production credential path the gateway/TUI actually use:
+    ``HADES_LANGFUSE_*`` env -> ``_seed_langfuse_from_env`` -> captured
+    callbacks -> ``CallbackHandler`` injected into ``config['callbacks']``.
+
+    The other tests inject credentials directly into ``_callbacks``; these
+    cover the env-seeding layer that runs in ``__init__`` in production.
+    """
+
+    def test_seed_populates_captured_credentials(self, monkeypatch):
+        monkeypatch.setenv("HADES_LANGFUSE_PUBLIC_KEY", "pk-lf-env")
+        monkeypatch.setenv("HADES_LANGFUSE_SECRET_KEY", "sk-lf-env")
+        monkeypatch.setenv("HADES_LANGFUSE_BASE_URL", "https://lf.example.com")
+        agent = _make_agent(callbacks={})
+        agent._seed_langfuse_from_env()
+        assert agent._get_cap("langfuse_public_key") == "pk-lf-env"
+        assert agent._get_cap("langfuse_secret_key") == "sk-lf-env"
+        assert agent._get_cap("langfuse_base_url") == "https://lf.example.com"
+
+    def test_env_credentials_inject_handler(self, monkeypatch):
+        """End-to-end v3 wiring: env creds -> seed -> Langfuse client built with
+        those creds -> credential-less CallbackHandler added to
+        config['callbacks'] -> session grouped via config metadata."""
+        monkeypatch.setenv("HADES_LANGFUSE_PUBLIC_KEY", "pk-lf-env")
+        monkeypatch.setenv("HADES_LANGFUSE_SECRET_KEY", "sk-lf-env")
+        monkeypatch.setenv("HADES_LANGFUSE_BASE_URL", "https://lf.example.com")
+        agent = _make_agent(callbacks={}, _session_id="sess-42")
+        agent._seed_langfuse_from_env()
+        fake_handler = object()
+        with (
+            patch("agent.deep_agents_runtime.LANGFUSE_AVAILABLE", True),
+            patch("agent.deep_agents_runtime.Langfuse") as mock_client,
+            patch(
+                "agent.deep_agents_runtime.CallbackHandler",
+                return_value=fake_handler,
+            ) as mock_ctor,
+        ):
+            config = _invoke_and_get_config(agent)
+
+        assert fake_handler in config.get("callbacks", [])
+        # v3: credentials go to the Langfuse client, not the handler.
+        client_kwargs = mock_client.call_args.kwargs
+        assert client_kwargs["public_key"] == "pk-lf-env"
+        assert client_kwargs["secret_key"] == "sk-lf-env"
+        assert client_kwargs["host"] == "https://lf.example.com"
+        # v3: handler takes no credentials.
+        assert mock_ctor.call_args.kwargs == {}
+        assert mock_ctor.call_args.args == ()
+        # v3: session grouping is passed via config metadata.
+        assert config["metadata"]["langfuse_session_id"] == "sess-42"

@@ -40,7 +40,7 @@ from hades_cli.secret_prompt import masked_secret_prompt
 def register_cli(parent_parser: argparse.ArgumentParser) -> None:
     """Attach the ``bitwarden`` subcommand tree to a parent parser.
 
-    Called from ``has_cli.main`` as part of building the top-level
+    Called from ``hades_cli.main`` as part of building the top-level
     ``hades secrets`` parser.
     """
     sub = parent_parser.add_subparsers(dest="secrets_bw_command")

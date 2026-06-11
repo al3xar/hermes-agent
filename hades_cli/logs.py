@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Sequence
 
-from has_constants import get_hades_home, display_hades_home
+from hades_constants import get_hades_home, display_hades_home
 
 # Known log files (name → filename)
 LOG_FILES = {
@@ -195,7 +195,7 @@ def tail_log(
     # Resolve component to logger name prefixes
     component_prefixes = None
     if component:
-        from has_logging import COMPONENT_PREFIXES
+        from hades_logging import COMPONENT_PREFIXES
         component_lower = component.lower()
         if component_lower not in COMPONENT_PREFIXES:
             available = ", ".join(sorted(COMPONENT_PREFIXES))

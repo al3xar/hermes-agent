@@ -131,7 +131,7 @@ def slack_manifest_command(args) -> int:
         if isinstance(write_target, bool) and write_target:
             # --write with no value → default location
             try:
-                from has_constants import get_hades_home
+                from hades_constants import get_hades_home
 
                 target = Path(get_hades_home()) / "slack-manifest.json"
             except Exception:

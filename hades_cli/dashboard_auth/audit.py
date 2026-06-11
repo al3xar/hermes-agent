@@ -5,7 +5,7 @@ Format: one JSON object per line. Token-like fields are stripped before
 serialisation to avoid leaking refresh tokens or JWTs to disk.
 
 This module deliberately keeps a minimal dependency surface — no imports
-from ``hades_constants`` or other has_cli modules — so it can be
+from ``hades_constants`` or other hades_cli modules — so it can be
 imported safely from middleware code that loads early in the startup
 sequence.
 """
@@ -54,7 +54,7 @@ def _resolve_log_path() -> Path:
 
     Mirrors ``hades_constants.get_hades_home`` semantics: env var wins,
     else ``~/.hades``. A local copy avoids an import cycle with the
-    middleware which lives below ``has_cli``.
+    middleware which lives below ``hades_cli``.
     """
     home = os.environ.get("HADES_HOME") or str(Path.home() / ".hades")
     return Path(home) / "logs" / "dashboard-auth.log"

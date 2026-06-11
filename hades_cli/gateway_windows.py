@@ -179,7 +179,7 @@ def _launch_elevated_gateway_command(command: str, extra_args: list[str] | None 
     decisions are already collected in the parent shell before this point.
     """
     _assert_windows()
-    args = ["-m", "has_cli.main", *_current_profile_cli_args(), "gateway", command]
+    args = ["-m", "hades_cli.main", *_current_profile_cli_args(), "gateway", command]
     if extra_args:
         args.extend(extra_args)
     params = subprocess.list2cmdline(args)
@@ -255,7 +255,7 @@ def get_task_name() -> str:
     Named profile X: ``Hades_Gateway_<X>``
     """
     _assert_windows()
-    # Local import to avoid circular module initialization during has_cli boot.
+    # Local import to avoid circular module initialization during hades_cli boot.
     from hades_cli.gateway import _profile_suffix
 
     suffix = _profile_suffix()
@@ -364,7 +364,7 @@ def _build_gateway_cmd_script(
     lines.append(f'set "VIRTUAL_ENV={venv_dir}"')
 
     pythonw_path = _derive_venv_pythonw(python_path)
-    prog_args = [pythonw_path, "-m", "has_cli.main"]
+    prog_args = [pythonw_path, "-m", "hades_cli.main"]
     if profile_arg:
         prog_args.extend(profile_arg.split())
     prog_args.extend(["gateway", "run"])
@@ -590,7 +590,7 @@ def _build_gateway_argv() -> tuple[list[str], str, dict[str, str]]:
     hades_home = str(Path(get_hades_home()).resolve())
     profile_arg = _profile_arg(hades_home)
 
-    argv = [python_exe, "-m", "has_cli.main"]
+    argv = [python_exe, "-m", "hades_cli.main"]
     if profile_arg:
         argv.extend(profile_arg.split())
     argv.extend(["gateway", "run"])
