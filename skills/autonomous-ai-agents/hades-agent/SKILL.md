@@ -7,8 +7,18 @@ license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hades:
-    tags: [hades, setup, configuration, multi-agent, spawning, cli, gateway, development]
-    homepage: https://github.com/NousResearch/hades-agent
+    tags:
+      [
+        hades,
+        setup,
+        configuration,
+        multi-agent,
+        spawning,
+        cli,
+        gateway,
+        development,
+      ]
+    homepage: https://github.com/NousResearch/hermes-agent
     related_skills: [claude-code, codex, opencode]
 ---
 
@@ -29,13 +39,13 @@ People use Hades for software development, research, system administration, data
 
 **This skill helps you work with Hades Agent effectively** — setting it up, configuring features, spawning additional agent instances, troubleshooting issues, finding the right commands and settings, and understanding how the system works when you need to extend or contribute to it.
 
-**Docs:** https://hades-agent.nousresearch.com/docs/
+**Docs:** https://hermes-agent.nousresearch.com/docs/
 
 ## Quick Start
 
 ```bash
 # Install
-curl -fsSL https://hades-agent.nousresearch.com/install.sh | bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
 # Interactive chat (default)
 hades
@@ -157,7 +167,7 @@ hades gateway setup        Configure platforms
 
 Supported platforms: Telegram, Discord, Slack, WhatsApp, Signal, Email, SMS, Matrix, Mattermost, Home Assistant, DingTalk, Feishu, WeCom, BlueBubbles (iMessage), Weixin (WeChat), API Server, Webhooks. Open WebUI connects via the API Server adapter.
 
-Platform docs: https://hades-agent.nousresearch.com/docs/user-guide/messaging/
+Platform docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
 
 ### Sessions
 
@@ -239,11 +249,12 @@ hades uninstall            Uninstall Hades
 
 Type these during an interactive chat session. New commands land fairly
 often; if something below looks stale, run `/help` in-session for the
-authoritative list or see the [live slash commands reference](https://hades-agent.nousresearch.com/docs/reference/slash-commands).
+authoritative list or see the [live slash commands reference](https://hermes-agent.nousresearch.com/docs/reference/slash-commands).
 The registry of record is `hades_cli/commands.py` — every consumer
 (autocomplete, Telegram menu, Slack mapping, `/help`) derives from it.
 
 ### Session Control
+
 ```
 /new (/reset)        Fresh session
 /clear               Clear screen + new session (CLI)
@@ -265,6 +276,7 @@ The registry of record is `hades_cli/commands.py` — every consumer
 ```
 
 ### Configuration
+
 ```
 /config              Show config (CLI)
 /model [name]        Show or change model
@@ -283,6 +295,7 @@ The registry of record is `hades_cli/commands.py` — every consumer
 ```
 
 ### Tools & Skills
+
 ```
 /tools               Manage tools (CLI)
 /toolsets            List toolsets (CLI)
@@ -298,6 +311,7 @@ The registry of record is `hades_cli/commands.py` — every consumer
 ```
 
 ### Gateway
+
 ```
 /approve             Approve a pending command (gateway)
 /deny                Deny a pending command (gateway)
@@ -309,6 +323,7 @@ The registry of record is `hades_cli/commands.py` — every consumer
 ```
 
 ### Utility
+
 ```
 /branch (/fork)      Branch the current session
 /fast                Toggle priority/fast processing
@@ -321,6 +336,7 @@ The registry of record is `hades_cli/commands.py` — every consumer
 ```
 
 ### Info
+
 ```
 /help                Show commands
 /commands [page]     Browse all commands (gateway)
@@ -333,6 +349,7 @@ The registry of record is `hades_cli/commands.py` — every consumer
 ```
 
 ### Exit
+
 ```
 /quit (/exit, /q)    Exit CLI
 ```
@@ -358,88 +375,88 @@ Profiles use `~/.hades/profiles/<name>/` with the same layout.
 
 Edit with `hades config edit` or `hades config set section.key value`.
 
-| Section | Key options |
-|---------|-------------|
-| `model` | `default`, `provider`, `base_url`, `api_key`, `context_length` |
-| `agent` | `max_turns` (90), `tool_use_enforcement` |
-| `terminal` | `backend` (local/docker/ssh/modal), `cwd`, `timeout` (180) |
-| `compression` | `enabled`, `threshold` (0.50), `target_ratio` (0.20) |
-| `display` | `skin`, `tool_progress`, `show_reasoning`, `show_cost` |
-| `stt` | `enabled`, `provider` (local/groq/openai/mistral) |
-| `tts` | `provider` (edge/elevenlabs/openai/minimax/mistral/neutts) |
-| `memory` | `memory_enabled`, `user_profile_enabled`, `provider` |
-| `security` | `tirith_enabled`, `website_blocklist` |
-| `delegation` | `model`, `provider`, `base_url`, `api_key`, `max_iterations` (50), `reasoning_effort` |
-| `checkpoints` | `enabled`, `max_snapshots` (50) |
+| Section       | Key options                                                                           |
+| ------------- | ------------------------------------------------------------------------------------- |
+| `model`       | `default`, `provider`, `base_url`, `api_key`, `context_length`                        |
+| `agent`       | `max_turns` (90), `tool_use_enforcement`                                              |
+| `terminal`    | `backend` (local/docker/ssh/modal), `cwd`, `timeout` (180)                            |
+| `compression` | `enabled`, `threshold` (0.50), `target_ratio` (0.20)                                  |
+| `display`     | `skin`, `tool_progress`, `show_reasoning`, `show_cost`                                |
+| `stt`         | `enabled`, `provider` (local/groq/openai/mistral)                                     |
+| `tts`         | `provider` (edge/elevenlabs/openai/minimax/mistral/neutts)                            |
+| `memory`      | `memory_enabled`, `user_profile_enabled`, `provider`                                  |
+| `security`    | `tirith_enabled`, `website_blocklist`                                                 |
+| `delegation`  | `model`, `provider`, `base_url`, `api_key`, `max_iterations` (50), `reasoning_effort` |
+| `checkpoints` | `enabled`, `max_snapshots` (50)                                                       |
 
-Full config reference: https://hades-agent.nousresearch.com/docs/user-guide/configuration
+Full config reference: https://hermes-agent.nousresearch.com/docs/user-guide/configuration
 
 ### Providers
 
 20+ providers supported. Set via `hades model` or `hades setup`.
 
-| Provider | Auth | Key env var |
-|----------|------|-------------|
-| OpenRouter | API key | `OPENROUTER_API_KEY` |
-| Anthropic | API key | `ANTHROPIC_API_KEY` |
-| Nous Portal | OAuth | `hades auth` |
-| OpenAI Codex | OAuth | `hades auth` |
-| GitHub Copilot | Token | `COPILOT_GITHUB_TOKEN` |
-| Google Gemini | API key | `GOOGLE_API_KEY` or `GEMINI_API_KEY` |
-| DeepSeek | API key | `DEEPSEEK_API_KEY` |
-| xAI / Grok | API key | `XAI_API_KEY` |
-| Hugging Face | Token | `HF_TOKEN` |
-| Z.AI / GLM | API key | `GLM_API_KEY` |
-| MiniMax | API key | `MINIMAX_API_KEY` |
-| MiniMax CN | API key | `MINIMAX_CN_API_KEY` |
-| Kimi / Moonshot | API key | `KIMI_API_KEY` |
-| Alibaba / DashScope | API key | `DASHSCOPE_API_KEY` |
-| Xiaomi MiMo | API key | `XIAOMI_API_KEY` |
-| Kilo Code | API key | `KILOCODE_API_KEY` |
-| OpenCode Zen | API key | `OPENCODE_ZEN_API_KEY` |
-| OpenCode Go | API key | `OPENCODE_GO_API_KEY` |
-| Qwen OAuth | OAuth | `hades auth add qwen-oauth` |
-| Custom endpoint | Config | `model.base_url` + `model.api_key` in config.yaml |
-| GitHub Copilot ACP | External | `COPILOT_CLI_PATH` or Copilot CLI |
+| Provider            | Auth     | Key env var                                       |
+| ------------------- | -------- | ------------------------------------------------- |
+| OpenRouter          | API key  | `OPENROUTER_API_KEY`                              |
+| Anthropic           | API key  | `ANTHROPIC_API_KEY`                               |
+| Nous Portal         | OAuth    | `hades auth`                                      |
+| OpenAI Codex        | OAuth    | `hades auth`                                      |
+| GitHub Copilot      | Token    | `COPILOT_GITHUB_TOKEN`                            |
+| Google Gemini       | API key  | `GOOGLE_API_KEY` or `GEMINI_API_KEY`              |
+| DeepSeek            | API key  | `DEEPSEEK_API_KEY`                                |
+| xAI / Grok          | API key  | `XAI_API_KEY`                                     |
+| Hugging Face        | Token    | `HF_TOKEN`                                        |
+| Z.AI / GLM          | API key  | `GLM_API_KEY`                                     |
+| MiniMax             | API key  | `MINIMAX_API_KEY`                                 |
+| MiniMax CN          | API key  | `MINIMAX_CN_API_KEY`                              |
+| Kimi / Moonshot     | API key  | `KIMI_API_KEY`                                    |
+| Alibaba / DashScope | API key  | `DASHSCOPE_API_KEY`                               |
+| Xiaomi MiMo         | API key  | `XIAOMI_API_KEY`                                  |
+| Kilo Code           | API key  | `KILOCODE_API_KEY`                                |
+| OpenCode Zen        | API key  | `OPENCODE_ZEN_API_KEY`                            |
+| OpenCode Go         | API key  | `OPENCODE_GO_API_KEY`                             |
+| Qwen OAuth          | OAuth    | `hades auth add qwen-oauth`                       |
+| Custom endpoint     | Config   | `model.base_url` + `model.api_key` in config.yaml |
+| GitHub Copilot ACP  | External | `COPILOT_CLI_PATH` or Copilot CLI                 |
 
-Full provider docs: https://hades-agent.nousresearch.com/docs/integrations/providers
+Full provider docs: https://hermes-agent.nousresearch.com/docs/integrations/providers
 
 ### Toolsets
 
 Enable/disable via `hades tools` (interactive) or `hades tools enable/disable NAME`.
 
-| Toolset | What it provides |
-|---------|-----------------|
-| `web` | Web search and content extraction |
-| `search` | Web search only (subset of `web`) |
-| `browser` | Browser automation (Browserbase, Camofox, or local Chromium) |
-| `terminal` | Shell commands and process management |
-| `file` | File read/write/search/patch |
-| `code_execution` | Sandboxed Python execution |
-| `vision` | Image analysis |
-| `image_gen` | AI image generation |
-| `video` | Video analysis and generation |
-| `tts` | Text-to-speech |
-| `skills` | Skill browsing and management |
-| `memory` | Persistent cross-session memory |
-| `session_search` | Search past conversations |
-| `delegation` | Subagent task delegation |
-| `cronjob` | Scheduled task management |
-| `clarify` | Ask user clarifying questions |
-| `messaging` | Cross-platform message sending |
-| `todo` | In-session task planning and tracking |
-| `kanban` | Multi-agent work-queue tools (gated to workers) |
-| `debugging` | Extra introspection/debug tools (off by default) |
-| `safe` | Minimal, low-risk toolset for locked-down sessions |
-| `spotify` | Spotify playback and playlist control |
-| `homeassistant` | Smart home control (off by default) |
-| `discord` | Discord integration tools |
-| `discord_admin` | Discord admin/moderation tools |
-| `feishu_doc` | Feishu (Lark) document tools |
-| `feishu_drive` | Feishu (Lark) drive tools |
-| `yuanbao` | Yuanbao integration tools |
-| `rl` | Reinforcement learning tools (off by default) |
-| `moa` | Mixture of Agents (off by default) |
+| Toolset          | What it provides                                             |
+| ---------------- | ------------------------------------------------------------ |
+| `web`            | Web search and content extraction                            |
+| `search`         | Web search only (subset of `web`)                            |
+| `browser`        | Browser automation (Browserbase, Camofox, or local Chromium) |
+| `terminal`       | Shell commands and process management                        |
+| `file`           | File read/write/search/patch                                 |
+| `code_execution` | Sandboxed Python execution                                   |
+| `vision`         | Image analysis                                               |
+| `image_gen`      | AI image generation                                          |
+| `video`          | Video analysis and generation                                |
+| `tts`            | Text-to-speech                                               |
+| `skills`         | Skill browsing and management                                |
+| `memory`         | Persistent cross-session memory                              |
+| `session_search` | Search past conversations                                    |
+| `delegation`     | Subagent task delegation                                     |
+| `cronjob`        | Scheduled task management                                    |
+| `clarify`        | Ask user clarifying questions                                |
+| `messaging`      | Cross-platform message sending                               |
+| `todo`           | In-session task planning and tracking                        |
+| `kanban`         | Multi-agent work-queue tools (gated to workers)              |
+| `debugging`      | Extra introspection/debug tools (off by default)             |
+| `safe`           | Minimal, low-risk toolset for locked-down sessions           |
+| `spotify`        | Spotify playback and playlist control                        |
+| `homeassistant`  | Smart home control (off by default)                          |
+| `discord`        | Discord integration tools                                    |
+| `discord_admin`  | Discord admin/moderation tools                               |
+| `feishu_doc`     | Feishu (Lark) document tools                                 |
+| `feishu_drive`   | Feishu (Lark) drive tools                                    |
+| `yuanbao`        | Yuanbao integration tools                                    |
+| `rl`             | Reinforcement learning tools (off by default)                |
+| `moa`            | Mixture of Agents (off by default)                           |
 
 Full enumeration lives in `toolsets.py` as the `TOOLSETS` dict; `_HADES_CORE_TOOLS` is the default bundle most platforms inherit from.
 
@@ -462,6 +479,7 @@ hades config set security.redact_secrets true       # keep enabled globally
 **Restart required.** `security.redact_secrets` is snapshotted at import time — toggling it mid-session (e.g. via `export HADES_REDACT_SECRETS=false` from a tool call) will NOT take effect for the running process. Tell the user to change it in config from a terminal, then start a new session. This is deliberate — it prevents an LLM from flipping the toggle on itself mid-task.
 
 Disable only when you deliberately need raw credential-like strings for debugging or redactor development:
+
 ```bash
 hades config set security.redact_secrets false
 ```
@@ -489,6 +507,7 @@ hades config set approvals.mode off         # bypass everything (not recommended
 ```
 
 Per-invocation bypass without changing config:
+
 - `hades --yolo …`
 - `export HADES_YOLO_MODE=1`
 
@@ -511,30 +530,32 @@ To keep the model away from network or media tools entirely, open `hades tools` 
 Voice messages from messaging platforms are auto-transcribed.
 
 Provider priority (auto-detected):
+
 1. **Local faster-whisper** — free, no API key: `pip install faster-whisper`
 2. **Groq Whisper** — free tier: set `GROQ_API_KEY`
 3. **OpenAI Whisper** — paid: set `VOICE_TOOLS_OPENAI_KEY`
 4. **Mistral Voxtral** — set `MISTRAL_API_KEY`
 
 Config:
+
 ```yaml
 stt:
   enabled: true
-  provider: local        # local, groq, openai, mistral
+  provider: local # local, groq, openai, mistral
   local:
-    model: base          # tiny, base, small, medium, large-v3
+    model: base # tiny, base, small, medium, large-v3
 ```
 
 ### TTS (Text → Voice)
 
-| Provider | Env var | Free? |
-|----------|---------|-------|
-| Edge TTS | None | Yes (default) |
-| ElevenLabs | `ELEVENLABS_API_KEY` | Free tier |
-| OpenAI | `VOICE_TOOLS_OPENAI_KEY` | Paid |
-| MiniMax | `MINIMAX_API_KEY` | Paid |
-| Mistral (Voxtral) | `MISTRAL_API_KEY` | Paid |
-| NeuTTS (local) | None (`pip install neutts[all]` + `espeak-ng`) | Free |
+| Provider          | Env var                                        | Free?         |
+| ----------------- | ---------------------------------------------- | ------------- |
+| Edge TTS          | None                                           | Yes (default) |
+| ElevenLabs        | `ELEVENLABS_API_KEY`                           | Free tier     |
+| OpenAI            | `VOICE_TOOLS_OPENAI_KEY`                       | Paid          |
+| MiniMax           | `MINIMAX_API_KEY`                              | Paid          |
+| Mistral (Voxtral) | `MISTRAL_API_KEY`                              | Paid          |
+| NeuTTS (local)    | None (`pip install neutts[all]` + `espeak-ng`) | Free          |
 
 Voice commands: `/voice on` (voice-to-voice), `/voice tts` (always voice), `/voice off`.
 
@@ -546,13 +567,13 @@ Run additional Hades processes as fully independent subprocesses — separate se
 
 ### When to Use This vs delegate_task
 
-| | `delegate_task` | Spawning `hades` process |
-|-|-----------------|--------------------------|
-| Isolation | Separate conversation, shared process | Fully independent process |
-| Duration | Minutes (bounded by parent loop) | Hours/days |
-| Tool access | Subset of parent's tools | Full tool access |
-| Interactive | No | Yes (PTY mode) |
-| Use case | Quick parallel subtasks | Long autonomous missions |
+|             | `delegate_task`                       | Spawning `hades` process  |
+| ----------- | ------------------------------------- | ------------------------- |
+| Isolation   | Separate conversation, shared process | Fully independent process |
+| Duration    | Minutes (bounded by parent loop)      | Hours/days                |
+| Tool access | Subset of parent's tools              | Full tool access          |
+| Interactive | No                                    | Yes (PTY mode)            |
+| Use case    | Quick parallel subtasks               | Long autonomous missions  |
 
 ### One-Shot Mode
 
@@ -662,7 +683,7 @@ the `cronjob` tool, the `hades cron` CLI (`list`, `add`, `edit`,
   header/footer instead of being mirrored into the target gateway
   session (keeps role alternation intact).
 
-User docs: https://hades-agent.nousresearch.com/docs/user-guide/features/cron
+User docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/cron
 
 ### Curator (skill lifecycle)
 
@@ -683,7 +704,7 @@ so nothing is lost.
 
 Config: `curator.*` (`enabled`, `interval_hours`, `min_idle_hours`,
 `stale_after_days`, `archive_after_days`, `backup.*`).
-User docs: https://hades-agent.nousresearch.com/docs/user-guide/features/curator
+User docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/curator
 
 ### Kanban (multi-agent work queue)
 
@@ -712,7 +733,7 @@ sessions still have zero `kanban_*` schema footprint unless configured.
   `HADES_KANBAN_BOARD` pinned in env); tenant is a soft namespace
   within a board for workspace-path + memory-key isolation.
 
-User docs: https://hades-agent.nousresearch.com/docs/user-guide/features/kanban
+User docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban
 
 ---
 
@@ -785,6 +806,7 @@ Use `-n 0`, not `-n 4` — `pyproject.toml`'s default `addopts` already
 includes `-n`, and the wrapper's CI-parity guarantees don't apply off POSIX.
 
 **POSIX-only tests need skip guards.** Common markers already in the codebase:
+
 - Symlinks — elevated privileges on Windows
 - `0o600` file modes — POSIX mode bits not enforced on NTFS by default
 - `signal.SIGALRM` — Unix-only (see `tests/conftest.py::_enforce_test_timeout`)
@@ -809,49 +831,60 @@ and logs — avoids shell-escaping backslashes in bash.
 ## Troubleshooting
 
 ### Voice not working
+
 1. Check `stt.enabled: true` in config.yaml
 2. Verify provider: `pip install faster-whisper` or set API key
 3. In gateway: `/restart`. In CLI: exit and relaunch.
 
 ### Tool not available
+
 1. `hades tools` — check if toolset is enabled for your platform
 2. Some tools need env vars (check `.env`)
 3. `/reset` after enabling tools
 
 ### Model/provider issues
+
 1. `hades doctor` — check config and dependencies
 2. `hades auth` — re-authenticate OAuth providers (or `hades auth add <provider>`)
 3. Check `.env` has the right API key
 4. **Copilot 403**: `gh auth login` tokens do NOT work for Copilot API. You must use the Copilot-specific OAuth device code flow via `hades model` → GitHub Copilot.
 
 ### Changes not taking effect
+
 - **Tools/skills:** `/reset` starts a new session with updated toolset
 - **Config changes:** In gateway: `/restart`. In CLI: exit and relaunch.
 - **Code changes:** Restart the CLI or gateway process
 
 ### Skills not showing
+
 1. `hades skills list` — verify installed
 2. `hades skills config` — check platform enablement
 3. Load explicitly: `/skill name` or `hades -s name`
 
 ### Gateway issues
+
 Check logs first:
+
 ```bash
 grep -i "failed to send\|error" ~/.hades/logs/gateway.log | tail -20
 ```
 
 Common gateway problems:
+
 - **Gateway dies on SSH logout**: Enable linger: `sudo loginctl enable-linger $USER`
 - **Gateway dies on WSL2 close**: WSL2 requires `systemd=true` in `/etc/wsl.conf` for systemd services to work. Without it, gateway falls back to `nohup` (dies when session closes).
 - **Gateway crash loop**: Reset the failed state: `systemctl --user reset-failed hades-gateway`
 
 ### Platform-specific issues
+
 - **Discord bot silent**: Must enable **Message Content Intent** in Bot → Privileged Gateway Intents.
 - **Slack bot only works in DMs**: Must subscribe to `message.channels` event. Without it, the bot ignores public channels.
 - **Windows-specific issues** (`Alt+Enter` newline, WinError 10106, UTF-8 BOM config, test suite, line endings): see the dedicated **Windows-Specific Quirks** section above.
 
 ### Auxiliary models not working
+
 If `auxiliary` tasks (vision, compression, session_search) fail silently, the `auto` provider can't find a backend. Either set `OPENROUTER_API_KEY` or `GOOGLE_API_KEY`, or explicitly configure each auxiliary task's provider:
+
 ```bash
 hades config set auxiliary.vision.provider <your_provider>
 hades config set auxiliary.vision.model <model_name>
@@ -861,29 +894,29 @@ hades config set auxiliary.vision.model <model_name>
 
 ## Where to Find Things
 
-| Looking for... | Location |
-|----------------|----------|
-| Config options | `hades config edit` or [Configuration docs](https://hades-agent.nousresearch.com/docs/user-guide/configuration) |
-| Available tools | `hades tools list` or [Tools reference](https://hades-agent.nousresearch.com/docs/reference/tools-reference) |
-| Slash commands | `/help` in session or [Slash commands reference](https://hades-agent.nousresearch.com/docs/reference/slash-commands) |
-| Skills catalog | `hades skills browse` or [Skills catalog](https://hades-agent.nousresearch.com/docs/reference/skills-catalog) |
-| Provider setup | `hades model` or [Providers guide](https://hades-agent.nousresearch.com/docs/integrations/providers) |
-| Platform setup | `hades gateway setup` or [Messaging docs](https://hades-agent.nousresearch.com/docs/user-guide/messaging/) |
-| MCP servers | `hades mcp list` or [MCP guide](https://hades-agent.nousresearch.com/docs/user-guide/features/mcp) |
-| Profiles | `hades profile list` or [Profiles docs](https://hades-agent.nousresearch.com/docs/user-guide/profiles) |
-| Cron jobs | `hades cron list` or [Cron docs](https://hades-agent.nousresearch.com/docs/user-guide/features/cron) |
-| Memory | `hades memory status` or [Memory docs](https://hades-agent.nousresearch.com/docs/user-guide/features/memory) |
-| Env variables | `hades config env-path` or [Env vars reference](https://hades-agent.nousresearch.com/docs/reference/environment-variables) |
-| CLI commands | `hades --help` or [CLI reference](https://hades-agent.nousresearch.com/docs/reference/cli-commands) |
-| Gateway logs | `~/.hades/logs/gateway.log` |
-| Session files | `hades sessions browse` (reads state.db) |
-| Source code | `~/.hades/hades-agent/` |
+| Looking for...  | Location                                                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Config options  | `hades config edit` or [Configuration docs](https://hermes-agent.nousresearch.com/docs/user-guide/configuration)            |
+| Available tools | `hades tools list` or [Tools reference](https://hermes-agent.nousresearch.com/docs/reference/tools-reference)               |
+| Slash commands  | `/help` in session or [Slash commands reference](https://hermes-agent.nousresearch.com/docs/reference/slash-commands)       |
+| Skills catalog  | `hades skills browse` or [Skills catalog](https://hermes-agent.nousresearch.com/docs/reference/skills-catalog)              |
+| Provider setup  | `hades model` or [Providers guide](https://hermes-agent.nousresearch.com/docs/integrations/providers)                       |
+| Platform setup  | `hades gateway setup` or [Messaging docs](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/)                 |
+| MCP servers     | `hades mcp list` or [MCP guide](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)                         |
+| Profiles        | `hades profile list` or [Profiles docs](https://hermes-agent.nousresearch.com/docs/user-guide/profiles)                     |
+| Cron jobs       | `hades cron list` or [Cron docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron)                       |
+| Memory          | `hades memory status` or [Memory docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory)               |
+| Env variables   | `hades config env-path` or [Env vars reference](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) |
+| CLI commands    | `hades --help` or [CLI reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands)                        |
+| Gateway logs    | `~/.hades/logs/gateway.log`                                                                                                 |
+| Session files   | `hades sessions browse` (reads state.db)                                                                                    |
+| Source code     | `~/.hades/hades-agent/`                                                                                                     |
 
 ---
 
 ## Contributor Quick Reference
 
-For occasional contributors and PR authors. Full developer docs: https://hades-agent.nousresearch.com/docs/developer-guide/
+For occasional contributors and PR authors. Full developer docs: https://hermes-agent.nousresearch.com/docs/developer-guide/
 
 ### Project Layout
 
@@ -913,6 +946,7 @@ Config: `~/.hades/config.yaml` (settings), `~/.hades/.env` (API keys).
 ### Adding a Tool (3 files)
 
 **1. Create `tools/your_tool.py`:**
+
 ```python
 import json, os
 from tools.registry import registry
@@ -981,6 +1015,7 @@ export PYTHONPATH="$(pwd)"
 Use `-n 0` (not `-n 4`) because `pyproject.toml`'s default `addopts` already includes `-n`, and the wrapper's CI-parity story doesn't apply off-POSIX.
 
 **Cross-platform test guards:** tests that use POSIX-only syscalls need a skip marker. Common ones already in the codebase:
+
 - Symlink creation → `@pytest.mark.skipif(sys.platform == "win32", reason="Symlinks require elevated privileges on Windows")` (see `tests/cron/test_cron_script.py`)
 - POSIX file modes (0o600, etc.) → `@pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX mode bits not enforced on Windows")` (see `tests/hades_cli/test_auth_toctou_file_modes.py`)
 - `signal.SIGALRM` → Unix-only (see `tests/conftest.py::_enforce_test_timeout`)
@@ -1002,7 +1037,7 @@ Factual guidance about the host OS, user home, cwd, terminal backend, and shell 
 
 - **Local terminal backend** → emit host info (OS, `$HOME`, cwd) + Windows-specific notes (hostname ≠ username, `terminal` uses bash not PowerShell).
 - **Remote terminal backend** (anything in `_REMOTE_TERMINAL_BACKENDS`: `docker, singularity, modal, daytona, ssh, managed_modal`) → **suppress** host info entirely and describe only the backend. A live `uname`/`whoami`/`pwd` probe runs inside the backend via `tools.environments.get_environment(...).execute(...)`, cached per process in `_BACKEND_PROBE_CACHE`, with a static fallback if the probe times out.
-- **Key fact for prompt authoring:** when `TERMINAL_ENV != "local"`, *every* file tool (`read_file`, `write_file`, `patch`, `search_files`) runs inside the backend container, not on the host. The system prompt must never describe the host in that case — the agent can't touch it.
+- **Key fact for prompt authoring:** when `TERMINAL_ENV != "local"`, _every_ file tool (`read_file`, `write_file`, `patch`, `search_files`) runs inside the backend container, not on the host. The system prompt must never describe the host in that case — the agent can't touch it.
 
 Full design notes, the exact emitted strings, and testing pitfalls:
 `references/prompt-builder-environment-hints.md`.

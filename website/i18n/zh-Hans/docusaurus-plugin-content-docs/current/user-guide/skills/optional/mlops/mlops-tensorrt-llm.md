@@ -75,11 +75,7 @@ from tensorrt_llm import LLM, SamplingParams
 llm = LLM(model="meta-llama/Meta-Llama-3-8B")
 
 # 配置采样参数
-sampling_params = SamplingParams(
-    max_tokens=100,
-    temperature=0.7,
-    top_p=0.9
-)
+sampling_params = SamplingParams(max_tokens=100, temperature=0.7, top_p=0.9)
 
 # 生成
 prompts = ["Explain quantum computing"]
@@ -137,11 +133,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 from tensorrt_llm import LLM
 
 # 加载 FP8 量化模型（速度提升 2 倍，内存减少 50%）
-llm = LLM(
-    model="meta-llama/Meta-Llama-3-70B",
-    dtype="fp8",
-    max_num_tokens=8192
-)
+llm = LLM(model="meta-llama/Meta-Llama-3-70B", dtype="fp8", max_num_tokens=8192)
 
 # 推理方式与之前相同
 outputs = llm.generate(["Summarize this article..."])
@@ -151,11 +143,7 @@ outputs = llm.generate(["Summarize this article..."])
 
 ```python
 # 跨 8 个 GPU 的张量并行
-llm = LLM(
-    model="meta-llama/Meta-Llama-3-405B",
-    tensor_parallel_size=8,
-    dtype="fp8"
-)
+llm = LLM(model="meta-llama/Meta-Llama-3-405B", tensor_parallel_size=8, dtype="fp8")
 ```
 
 ### 批量推理
@@ -164,10 +152,7 @@ llm = LLM(
 # 高效处理 100 个 prompt
 prompts = [f"Question {i}: ..." for i in range(100)]
 
-outputs = llm.generate(
-    prompts,
-    sampling_params=SamplingParams(max_tokens=200)
-)
+outputs = llm.generate(prompts, sampling_params=SamplingParams(max_tokens=200))
 
 # 自动 in-flight batching 以实现最大吞吐量
 ```
@@ -195,9 +180,9 @@ outputs = llm.generate(
 
 ## 参考文档
 
-- **[优化指南](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/tensorrt-llm/references/optimization.md)** — 量化、批处理、KV cache 调优
-- **[多 GPU 配置](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/tensorrt-llm/references/multi-gpu.md)** — 张量/流水线并行、多节点
-- **[服务指南](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/tensorrt-llm/references/serving.md)** — 生产部署、监控、自动扩缩容
+- **[优化指南](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/tensorrt-llm/references/optimization.md)** — 量化、批处理、KV cache 调优
+- **[多 GPU 配置](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/tensorrt-llm/references/multi-gpu.md)** — 张量/流水线并行、多节点
+- **[服务指南](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/tensorrt-llm/references/serving.md)** — 生产部署、监控、自动扩缩容
 
 ## 资源
 

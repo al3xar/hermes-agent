@@ -78,14 +78,17 @@ import pandas as pd
 df = pd.DataFrame({"text": ["Good document", "Bad doc", "Excellent text"]})
 dataset = DocumentDataset(df)
 
+
 # 质量过滤
 def quality_score(doc):
     return len(doc["text"].split()) > 5  # Filter short docs
+
 
 filtered = ScoreFilter(quality_score)(dataset)
 
 # 去重
 from nemo_curator.modules import ExactDuplicates
+
 deduped = ExactDuplicates()(filtered)
 
 # 保存
@@ -101,7 +104,7 @@ from nemo_curator.filters import (
     WordCountFilter,
     RepeatedLinesFilter,
     UrlRatioFilter,
-    NonAlphaNumericFilter
+    NonAlphaNumericFilter,
 )
 
 # 应用 30+ 启发式过滤器
@@ -135,9 +138,9 @@ from nemo_curator.modules import FuzzyDuplicates
 fuzzy_dedup = FuzzyDuplicates(
     id_field="id",
     text_field="text",
-    num_hashes=260,      # MinHash parameters
+    num_hashes=260,  # MinHash parameters
     num_buckets=20,
-    hash_method="md5"
+    hash_method="md5",
 )
 
 deduped = fuzzy_dedup(dataset)
@@ -152,7 +155,7 @@ semantic_dedup = SemanticDuplicates(
     id_field="id",
     text_field="text",
     embedding_model="sentence-transformers/all-MiniLM-L6-v2",
-    threshold=0.8  # Cosine similarity threshold
+    threshold=0.8,  # Cosine similarity threshold
 )
 
 deduped = semantic_dedup(dataset)
@@ -167,7 +170,7 @@ from nemo_curator.modifiers import PIIRedactor
 # 脱敏个人身份信息（PII）
 pii_redactor = PIIRedactor(
     supported_entities=["EMAIL_ADDRESS", "PHONE_NUMBER", "PERSON", "LOCATION"],
-    anonymize_action="replace"  # or "redact"
+    anonymize_action="replace",  # or "redact"
 )
 
 redacted = Modify(pii_redactor)(dataset)
@@ -180,9 +183,7 @@ from nemo_curator.classifiers import QualityClassifier
 
 # 质量分类
 quality_clf = QualityClassifier(
-    model_path="nvidia/quality-classifier-deberta",
-    batch_size=256,
-    device="cuda"
+    model_path="nvidia/quality-classifier-deberta", batch_size=256, device="cuda"
 )
 
 # 过滤低质量文档
@@ -217,11 +218,7 @@ deduped = FuzzyDuplicates(...)(dataset)
 ### 图像整理
 
 ```python
-from nemo_curator.image import (
-    AestheticFilter,
-    NSFWFilter,
-    CLIPEmbedder
-)
+from nemo_curator.image import AestheticFilter, NSFWFilter, CLIPEmbedder
 
 # 美学评分
 aesthetic_filter = AestheticFilter(threshold=5.0)
@@ -239,11 +236,7 @@ image_embeddings = clip_embedder(safe_images)
 ### 视频整理
 
 ```python
-from nemo_curator.video import (
-    SceneDetector,
-    ClipExtractor,
-    InternVideo2Embedder
-)
+from nemo_curator.video import SceneDetector, ClipExtractor, InternVideo2Embedder
 
 # 场景检测
 scene_detector = SceneDetector(threshold=27.0)
@@ -261,11 +254,7 @@ video_embeddings = video_embedder(clips)
 ### 音频整理
 
 ```python
-from nemo_curator.audio import (
-    ASRInference,
-    WERFilter,
-    DurationFilter
-)
+from nemo_curator.audio import ASRInference, WERFilter, DurationFilter
 
 # ASR 转录
 asr = ASRInference(model="nvidia/stt_en_fastconformer_hybrid_large_pc")
@@ -300,19 +289,15 @@ pipeline = [
     RepeatedLinesFilter(max_repeated_line_fraction=0.2),
     SymbolToWordRatioFilter(max_symbol_to_word_ratio=0.3),
     UrlRatioFilter(max_url_ratio=0.3),
-
     # 2. 语言过滤
     LanguageIdentificationFilter(target_languages=["en"]),
-
     # 3. 去重
     ExactDuplicates(id_field="id", text_field="text"),
     FuzzyDuplicates(id_field="id", text_field="text", num_hashes=260),
-
     # 4. PII 脱敏
     PIIRedactor(),
-
     # 5. NSFW 过滤
-    NSFWClassifier(threshold=0.8)
+    NSFWClassifier(threshold=0.8),
 ]
 
 # 执行
@@ -390,8 +375,8 @@ cluster.close()
 
 ## 参考资料
 
-- **[过滤指南](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/nemo-curator/references/filtering.md)** - 30+ 质量过滤器与启发式规则
-- **[去重指南](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/nemo-curator/references/deduplication.md)** - 精确、模糊、语义去重方法
+- **[过滤指南](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/nemo-curator/references/filtering.md)** - 30+ 质量过滤器与启发式规则
+- **[去重指南](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/nemo-curator/references/deduplication.md)** - 精确、模糊、语义去重方法
 
 ## 资源
 

@@ -86,7 +86,7 @@ client = QdrantClient(host="localhost", port=6333)
 # Create collection
 client.create_collection(
     collection_name="documents",
-    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+    vectors_config=VectorParams(size=384, distance=Distance.COSINE),
 )
 
 # Insert vectors with payload
@@ -96,24 +96,22 @@ client.upsert(
         PointStruct(
             id=1,
             vector=[0.1, 0.2, ...],  # 384-dim vector
-            payload={"title": "Doc 1", "category": "tech"}
+            payload={"title": "Doc 1", "category": "tech"},
         ),
         PointStruct(
             id=2,
             vector=[0.3, 0.4, ...],
-            payload={"title": "Doc 2", "category": "science"}
-        )
-    ]
+            payload={"title": "Doc 2", "category": "science"},
+        ),
+    ],
 )
 
 # Search with filtering
 results = client.search(
     collection_name="documents",
     query_vector=[0.15, 0.25, ...],
-    query_filter={
-        "must": [{"key": "category", "match": {"value": "tech"}}]
-    },
-    limit=10
+    query_filter={"must": [{"key": "category", "match": {"value": "tech"}}]},
+    limit=10,
 )
 
 for point in results:
@@ -129,21 +127,21 @@ from qdrant_client.models import PointStruct
 
 # Point = ID + Vector(s) + Payload
 point = PointStruct(
-    id=123,                              # Integer or UUID string
-    vector=[0.1, 0.2, 0.3, ...],        # Dense vector
-    payload={                            # Arbitrary JSON metadata
+    id=123,  # Integer or UUID string
+    vector=[0.1, 0.2, 0.3, ...],  # Dense vector
+    payload={  # Arbitrary JSON metadata
         "title": "Document title",
         "category": "tech",
         "timestamp": 1699900000,
-        "tags": ["python", "ml"]
-    }
+        "tags": ["python", "ml"],
+    },
 )
 
 # Batch upsert (recommended)
 client.upsert(
     collection_name="documents",
     points=[point1, point2, point3],
-    wait=True  # Wait for indexing
+    wait=True,  # Wait for indexing
 )
 ```
 
@@ -156,15 +154,15 @@ from qdrant_client.models import VectorParams, Distance, HnswConfigDiff
 client.create_collection(
     collection_name="documents",
     vectors_config=VectorParams(
-        size=384,                        # Vector dimensions
-        distance=Distance.COSINE         # COSINE, EUCLID, DOT, MANHATTAN
+        size=384,  # Vector dimensions
+        distance=Distance.COSINE,  # COSINE, EUCLID, DOT, MANHATTAN
     ),
     hnsw_config=HnswConfigDiff(
-        m=16,                            # Connections per node (default 16)
-        ef_construct=100,                # Build-time accuracy (default 100)
-        full_scan_threshold=10000        # Switch to brute force below this
+        m=16,  # Connections per node (default 16)
+        ef_construct=100,  # Build-time accuracy (default 100)
+        full_scan_threshold=10000,  # Switch to brute force below this
     ),
-    on_disk_payload=True                 # Store payload on disk
+    on_disk_payload=True,  # Store payload on disk
 )
 
 # Collection info
@@ -192,7 +190,7 @@ results = client.search(
     query_vector=[0.1, 0.2, ...],
     limit=10,
     with_payload=True,
-    with_vectors=False  # Don't return vectors (faster)
+    with_vectors=False,  # Don't return vectors (faster)
 )
 ```
 
@@ -208,13 +206,11 @@ results = client.search(
     query_filter=Filter(
         must=[
             FieldCondition(key="category", match=MatchValue(value="tech")),
-            FieldCondition(key="timestamp", range=Range(gte=1699000000))
+            FieldCondition(key="timestamp", range=Range(gte=1699000000)),
         ],
-        must_not=[
-            FieldCondition(key="status", match=MatchValue(value="archived"))
-        ]
+        must_not=[FieldCondition(key="status", match=MatchValue(value="archived"))],
     ),
-    limit=10
+    limit=10,
 )
 
 # Shorthand filter syntax
@@ -224,10 +220,10 @@ results = client.search(
     query_filter={
         "must": [
             {"key": "category", "match": {"value": "tech"}},
-            {"key": "price", "range": {"gte": 10, "lte": 100}}
+            {"key": "price", "range": {"gte": 10, "lte": 100}},
         ]
     },
-    limit=10
+    limit=10,
 )
 ```
 
@@ -242,8 +238,8 @@ results = client.search_batch(
     requests=[
         SearchRequest(vector=[0.1, ...], limit=5),
         SearchRequest(vector=[0.2, ...], limit=5, filter={"must": [...]}),
-        SearchRequest(vector=[0.3, ...], limit=10)
-    ]
+        SearchRequest(vector=[0.3, ...], limit=10),
+    ],
 )
 ```
 
@@ -263,7 +259,7 @@ client = QdrantClient(host="localhost", port=6333)
 # Create collection
 client.create_collection(
     collection_name="knowledge_base",
-    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+    vectors_config=VectorParams(size=384, distance=Distance.COSINE),
 )
 
 # Index documents
@@ -276,21 +272,21 @@ points = [
     PointStruct(
         id=doc["id"],
         vector=encoder.encode(doc["text"]).tolist(),
-        payload={"text": doc["text"], "source": doc["source"]}
+        payload={"text": doc["text"], "source": doc["source"]},
     )
     for doc in documents
 ]
 client.upsert(collection_name="knowledge_base", points=points)
 
+
 # RAG retrieval
 def retrieve(query: str, top_k: int = 5) -> list[dict]:
     query_vector = encoder.encode(query).tolist()
     results = client.search(
-        collection_name="knowledge_base",
-        query_vector=query_vector,
-        limit=top_k
+        collection_name="knowledge_base", query_vector=query_vector, limit=top_k
     )
     return [{"text": r.payload["text"], "score": r.score} for r in results]
+
 
 # Use in RAG pipeline
 context = retrieve("What is Python?")
@@ -304,7 +300,9 @@ from langchain_community.vectorstores import Qdrant
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vectorstore = Qdrant.from_documents(documents, embeddings, url="http://localhost:6333", collection_name="docs")
+vectorstore = Qdrant.from_documents(
+    documents, embeddings, url="http://localhost:6333", collection_name="docs"
+)
 retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 ```
 
@@ -332,8 +330,8 @@ client.create_collection(
     collection_name="hybrid_search",
     vectors_config={
         "dense": VectorParams(size=384, distance=Distance.COSINE),
-        "sparse": VectorParams(size=30000, distance=Distance.DOT)
-    }
+        "sparse": VectorParams(size=30000, distance=Distance.DOT),
+    },
 )
 
 # Insert with named vectors
@@ -342,20 +340,17 @@ client.upsert(
     points=[
         PointStruct(
             id=1,
-            vector={
-                "dense": dense_embedding,
-                "sparse": sparse_embedding
-            },
-            payload={"text": "document text"}
+            vector={"dense": dense_embedding, "sparse": sparse_embedding},
+            payload={"text": "document text"},
         )
-    ]
+    ],
 )
 
 # Search specific vector
 results = client.search(
     collection_name="hybrid_search",
     query_vector=("dense", query_dense),  # Specify which vector
-    limit=10
+    limit=10,
 )
 ```
 
@@ -368,20 +363,32 @@ from qdrant_client.models import SparseVectorParams, SparseIndexParams, SparseVe
 client.create_collection(
     collection_name="sparse_search",
     vectors_config={},
-    sparse_vectors_config={"text": SparseVectorParams(index=SparseIndexParams(on_disk=False))}
+    sparse_vectors_config={
+        "text": SparseVectorParams(index=SparseIndexParams(on_disk=False))
+    },
 )
 
 # Insert sparse vector
 client.upsert(
     collection_name="sparse_search",
-    points=[PointStruct(id=1, vector={"text": SparseVector(indices=[1, 5, 100], values=[0.5, 0.8, 0.2])}, payload={"text": "document"})]
+    points=[
+        PointStruct(
+            id=1,
+            vector={"text": SparseVector(indices=[1, 5, 100], values=[0.5, 0.8, 0.2])},
+            payload={"text": "document"},
+        )
+    ],
 )
 ```
 
 ## Quantization (memory optimization)
 
 ```python
-from qdrant_client.models import ScalarQuantization, ScalarQuantizationConfig, ScalarType
+from qdrant_client.models import (
+    ScalarQuantization,
+    ScalarQuantizationConfig,
+    ScalarType,
+)
 
 # Scalar quantization (4x memory reduction)
 client.create_collection(
@@ -390,10 +397,10 @@ client.create_collection(
     quantization_config=ScalarQuantization(
         scalar=ScalarQuantizationConfig(
             type=ScalarType.INT8,
-            quantile=0.99,        # Clip outliers
-            always_ram=True      # Keep quantized in RAM
+            quantile=0.99,  # Clip outliers
+            always_ram=True,  # Keep quantized in RAM
         )
-    )
+    ),
 )
 
 # Search with rescoring
@@ -401,7 +408,7 @@ results = client.search(
     collection_name="quantized",
     query_vector=query,
     search_params={"quantization": {"rescore": True}},  # Rescore top results
-    limit=10
+    limit=10,
 )
 ```
 
@@ -414,13 +421,13 @@ from qdrant_client.models import PayloadSchemaType
 client.create_payload_index(
     collection_name="documents",
     field_name="category",
-    field_schema=PayloadSchemaType.KEYWORD
+    field_schema=PayloadSchemaType.KEYWORD,
 )
 
 client.create_payload_index(
     collection_name="documents",
     field_name="timestamp",
-    field_schema=PayloadSchemaType.INTEGER
+    field_schema=PayloadSchemaType.INTEGER,
 )
 
 # Index types: KEYWORD, INTEGER, FLOAT, GEO, TEXT (full-text), BOOL
@@ -435,8 +442,7 @@ from qdrant_client import QdrantClient
 
 # Connect to Qdrant Cloud
 client = QdrantClient(
-    url="https://your-cluster.cloud.qdrant.io",
-    api_key="your-api-key"
+    url="https://your-cluster.cloud.qdrant.io", api_key="your-api-key"
 )
 ```
 
@@ -445,14 +451,12 @@ client = QdrantClient(
 ```python
 # Optimize for search speed (higher recall)
 client.update_collection(
-    collection_name="documents",
-    hnsw_config=HnswConfigDiff(ef_construct=200, m=32)
+    collection_name="documents", hnsw_config=HnswConfigDiff(ef_construct=200, m=32)
 )
 
 # Optimize for indexing speed (bulk loads)
 client.update_collection(
-    collection_name="documents",
-    optimizer_config={"indexing_threshold": 20000}
+    collection_name="documents", optimizer_config={"indexing_threshold": 20000}
 )
 ```
 
@@ -473,7 +477,7 @@ client.update_collection(
 client.create_payload_index(
     collection_name="docs",
     field_name="category",
-    field_schema=PayloadSchemaType.KEYWORD
+    field_schema=PayloadSchemaType.KEYWORD,
 )
 ```
 
@@ -484,7 +488,7 @@ client.create_collection(
     collection_name="large_collection",
     vectors_config=VectorParams(size=384, distance=Distance.COSINE),
     quantization_config=ScalarQuantization(...),
-    on_disk_payload=True
+    on_disk_payload=True,
 )
 ```
 
@@ -495,14 +499,14 @@ client = QdrantClient(
     host="localhost",
     port=6333,
     timeout=30,
-    prefer_grpc=True  # gRPC for better performance
+    prefer_grpc=True,  # gRPC for better performance
 )
 ```
 
 ## References
 
-- **[Advanced Usage](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/qdrant/references/advanced-usage.md)** - Distributed mode, hybrid search, recommendations
-- **[Troubleshooting](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/qdrant/references/troubleshooting.md)** - Common issues, debugging, performance tuning
+- **[Advanced Usage](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/qdrant/references/advanced-usage.md)** - Distributed mode, hybrid search, recommendations
+- **[Troubleshooting](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/qdrant/references/troubleshooting.md)** - Common issues, debugging, performance tuning
 
 ## Resources
 

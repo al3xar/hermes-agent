@@ -149,11 +149,11 @@ hades webhook subscribe pr-review \
   --deliver github_comment
 ```
 
-Full automation templates gallery: [hades-agent.nousresearch.com/docs/guides/automation-templates](https://hades-agent.nousresearch.com/docs/guides/automation-templates)
+Full automation templates gallery: [hades-agent.nousresearch.com/docs/guides/automation-templates](https://hermes-agent.nousresearch.com/docs/guides/automation-templates)
 
-Documentation: [hades-agent.nousresearch.com](https://hades-agent.nousresearch.com)
+Documentation: [hades-agent.nousresearch.com](https://hermes-agent.nousresearch.com)
 
-GitHub: [github.com/NousResearch/hades-agent](https://github.com/NousResearch/hades-agent)
+GitHub: [github.com/NousResearch/hades-agent](https://github.com/NousResearch/hermes-agent)
 
 ---
 

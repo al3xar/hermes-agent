@@ -4,7 +4,7 @@ Verifies that subprocesses (terminal, execute_code, background processes)
 receive a per-profile HOME directory while the Python process's own HOME
 and Path.home() remain unchanged.
 
-See: https://github.com/NousResearch/hades-agent/issues/4426
+See: https://github.com/NousResearch/hermes-agent/issues/4426
 """
 
 import os
@@ -12,10 +12,10 @@ import threading
 from pathlib import Path
 
 
-
 # ---------------------------------------------------------------------------
 # get_subprocess_home()
 # ---------------------------------------------------------------------------
+
 
 class TestGetSubprocessHome:
     """Unit tests for hades_constants.get_subprocess_home()."""
@@ -23,6 +23,7 @@ class TestGetSubprocessHome:
     def test_returns_none_when_hades_home_unset(self, monkeypatch):
         monkeypatch.delenv("HADES_HOME", raising=False)
         from hades_constants import get_subprocess_home
+
         assert get_subprocess_home() is None
 
     def test_returns_none_when_home_dir_missing(self, tmp_path, monkeypatch):
@@ -31,6 +32,7 @@ class TestGetSubprocessHome:
         monkeypatch.setenv("HADES_HOME", str(hades_home))
         # No home/ subdirectory created
         from hades_constants import get_subprocess_home
+
         assert get_subprocess_home() is None
 
     def test_returns_path_when_home_dir_exists(self, tmp_path, monkeypatch):
@@ -40,6 +42,7 @@ class TestGetSubprocessHome:
         profile_home.mkdir()
         monkeypatch.setenv("HADES_HOME", str(hades_home))
         from hades_constants import get_subprocess_home
+
         assert get_subprocess_home() == str(profile_home)
 
     def test_returns_profile_specific_path(self, tmp_path, monkeypatch):
@@ -50,6 +53,7 @@ class TestGetSubprocessHome:
         profile_home.mkdir()
         monkeypatch.setenv("HADES_HOME", str(profile_dir))
         from hades_constants import get_subprocess_home
+
         assert get_subprocess_home() == str(profile_home)
 
     def test_two_profiles_get_different_homes(self, tmp_path, monkeypatch):
@@ -116,6 +120,7 @@ class TestGetSubprocessHome:
 # _make_run_env() injection
 # ---------------------------------------------------------------------------
 
+
 class TestMakeRunEnvHomeInjection:
     """Verify _make_run_env() injects HOME into subprocess envs."""
 
@@ -128,6 +133,7 @@ class TestMakeRunEnvHomeInjection:
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
         from tools.environments.local import _make_run_env
+
         result = _make_run_env({})
 
         assert result["HOME"] == str(hades_home / "home")
@@ -141,6 +147,7 @@ class TestMakeRunEnvHomeInjection:
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
         from tools.environments.local import _make_run_env
+
         result = _make_run_env({})
 
         assert result["HOME"] == "/root"
@@ -151,6 +158,7 @@ class TestMakeRunEnvHomeInjection:
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
         from tools.environments.local import _make_run_env
+
         result = _make_run_env({})
 
         assert result["HOME"] == "/home/user"
@@ -182,6 +190,7 @@ class TestMakeRunEnvHomeInjection:
 # _sanitize_subprocess_env() injection
 # ---------------------------------------------------------------------------
 
+
 class TestSanitizeSubprocessEnvHomeInjection:
     """Verify _sanitize_subprocess_env() injects HOME for background procs."""
 
@@ -193,6 +202,7 @@ class TestSanitizeSubprocessEnvHomeInjection:
 
         base_env = {"HOME": "/root", "PATH": "/usr/bin", "USER": "root"}
         from tools.environments.local import _sanitize_subprocess_env
+
         result = _sanitize_subprocess_env(base_env)
 
         assert result["HOME"] == str(hades_home / "home")
@@ -204,6 +214,7 @@ class TestSanitizeSubprocessEnvHomeInjection:
 
         base_env = {"HOME": "/root", "PATH": "/usr/bin"}
         from tools.environments.local import _sanitize_subprocess_env
+
         result = _sanitize_subprocess_env(base_env)
 
         assert result["HOME"] == "/root"
@@ -234,11 +245,13 @@ class TestSanitizeSubprocessEnvHomeInjection:
 # Profile bootstrap
 # ---------------------------------------------------------------------------
 
+
 class TestProfileBootstrap:
     """Verify new profiles get a home/ subdirectory."""
 
     def test_profile_dirs_includes_home(self):
         from hades_cli.profiles import _PROFILE_DIRS
+
         assert "home" in _PROFILE_DIRS
 
     def test_create_profile_bootstraps_home_dir(self, tmp_path, monkeypatch):
@@ -249,6 +262,7 @@ class TestProfileBootstrap:
         monkeypatch.setenv("HADES_HOME", str(home))
 
         from hades_cli.profiles import create_profile
+
         profile_dir = create_profile("testbot", no_alias=True)
         assert (profile_dir / "home").is_dir()
 
@@ -256,6 +270,7 @@ class TestProfileBootstrap:
 # ---------------------------------------------------------------------------
 # Python process HOME unchanged
 # ---------------------------------------------------------------------------
+
 
 class TestPythonProcessUnchanged:
     """Confirm the Python process's own HOME is never modified."""
@@ -272,6 +287,7 @@ class TestPythonProcessUnchanged:
         original_path_home = str(Path.home())
 
         from hades_constants import get_subprocess_home
+
         sub_home = get_subprocess_home()
 
         # Subprocess home is set but Python HOME stays the same

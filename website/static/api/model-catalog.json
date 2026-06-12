@@ -3,7 +3,7 @@
   "updated_at": "2026-06-09T05:57:24Z",
   "metadata": {
     "source": "hades-agent repo",
-    "docs": "https://hades-agent.nousresearch.com/docs/reference/model-catalog"
+    "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog"
   },
   "providers": {
     "openrouter": {

@@ -75,13 +75,13 @@ accelerate launch train.py
 # train.py
 import torch
 
-model = torch.nn.Linear(10, 2).to('cuda')
+model = torch.nn.Linear(10, 2).to("cuda")
 optimizer = torch.optim.Adam(model.parameters())
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=32)
 
 for epoch in range(10):
     for batch in dataloader:
-        batch = batch.to('cuda')
+        batch = batch.to("cuda")
         optimizer.zero_grad()
         loss = model(batch).mean()
         loss.backward()
@@ -144,13 +144,13 @@ accelerate launch --multi_gpu --num_processes 16 \
 from accelerate import Accelerator
 
 # FP16 (with gradient scaling)
-accelerator = Accelerator(mixed_precision='fp16')
+accelerator = Accelerator(mixed_precision="fp16")
 
 # BF16 (no scaling, more stable)
-accelerator = Accelerator(mixed_precision='bf16')
+accelerator = Accelerator(mixed_precision="bf16")
 
 # FP8 (H100+)
-accelerator = Accelerator(mixed_precision='fp8')
+accelerator = Accelerator(mixed_precision="fp8")
 
 model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader)
 
@@ -168,12 +168,12 @@ for batch in dataloader:
 from accelerate import Accelerator
 
 accelerator = Accelerator(
-    mixed_precision='bf16',
+    mixed_precision="bf16",
     deepspeed_plugin={
         "zero_stage": 2,  # ZeRO-2
         "offload_optimizer": False,
-        "gradient_accumulation_steps": 4
-    }
+        "gradient_accumulation_steps": 4,
+    },
 )
 
 # Same code as before!
@@ -214,13 +214,10 @@ from accelerate import Accelerator, FullyShardedDataParallelPlugin
 fsdp_plugin = FullyShardedDataParallelPlugin(
     sharding_strategy="FULL_SHARD",  # ZeRO-3 equivalent
     auto_wrap_policy="TRANSFORMER_AUTO_WRAP",
-    cpu_offload=False
+    cpu_offload=False,
 )
 
-accelerator = Accelerator(
-    mixed_precision='bf16',
-    fsdp_plugin=fsdp_plugin
-)
+accelerator = Accelerator(mixed_precision="bf16", fsdp_plugin=fsdp_plugin)
 
 model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader)
 ```
@@ -280,7 +277,7 @@ for batch in dataloader:
 Don't manually move to device:
 ```python
 # WRONG
-batch = batch.to('cuda')
+batch = batch.to("cuda")
 
 # CORRECT
 # Accelerate handles it automatically after prepare()
@@ -303,10 +300,10 @@ Use accelerator methods:
 ```python
 # Save only on main process
 if accelerator.is_main_process:
-    accelerator.save_state('checkpoint/')
+    accelerator.save_state("checkpoint/")
 
 # Load on all processes
-accelerator.load_state('checkpoint/')
+accelerator.load_state("checkpoint/")
 ```
 
 **Issue: Different results with FSDP**
@@ -314,16 +311,17 @@ accelerator.load_state('checkpoint/')
 Ensure same random seed:
 ```python
 from accelerate.utils import set_seed
+
 set_seed(42)
 ```
 
 ## Advanced topics
 
-**Megatron integration**: See [references/megatron-integration.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/accelerate/references/megatron-integration.md) for tensor parallelism, pipeline parallelism, and sequence parallelism setup.
+**Megatron integration**: See [references/megatron-integration.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/accelerate/references/megatron-integration.md) for tensor parallelism, pipeline parallelism, and sequence parallelism setup.
 
-**Custom plugins**: See [references/custom-plugins.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/accelerate/references/custom-plugins.md) for creating custom distributed plugins and advanced configuration.
+**Custom plugins**: See [references/custom-plugins.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/accelerate/references/custom-plugins.md) for creating custom distributed plugins and advanced configuration.
 
-**Performance tuning**: See [references/performance.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/accelerate/references/performance.md) for profiling, memory optimization, and best practices.
+**Performance tuning**: See [references/performance.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/accelerate/references/performance.md) for profiling, memory optimization, and best practices.
 
 ## Hardware requirements
 

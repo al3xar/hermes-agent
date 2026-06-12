@@ -242,7 +242,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = with lib; {
     description = "AI agent with advanced tool-calling capabilities";
-    homepage = "https://github.com/NousResearch/hades-agent";
+    homepage = "https://github.com/NousResearch/hermes-agent";
     mainProgram = "hades";
     license = licenses.mit;
     platforms = platforms.unix;

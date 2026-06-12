@@ -579,7 +579,7 @@ for row_idx, wacc_value in enumerate(wacc_range):
     for col_idx, term_growth_value in enumerate(term_growth_range):
         # Build formula that uses wacc_value and term_growth_value
         formula = f"=<DCF recalc using {wacc_value} and {term_growth_value}>"
-        ws.cell(row=start_row+row_idx, column=start_col+col_idx).value = formula
+        ws.cell(row=start_row + row_idx, column=start_col + col_idx).value = formula
 ```
 
 **The sensitivity tables must work immediately when the model is opened, with no manual steps required from the user.**
@@ -1196,7 +1196,7 @@ This approach centralizes scenario logic, making the model easier to audit and m
 
 ## Troubleshooting
 
-**If you encounter errors or unreasonable results, read [TROUBLESHOOTING.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) for detailed debugging guidance.**
+**If you encounter errors or unreasonable results, read [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) for detailed debugging guidance.**
 
 ## Workflow Integration
 
@@ -1234,7 +1234,7 @@ This approach centralizes scenario logic, making the model easier to audit and m
 
 3. **Check output**:
    - If `status` is `"success"` → Continue to step 4
-   - If `status` is `"errors_found"` → Check `error_summary` and read [TROUBLESHOOTING.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) for debugging guidance
+   - If `status` is `"errors_found"` → Check `error_summary` and read [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) for debugging guidance
 
 4. **Fix errors and re-run recalc.py** until status is "success"
 

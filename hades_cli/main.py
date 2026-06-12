@@ -233,7 +233,11 @@ def _print_fast_version_info() -> None:
     print(f"Python: {sys.version.split()[0]}")
 
     openai_version = _read_openai_version_fast()
-    print(f"OpenAI SDK: {openai_version}" if openai_version else "OpenAI SDK: Not installed")
+    print(
+        f"OpenAI SDK: {openai_version}"
+        if openai_version
+        else "OpenAI SDK: Not installed"
+    )
 
 
 def _try_termux_ultrafast_version() -> bool:
@@ -262,7 +266,9 @@ from pathlib import Path
 from typing import Optional
 
 
-from hades_cli.subcommands._shared import add_accept_hooks_flag as _add_accept_hooks_flag
+from hades_cli.subcommands._shared import (
+    add_accept_hooks_flag as _add_accept_hooks_flag,
+)
 from hades_cli.subcommands.cron import build_cron_parser
 from hades_cli.subcommands.gateway import build_gateway_parser
 from hades_cli.subcommands.profile import build_profile_parser
@@ -394,7 +400,7 @@ def _apply_profile_override() -> None:
         try:
             from hades_cli.profiles import resolve_profile_env
 
-            hades_home=resolve_profile_env(profile_name)
+            hades_home = resolve_profile_env(profile_name)
         except (ValueError, FileNotFoundError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
             sys.exit(1)
@@ -518,6 +524,7 @@ from hades_cli.model_setup_flows import (
     _model_flow_api_key_provider,
     _model_flow_anthropic,
 )
+
 logger = logging.getLogger(__name__)
 
 
@@ -539,7 +546,9 @@ def _read_packed_ref(common_dir: Path, ref: str) -> str | None:
     peel lines and ``#``-prefixed comments / ``# pack-refs with:`` header.
     """
     try:
-        text = (common_dir / "packed-refs").read_text(encoding="utf-8", errors="replace")
+        text = (common_dir / "packed-refs").read_text(
+            encoding="utf-8", errors="replace"
+        )
     except OSError:
         return None
     for line in text.splitlines():
@@ -556,7 +565,9 @@ def _read_git_revision_fingerprint(repo_root: Path) -> str | None:
     git_dir = repo_root / ".git"
     try:
         if git_dir.is_file():
-            for line in git_dir.read_text(encoding="utf-8", errors="replace").splitlines():
+            for line in git_dir.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines():
                 key, _, value = line.partition(":")
                 if key.strip() == "gitdir" and value.strip():
                     git_dir = (repo_root / value.strip()).resolve()
@@ -568,7 +579,9 @@ def _read_git_revision_fingerprint(repo_root: Path) -> str | None:
         commondir_file = git_dir / "commondir"
         if commondir_file.exists():
             try:
-                rel = commondir_file.read_text(encoding="utf-8", errors="replace").strip()
+                rel = commondir_file.read_text(
+                    encoding="utf-8", errors="replace"
+                ).strip()
                 if rel:
                     common_dir = (git_dir / rel).resolve()
             except OSError:
@@ -604,7 +617,9 @@ def _termux_bundled_skills_fingerprint() -> str:
     skills_dir = PROJECT_ROOT / "skills"
     try:
         stat = skills_dir.stat()
-        return f"skills:{__version__}:{__release_date__}:{stat.st_mtime_ns}:{stat.st_size}"
+        return (
+            f"skills:{__version__}:{__release_date__}:{stat.st_mtime_ns}:{stat.st_size}"
+        )
     except OSError:
         return f"skills:{__version__}:{__release_date__}:missing"
 
@@ -620,7 +635,10 @@ def _termux_bundled_skills_sync_needed() -> bool:
         return True
     try:
         stamp = _termux_bundled_skills_stamp_path()
-        return stamp.read_text(encoding="utf-8").strip() != _termux_bundled_skills_fingerprint()
+        return (
+            stamp.read_text(encoding="utf-8").strip()
+            != _termux_bundled_skills_fingerprint()
+        )
     except OSError:
         return True
 
@@ -848,7 +866,9 @@ def _session_browse_picker(sessions: list) -> Optional[str]:
                 curses.init_pair(1, curses.COLOR_GREEN, -1)  # selected
                 curses.init_pair(2, curses.COLOR_YELLOW, -1)  # header
                 curses.init_pair(3, curses.COLOR_CYAN, -1)  # search
-                curses.init_pair(4, 8 if curses.COLORS > 8 else curses.COLOR_WHITE, -1)  # dim
+                curses.init_pair(
+                    4, 8 if curses.COLORS > 8 else curses.COLOR_WHITE, -1
+                )  # dim
 
             cursor = 0
             scroll_offset = 0
@@ -960,10 +980,14 @@ def _session_browse_picker(sessions: list) -> Optional[str]:
                 stdscr.refresh()
                 key = stdscr.getch()
 
-                if key in {curses.KEY_UP,}:
+                if key in {
+                    curses.KEY_UP,
+                }:
                     if filtered:
                         cursor = (cursor - 1) % len(filtered)
-                elif key in {curses.KEY_DOWN,}:
+                elif key in {
+                    curses.KEY_DOWN,
+                }:
                     if filtered:
                         cursor = (cursor + 1) % len(filtered)
                 elif key in {curses.KEY_ENTER, 10, 13}:
@@ -1333,9 +1357,10 @@ def _termux_workspace_install_context(
         if packages_dir.is_dir():
             for child in sorted(packages_dir.iterdir()):
                 if child.is_dir() and (child / "package.json").is_file():
-                    workspace_args.extend(
-                        ["--workspace", child.relative_to(ws_root).as_posix()]
-                    )
+                    workspace_args.extend([
+                        "--workspace",
+                        child.relative_to(ws_root).as_posix(),
+                    ])
     workspace_args.append("--include-workspace-root=false")
     return ws_root, tuple(workspace_args)
 
@@ -1438,9 +1463,15 @@ _TUI_BUILD_INPUT_FILES = (
     "packages/hades-ink/text-input.js",
 )
 
-_TUI_BUILD_INPUT_SUFFIXES = frozenset(
-    {".cjs", ".js", ".jsx", ".json", ".mjs", ".ts", ".tsx"}
-)
+_TUI_BUILD_INPUT_SUFFIXES = frozenset({
+    ".cjs",
+    ".js",
+    ".jsx",
+    ".json",
+    ".mjs",
+    ".ts",
+    ".tsx",
+})
 
 
 def _iter_tui_build_inputs(root: Path):
@@ -1508,7 +1539,7 @@ def _ensure_tui_node() -> None:
     if not helper.is_file():
         return
 
-    hades_home=os.environ.get("HADES_HOME") or str(Path.home() / ".hades")
+    hades_home = os.environ.get("HADES_HOME") or str(Path.home() / ".hades")
     try:
         # Helper writes logs to stderr; we ask bash to print `command -v node`
         # on stdout once ensure_node succeeds. Subshell PATH edits don't leak
@@ -1564,6 +1595,7 @@ def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
         if not path and bin == "node":
             try:
                 from hades_cli.dep_ensure import ensure_dependency
+
                 if ensure_dependency("node"):
                     path = shutil.which("node")
             except Exception:
@@ -1612,10 +1644,7 @@ def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
     skip_install_for_fresh_termux_bundle = (
         termux_startup and not tui_dev and not termux_need_rebuild
     )
-    if (
-        not skip_install_for_fresh_termux_bundle
-        and _tui_need_npm_install(tui_dir)
-    ):
+    if not skip_install_for_fresh_termux_bundle and _tui_need_npm_install(tui_dir):
         npm = _node_bin("npm")
         if not os.environ.get("HADES_QUIET"):
             print("Installing TUI dependencies…")
@@ -1827,9 +1856,12 @@ def _launch_tui(
     env = os.environ.copy()
     try:
         from hades_cli.config import apply_terminal_config_to_env
+
         apply_terminal_config_to_env(env=env)
     except Exception:
-        logger.debug("Failed to apply terminal config bridge for TUI launch", exc_info=True)
+        logger.debug(
+            "Failed to apply terminal config bridge for TUI launch", exc_info=True
+        )
     active_session_fd, active_session_file = tempfile.mkstemp(
         prefix="hades-tui-active-session-", suffix=".json"
     )
@@ -2089,7 +2121,9 @@ def cmd_chat(args):
             )
             for _ref in _retired_xai_refs:
                 sys.stderr.write(f"  \033[33m⚠\033[0m {format_issue(_ref)}\n")
-            sys.stderr.write(f"  \033[2mMigration guide: {MIGRATION_GUIDE_URL}\033[0m\n")
+            sys.stderr.write(
+                f"  \033[2mMigration guide: {MIGRATION_GUIDE_URL}\033[0m\n"
+            )
             sys.stderr.write("  \033[2mRun 'hades doctor' for details.\033[0m\n\n")
     except Exception:
         pass
@@ -2494,6 +2528,7 @@ def cmd_model(args):
     if getattr(args, "refresh", False):
         try:
             from hades_cli.models import clear_provider_models_cache
+
             clear_provider_models_cache()
             print("  Cleared model picker cache.")
         except Exception:
@@ -2510,6 +2545,7 @@ def _is_profile_api_key_provider(provider_id: str) -> bool:
     """
     try:
         from providers import get_provider_profile
+
         _p = get_provider_profile(provider_id)
         return _p is not None and _p.auth_type == "api_key"
     except Exception:
@@ -2553,6 +2589,7 @@ def select_provider_and_model(args=None):
         config_provider or os.getenv("HADES_INFERENCE_PROVIDER") or "auto"
     )
     compatible_custom_providers = get_compatible_custom_providers(config)
+
     def _named_custom_provider_map(cfg) -> dict[str, dict[str, str]]:
         from hades_cli.config import read_raw_config
 
@@ -2588,9 +2625,10 @@ def select_provider_and_model(args=None):
             if name:
                 identities.extend(((name.lower(),), (name.lower(), model)))
             if provider_key:
-                identities.extend(
-                    ((provider_key.lower(),), (provider_key.lower(), model))
-                )
+                identities.extend((
+                    (provider_key.lower(),),
+                    (provider_key.lower(), model),
+                ))
             if "${" in template:
                 for identity in identities:
                     raw_api_key_refs.setdefault(identity, template)
@@ -2771,7 +2809,11 @@ def select_provider_and_model(args=None):
         if row["kind"] == "group":
             gid = row["group_id"]
             group_desc = row.get("description", "")
-            label = f"{row['label']} ▸ ({group_desc})" if group_desc else f"{row['label']} ▸"
+            label = (
+                f"{row['label']} ▸ ({group_desc})"
+                if group_desc
+                else f"{row['label']} ▸"
+            )
             key = f"group:{gid}"
             is_active = bool(active_group) and gid == active_group
             members = row["members"]
@@ -2827,9 +2869,7 @@ def select_provider_and_model(args=None):
         member_default = 0
         if active in selected_members:
             member_default = selected_members.index(active)
-        member_labels = [
-            provider_labels.get(m, m) for m in selected_members
-        ]
+        member_labels = [provider_labels.get(m, m) for m in selected_members]
         member_idx = _prompt_provider_choice(member_labels, default=member_default)
         if member_idx is None:
             print("No change.")
@@ -2994,6 +3034,7 @@ def _all_aux_tasks() -> list[tuple[str, str, str]]:
     tasks = list(_AUX_TASKS)
     try:
         from hades_cli.plugins import get_plugin_auxiliary_tasks
+
         for entry in get_plugin_auxiliary_tasks():
             tasks.append((entry["key"], entry["display_name"], entry["description"]))
     except Exception:
@@ -3164,7 +3205,9 @@ def _aux_select_for_task(task: str) -> None:
     current_model = str(task_cfg.get("model") or "").strip()
     current_base_url = str(task_cfg.get("base_url") or "").strip()
 
-    display_name = next((name for key, name, _ in _all_aux_tasks() if key == task), task)
+    display_name = next(
+        (name for key, name, _ in _all_aux_tasks() if key == task), task
+    )
 
     # Gather authenticated providers (has credentials + curated model list)
     try:
@@ -3235,7 +3278,9 @@ def _aux_flow_provider_model(
     from hades_cli.auth import _prompt_model_selection
     from hades_cli.models import get_pricing_for_provider
 
-    display_name = next((name for key, name, _ in _all_aux_tasks() if key == task), task)
+    display_name = next(
+        (name for key, name, _ in _all_aux_tasks() if key == task), task
+    )
 
     # Fetch live pricing for this provider (non-blocking)
     pricing: dict = {}
@@ -3281,7 +3326,9 @@ def _aux_flow_custom_endpoint(task: str, task_cfg: dict) -> None:
     """Prompt for a direct OpenAI-compatible base_url + optional api_key/model."""
     from hades_cli.secret_prompt import masked_secret_prompt
 
-    display_name = next((name for key, name, _ in _all_aux_tasks() if key == task), task)
+    display_name = next(
+        (name for key, name, _ in _all_aux_tasks() if key == task), task
+    )
     current_base_url = str(task_cfg.get("base_url") or "").strip()
     current_model = str(task_cfg.get("model") or "").strip()
 
@@ -3370,29 +3417,15 @@ def _prompt_provider_choice(choices, *, default=0):
             return None
 
 
-
-
-
-
-
-
-
-
 _DEFAULT_QWEN_PORTAL_MODELS = [
     "qwen3-coder-plus",
     "qwen3-coder",
 ]
 
 
-
-
-
-
-
-
-
-
-def _prompt_custom_api_mode_selection(base_url: str, current_api_mode: str = "") -> Optional[str]:
+def _prompt_custom_api_mode_selection(
+    base_url: str, current_api_mode: str = ""
+) -> Optional[str]:
     """Prompt for a custom provider API mode.
 
     Returns an explicit mode string, or None to keep auto-detect behavior.
@@ -3439,9 +3472,7 @@ def _prompt_custom_api_mode_selection(base_url: str, current_api_mode: str = "")
         print(f"     {description}")
 
     try:
-        raw = input(
-            "Choice [1-4, Enter to keep current/detected]: "
-        ).strip().lower()
+        raw = input("Choice [1-4, Enter to keep current/detected]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
         raise
@@ -3568,8 +3599,6 @@ def _save_custom_provider(
     print(f'  💾 Saved to custom providers as "{name}" (edit in config.yaml)')
 
 
-
-
 def _remove_custom_provider(config):
     """Let the user remove a saved custom provider from config.yaml."""
     from hades_cli.config import load_config, save_config
@@ -3628,8 +3657,6 @@ def _remove_custom_provider(config):
     print(f'✅ Removed "{removed_name}" from custom providers.')
 
 
-
-
 # Lazy-export the model catalog at module level. Tests and a handful of
 # downstream call sites read `hades_cli.main._PROVIDER_MODELS` directly,
 # so the symbol needs to be reachable as a module attribute. But importing
@@ -3647,6 +3674,7 @@ def __getattr__(name):
     """Defer the model-catalog import until something actually reads it."""
     if name in _LAZY_MODEL_EXPORTS:
         from hades_cli.models import _PROVIDER_MODELS
+
         # Cache on the module so subsequent accesses skip the import machinery.
         globals()[name] = _PROVIDER_MODELS
         return _PROVIDER_MODELS
@@ -3748,10 +3776,6 @@ def _prompt_reasoning_effort_selection(efforts, current_effort=""):
             return None
 
 
-
-
-
-
 def _prompt_api_key(pconfig, existing_key: str, provider_id: str = "") -> tuple:
     """Shared API-key entry point for ``hades setup`` / ``hades model``.
 
@@ -3835,8 +3859,6 @@ def _prompt_api_key(pconfig, existing_key: str, provider_id: str = "") -> tuple:
     return existing_key, False
 
 
-
-
 def _infer_stepfun_region(base_url: str) -> str:
     """Infer the current StepFun region from the configured endpoint."""
     normalized = (base_url or "").strip().lower()
@@ -3856,14 +3878,6 @@ def _stepfun_base_url_for_region(region: str) -> str:
         if region == "china"
         else STEPFUN_STEP_PLAN_INTL_BASE_URL
     )
-
-
-
-
-
-
-
-
 
 
 def _run_anthropic_oauth_flow(save_env_value):
@@ -3957,8 +3971,6 @@ def _run_anthropic_oauth_flow(save_env_value):
             return True
         print("  Cancelled — install Claude Code and try again.")
         return False
-
-
 
 
 def cmd_login(args):
@@ -4348,7 +4360,9 @@ def _web_ui_build_needed(web_dir: Path) -> bool:
     Vite manifest as the sentinel because it is written last and therefore
     has the newest mtime of any build output.
     """
-    project_root = web_dir.parent.parent if web_dir.parent.name == "apps" else web_dir.parent
+    project_root = (
+        web_dir.parent.parent if web_dir.parent.name == "apps" else web_dir.parent
+    )
     dist_dir = project_root / "hades_cli" / "web_dist"
     sentinel = dist_dir / ".vite" / "manifest.json"
     if not sentinel.exists():
@@ -4434,7 +4448,12 @@ def _run_with_idle_timeout(
             except UnicodeEncodeError:
                 # Windows cp1252 fallback — same pattern as _say().
                 enc = getattr(sys.stdout, "encoding", None) or "ascii"
-                safe = line.rstrip().encode(enc, errors="replace").decode(enc, errors="replace")
+                safe = (
+                    line
+                    .rstrip()
+                    .encode(enc, errors="replace")
+                    .decode(enc, errors="replace")
+                )
                 print(f"{indent}{safe}", flush=True)
             with lock:
                 merged_chunks.append(line)
@@ -4521,7 +4540,10 @@ def _nixos_build_env() -> dict[str, str] | None:
     try:
         result = subprocess.run(
             ["nix-shell", "-p", "python3", "--run", "which python3"],
-            capture_output=True, text=True, check=False, timeout=15,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
         )
         if result.returncode == 0:
             python3_path = result.stdout.strip()
@@ -4531,6 +4553,8 @@ def _nixos_build_env() -> dict[str, str] | None:
         pass  # nix-shell not available — caller will get None
 
     return None
+
+
 def _run_npm_install_deterministic(
     npm: str,
     cwd: Path,
@@ -4604,7 +4628,11 @@ def _build_web_ui(web_dir: Path, *, fatal: bool = False) -> bool:
             print(text)
         except UnicodeEncodeError:
             encoding = getattr(sys.stdout, "encoding", None) or "ascii"
-            print(text.encode(encoding, errors="replace").decode(encoding, errors="replace"))
+            print(
+                text.encode(encoding, errors="replace").decode(
+                    encoding, errors="replace"
+                )
+            )
 
     npm = shutil.which("npm")
     if not npm:
@@ -4625,7 +4653,11 @@ def _build_web_ui(web_dir: Path, *, fatal: bool = False) -> bool:
         for blob in (result.stdout, result.stderr):
             if not blob:
                 continue
-            text = blob.decode("utf-8", errors="replace").rstrip() if isinstance(blob, bytes) else blob.rstrip()
+            text = (
+                blob.decode("utf-8", errors="replace").rstrip()
+                if isinstance(blob, bytes)
+                else blob.rstrip()
+            )
             if text:
                 _say(text)
 
@@ -4671,8 +4703,12 @@ def _build_web_ui(web_dir: Path, *, fatal: bool = False) -> bool:
         # the CompletedProcess.
         build_output = (r2.stderr or "") + (r2.stdout or "")
         stderr_preview = build_output.strip()
-        stderr_tail = "\n  ".join(stderr_preview.splitlines()[-10:]) if stderr_preview else ""
-        project_root = web_dir.parent.parent if web_dir.parent.name == "apps" else web_dir.parent
+        stderr_tail = (
+            "\n  ".join(stderr_preview.splitlines()[-10:]) if stderr_preview else ""
+        )
+        project_root = (
+            web_dir.parent.parent if web_dir.parent.name == "apps" else web_dir.parent
+        )
         dist_dir = project_root / "hades_cli" / "web_dist"
         dist_index = dist_dir / "index.html"
 
@@ -4723,6 +4759,7 @@ def _desktop_dist_exists(desktop_dir: Path) -> bool:
 #     "builtAt": "<ISO 8601>"
 #   }
 
+
 def _compute_desktop_content_hash(project_root: Path) -> str:
     """Return a SHA-256 hex digest of all source files that feed the desktop build.
 
@@ -4748,7 +4785,6 @@ def _compute_desktop_content_hash(project_root: Path) -> str:
             pass
         h.update(b"\0")
 
-
     from pathspec import PathSpec
 
     gitignore = project_root / ".gitignore"
@@ -4770,7 +4806,8 @@ def _compute_desktop_content_hash(project_root: Path) -> str:
     for dirpath, dirnames, filenames in os.walk(desktop_dir, topdown=True):
         # Prune ignored directories so we never descend into them
         dirnames[:] = [
-            d for d in dirnames
+            d
+            for d in dirnames
             if not spec.match_file(str((Path(dirpath) / d).relative_to(project_root)))
         ]
 
@@ -4786,10 +4823,13 @@ def _compute_desktop_content_hash(project_root: Path) -> str:
 def _desktop_stamp_path() -> Path:
     """Return the path to the desktop build stamp file under $HADES_HOME."""
     from hades_constants import get_hades_home
+
     return get_hades_home() / "desktop-build-stamp.json"
 
 
-def _desktop_build_needed(desktop_dir: Path, project_root: Path, *, source_mode: bool) -> bool:
+def _desktop_build_needed(
+    desktop_dir: Path, project_root: Path, *, source_mode: bool
+) -> bool:
     """Return True when the desktop build output is stale or missing.
 
     Compares the current content hash against the saved stamp. Also returns
@@ -4832,6 +4872,7 @@ def _write_desktop_build_stamp(project_root: Path, *, source_mode: bool) -> None
         stamp_file.parent.mkdir(parents=True, exist_ok=True)
         content_hash = _compute_desktop_content_hash(project_root)
         from datetime import datetime, timezone
+
         stamp_data = {
             "contentHash": content_hash,
             "sourceMode": source_mode,
@@ -4879,7 +4920,9 @@ def _electron_download_cache_dirs() -> list[Path]:
     """
     home = Path.home()
     candidates: list[Path] = []
-    override = os.environ.get("electron_config_cache") or os.environ.get("ELECTRON_CACHE")
+    override = os.environ.get("electron_config_cache") or os.environ.get(
+        "ELECTRON_CACHE"
+    )
     if override:
         candidates.append(Path(override))
     if sys.platform == "darwin":
@@ -5069,7 +5112,9 @@ def _desktop_macos_relaunchable_fixup(desktop_dir: Path) -> None:
         return
     try:
         subprocess.run(["xattr", "-cr", str(app)], check=False)
-        subprocess.run([codesign, "--force", "--deep", "--sign", "-", str(app)], check=False)
+        subprocess.run(
+            [codesign, "--force", "--deep", "--sign", "-", str(app)], check=False
+        )
     except Exception as exc:
         print(f"  (warning: macOS relaunch fixup skipped: {exc})")
 
@@ -5101,11 +5146,16 @@ def _desktop_linux_sandbox_fixup(packaged_executable: Path) -> bool:
 
     sudo = shutil.which("sudo")
     if not sudo:
-        print("✗ Hades Desktop requires sudo to configure Electron's Linux sandbox helper.")
+        print(
+            "✗ Hades Desktop requires sudo to configure Electron's Linux sandbox helper."
+        )
         return False
 
     print("→ Configuring Electron Linux sandbox helper (sudo required)...")
-    for command in ([sudo, "chown", "root:root", str(sandbox)], [sudo, "chmod", "4755", str(sandbox)]):
+    for command in (
+        [sudo, "chown", "root:root", str(sandbox)],
+        [sudo, "chmod", "4755", str(sandbox)],
+    ):
         if subprocess.run(command, check=False).returncode != 0:
             print(f"✗ Failed to configure Electron's Linux sandbox helper: {sandbox}")
             return False
@@ -5121,6 +5171,7 @@ def cmd_gui(args: argparse.Namespace):
 
     try:
         from hades_logging import setup_logging as _setup_logging_gui
+
         _setup_logging_gui(mode="gui")
     except Exception:
         pass
@@ -5131,7 +5182,9 @@ def cmd_gui(args: argparse.Namespace):
     if getattr(args, "ignore_existing", False):
         env["HADES_DESKTOP_IGNORE_EXISTING"] = "1"
     if getattr(args, "hades_root", None):
-        env["HADES_DESKTOP_HADES_ROOT"] = str(Path(args.hades_root).expanduser().resolve())
+        env["HADES_DESKTOP_HADES_ROOT"] = str(
+            Path(args.hades_root).expanduser().resolve()
+        )
     if getattr(args, "cwd", None):
         env["HADES_DESKTOP_CWD"] = str(Path(args.cwd).expanduser().resolve())
 
@@ -5153,23 +5206,39 @@ def cmd_gui(args: argparse.Namespace):
     if skip_build:
         if source_mode:
             if not _desktop_dist_exists(desktop_dir):
-                print(f"✗ --skip-build --source was passed but no desktop dist found at: {desktop_dir / 'dist'}")
+                print(
+                    f"✗ --skip-build --source was passed but no desktop dist found at: {desktop_dir / 'dist'}"
+                )
                 print("  Pre-build first:  cd apps/desktop && npm run build")
-                print("  Or drop --skip-build to install dependencies and build automatically.")
+                print(
+                    "  Or drop --skip-build to install dependencies and build automatically."
+                )
                 sys.exit(1)
-            if not (PROJECT_ROOT / "node_modules" / "electron" / "package.json").exists():
-                print("✗ --skip-build --source requires existing workspace dependencies.")
+            if not (
+                PROJECT_ROOT / "node_modules" / "electron" / "package.json"
+            ).exists():
+                print(
+                    "✗ --skip-build --source requires existing workspace dependencies."
+                )
                 print(f"  Install first:  cd {PROJECT_ROOT} && npm ci")
-                print("  Or drop --skip-build to install dependencies and build automatically.")
+                print(
+                    "  Or drop --skip-build to install dependencies and build automatically."
+                )
                 sys.exit(1)
-            print(f"→ Skipping desktop source build (--skip-build --source); using dist at {desktop_dir / 'dist'}")
+            print(
+                f"→ Skipping desktop source build (--skip-build --source); using dist at {desktop_dir / 'dist'}"
+            )
         elif packaged_executable is None:
-            print(f"✗ --skip-build was passed but no packaged desktop app was found at: {desktop_dir / 'release'}")
+            print(
+                f"✗ --skip-build was passed but no packaged desktop app was found at: {desktop_dir / 'release'}"
+            )
             print("  Pre-build first:  cd apps/desktop && npm run pack")
             print("  Or drop --skip-build to package automatically.")
             sys.exit(1)
         else:
-            print(f"→ Skipping desktop package build (--skip-build); using {packaged_executable}")
+            print(
+                f"→ Skipping desktop package build (--skip-build); using {packaged_executable}"
+            )
     else:
         # Check the content-hash stamp before doing any build work.
         # If the source tree hasn't changed since the last successful build,
@@ -5184,7 +5253,9 @@ def cmd_gui(args: argparse.Namespace):
         else:
             print("→ Installing desktop workspace dependencies...")
             nixos_env = _nixos_build_env()
-            install_result = _run_npm_install_deterministic(npm, PROJECT_ROOT, capture_output=False, env=nixos_env)
+            install_result = _run_npm_install_deterministic(
+                npm, PROJECT_ROOT, capture_output=False, env=nixos_env
+            )
             if install_result.returncode != 0:
                 print("✗ Desktop dependency install failed")
                 print(f"  Run manually:  cd {PROJECT_ROOT} && npm ci")
@@ -5201,8 +5272,12 @@ def cmd_gui(args: argparse.Namespace):
                 # headless --update rebuild — succeeds instead of failing cryptically.
                 stopped = _stop_desktop_processes_locking_build(desktop_dir)
                 if stopped:
-                    print(f"  ⚠ Stopped running desktop app to free the build output (pid {', '.join(map(str, stopped))})")
-            build_result = subprocess.run([npm, "run", build_script], cwd=desktop_dir, env=env, check=False)
+                    print(
+                        f"  ⚠ Stopped running desktop app to free the build output (pid {', '.join(map(str, stopped))})"
+                    )
+            build_result = subprocess.run(
+                [npm, "run", build_script], cwd=desktop_dir, env=env, check=False
+            )
             if build_result.returncode != 0 and not source_mode:
                 # A corrupt cached Electron zip makes `pack` fail with an ENOENT
                 # on the final `electron` -> `Hades` rename: unpack-electron
@@ -5219,18 +5294,25 @@ def cmd_gui(args: argparse.Namespace):
                 # and the retry fails the same way.
                 purged = _purge_electron_build_cache(desktop_dir)
                 if purged:
-                    print("  ⚠ Desktop build failed; cleared cached Electron download and retrying once...")
+                    print(
+                        "  ⚠ Desktop build failed; cleared cached Electron download and retrying once..."
+                    )
                     for p in purged:
                         print(f"    - {p}")
                     # The purge can't remove a win-unpacked tree whose Hades.exe
                     # is still locked by a running instance; stop it before retry.
                     _stop_desktop_processes_locking_build(desktop_dir)
-                    build_result = subprocess.run([npm, "run", build_script], cwd=desktop_dir, env=env, check=False)
+                    build_result = subprocess.run(
+                        [npm, "run", build_script],
+                        cwd=desktop_dir,
+                        env=env,
+                        check=False,
+                    )
             if build_result.returncode != 0:
                 print("✗ Desktop GUI build failed")
                 print(f"  Run manually:  cd apps/desktop && npm run {build_script}")
                 if sys.platform == "win32":
-                    print("  If this says \"Access is denied\" on Hades.exe, close any")
+                    print('  If this says "Access is denied" on Hades.exe, close any')
                     print("  running Hades desktop window and retry.")
                 sys.exit(build_result.returncode or 1)
             packaged_executable = _desktop_packaged_executable(desktop_dir)
@@ -5252,24 +5334,36 @@ def cmd_gui(args: argparse.Namespace):
     if getattr(args, "build_only", False):
         if source_mode:
             if not _desktop_dist_exists(desktop_dir):
-                print(f"✗ --build-only --source produced no dist at: {desktop_dir / 'dist'}")
+                print(
+                    f"✗ --build-only --source produced no dist at: {desktop_dir / 'dist'}"
+                )
                 sys.exit(1)
-            print(f"✓ Desktop source build ready at {desktop_dir / 'dist'} (not launching; --build-only)")
+            print(
+                f"✓ Desktop source build ready at {desktop_dir / 'dist'} (not launching; --build-only)"
+            )
         elif packaged_executable is None:
-            print(f"✗ --build-only produced no launchable app at: {desktop_dir / 'release'}")
+            print(
+                f"✗ --build-only produced no launchable app at: {desktop_dir / 'release'}"
+            )
             print("  Expected an unpacked Electron app for the current OS.")
             sys.exit(1)
         else:
-            print(f"✓ Desktop packaged app ready: {packaged_executable} (not launching; --build-only)")
+            print(
+                f"✓ Desktop packaged app ready: {packaged_executable} (not launching; --build-only)"
+            )
         return
 
     if source_mode:
         print("→ Launching Hades Desktop from source build...")
-        launch_result = subprocess.run([npm, "exec", "--", "electron", "."], cwd=desktop_dir, env=env, check=False)
+        launch_result = subprocess.run(
+            [npm, "exec", "--", "electron", "."], cwd=desktop_dir, env=env, check=False
+        )
         sys.exit(launch_result.returncode)
 
     if packaged_executable is None:
-        print(f"✗ Desktop package build completed but no launchable app was found at: {desktop_dir / 'release'}")
+        print(
+            f"✗ Desktop package build completed but no launchable app was found at: {desktop_dir / 'release'}"
+        )
         print("  Expected an unpacked Electron app for the current OS.")
         sys.exit(1)
 
@@ -5277,7 +5371,9 @@ def cmd_gui(args: argparse.Namespace):
         sys.exit(1)
 
     print(f"→ Launching packaged Hades Desktop: {packaged_executable}")
-    launch_result = subprocess.run([str(packaged_executable)], cwd=desktop_dir, env=env, check=False)
+    launch_result = subprocess.run(
+        [str(packaged_executable)], cwd=desktop_dir, env=env, check=False
+    )
     sys.exit(launch_result.returncode)
 
 
@@ -5425,7 +5521,7 @@ def _print_curator_first_run_notice() -> None:
     print("  Preview now:  hades curator run --dry-run")
     print("  Pause it:     hades curator pause")
     print(
-        "  Docs:         https://hades-agent.nousresearch.com/docs/user-guide/features/curator"
+        "  Docs:         https://hermes-agent.nousresearch.com/docs/user-guide/features/curator"
     )
 
 
@@ -5499,6 +5595,7 @@ def _format_time_ago(iso_ts: str) -> str:
     """Render an ISO timestamp as `Xh ago` / `Xd ago` / `Xm ago`. Best effort."""
     try:
         from datetime import datetime, timezone
+
         ts = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
@@ -5607,6 +5704,7 @@ def _kill_stale_dashboard_processes(
             # On Windows, os.kill(pid, 0) is NOT a no-op. Route through
             # the cross-platform existence check.
             from gateway.status import _pid_exists
+
             for pid in pending:
                 if _pid_exists(pid):
                     still_pending.append(pid)
@@ -5669,7 +5767,7 @@ def _update_via_zip(args):
         )
         sys.exit(1)
     zip_url = (
-        f"https://github.com/NousResearch/hades-agent/archive/refs/heads/{branch}.zip"
+        f"https://github.com/NousResearch/hermes-agent/archive/refs/heads/{branch}.zip"
     )
 
     print("→ Downloading latest version...")
@@ -5680,6 +5778,7 @@ def _update_via_zip(args):
 
         print("→ Extracting...")
         import stat as _stat
+
         with zipfile.ZipFile(zip_path, "r") as zf:
             # Validate paths to prevent zip-slip (path traversal) AND reject
             # symlink members. A GitHub source ZIP for hades-agent itself
@@ -6064,7 +6163,9 @@ def _discard_stashed_changes(
         _print_stash_cleanup_guidance(stash_ref, stash_selector)
         return False
 
-    print("→ Discarded local source changes (updates.non_interactive_local_changes=discard).")
+    print(
+        "→ Discarded local source changes (updates.non_interactive_local_changes=discard)."
+    )
     return True
 
 
@@ -6073,12 +6174,12 @@ def _discard_stashed_changes(
 # =========================================================================
 
 OFFICIAL_REPO_URLS = {
-    "https://github.com/NousResearch/hades-agent.git",
+    "https://github.com/NousResearch/hermes-agent.git",
     "git@github.com:NousResearch/hades-agent.git",
-    "https://github.com/NousResearch/hades-agent",
+    "https://github.com/NousResearch/hermes-agent",
     "git@github.com:NousResearch/hades-agent",
 }
-OFFICIAL_REPO_URL = "https://github.com/NousResearch/hades-agent.git"
+OFFICIAL_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
 
 
@@ -6226,7 +6327,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
             print("→ Adding upstream remote...")
             if _add_upstream_remote(git_cmd, cwd):
                 print(
-                    "  ✓ Added upstream: https://github.com/NousResearch/hades-agent.git"
+                    "  ✓ Added upstream: https://github.com/NousResearch/hermes-agent.git"
                 )
                 has_upstream = True
             else:
@@ -6234,7 +6335,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
                 return
         else:
             print(
-                "  Skipped. Run 'git remote add upstream https://github.com/NousResearch/hades-agent.git' to add later."
+                "  Skipped. Run 'git remote add upstream https://github.com/NousResearch/hermes-agent.git' to add later."
             )
             _mark_skip_upstream_prompt()
             return
@@ -7071,9 +7172,7 @@ def _verify_core_dependencies_installed(
         name_to_spec[bare.strip().split("[", 1)[0].strip()] = head
 
     specs = [name_to_spec.get(n, n) for n in still_missing]
-    print(
-        f"  → Force-installing remaining missing dep(s): {', '.join(specs)}"
-    )
+    print(f"  → Force-installing remaining missing dep(s): {', '.join(specs)}")
     try:
         _run_install_with_heartbeat(
             install_cmd_prefix + ["install", "--reinstall", *specs], env=env
@@ -7184,7 +7283,9 @@ def _ensure_uv_for_termux(pip_cmd: list[str]) -> str | None:
     if not _is_termux_env():
         return None
     try:
-        print("  → Termux detected: trying to install uv for faster dependency updates...")
+        print(
+            "  → Termux detected: trying to install uv for faster dependency updates..."
+        )
         subprocess.run(pip_cmd + ["install", "uv"], cwd=PROJECT_ROOT, check=False)
     except Exception:
         pass
@@ -7447,6 +7548,7 @@ def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False):
     dropping the flag.
     """
     from hades_cli.config import detect_install_method
+
     method = detect_install_method(PROJECT_ROOT)
     if method == "docker":
         # Docker can't ``git fetch`` from within the container.  Surface the
@@ -7454,13 +7556,17 @@ def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False):
         # path) uses — telling the user to "reinstall via curl" or that
         # ".git is missing" would point them at the wrong remediation.
         from hades_cli.config import format_docker_update_message
+
         print(format_docker_update_message())
         sys.exit(1)
     if method == "pip":
         from hades_cli.config import recommended_update_command
         from hades_cli.banner import check_via_pypi
+
         if branch_explicit and branch != "main":
-            print(f"⚠ --branch is ignored for PyPI installs (would have checked '{branch}').")
+            print(
+                f"⚠ --branch is ignored for PyPI installs (would have checked '{branch}')."
+            )
         result = check_via_pypi()
         if result is None:
             print("✗ Could not reach PyPI to check for updates.")
@@ -7585,7 +7691,9 @@ def _ensure_fhs_path_guard() -> None:
     if sys.platform != "linux":
         return
     try:
-        if os.geteuid() != 0:  # windows-footgun: ok — Linux FHS helper, guarded by sys.platform == "linux" above + AttributeError catch
+        if (
+            os.geteuid() != 0
+        ):  # windows-footgun: ok — Linux FHS helper, guarded by sys.platform == "linux" above + AttributeError catch
             return
     except AttributeError:
         return
@@ -7622,7 +7730,7 @@ def _ensure_fhs_path_guard() -> None:
 
     path_line = 'export PATH="/usr/local/bin:$PATH"'
     path_comment = (
-        "# Hades Agent — ensure /usr/local/bin is on PATH " "(RHEL non-login shells)"
+        "# Hades Agent — ensure /usr/local/bin is on PATH (RHEL non-login shells)"
     )
     wrote_any = False
     for candidate in (".bashrc", ".bash_profile"):
@@ -7867,7 +7975,9 @@ def _cmd_update_pip(args):
     if is_uv_tool_install():
         if not uv:
             print("✗ Detected a uv-tool install but managed uv install failed.")
-            print("  Install uv manually: https://docs.astral.sh/uv/getting-started/installation/")
+            print(
+                "  Install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
+            )
             sys.exit(1)
         cmd = [uv, "tool", "upgrade", "hades-agent"]
     elif pipx_managed and pipx:
@@ -7916,9 +8026,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # the `updates.non_interactive_local_changes` config setting to decide
     # whether to auto-restore stashed local source changes or throw them away.
     _non_interactive_update = (
-        gateway_mode
-        or assume_yes
-        or not (sys.stdin.isatty() and sys.stdout.isatty())
+        gateway_mode or assume_yes or not (sys.stdin.isatty() and sys.stdout.isatty())
     )
     discard_local_changes = False
     if _non_interactive_update:
@@ -7927,11 +8035,15 @@ def _cmd_update_impl(args, gateway_mode: bool):
 
             _update_cfg = (load_config() or {}).get("updates", {})
             if isinstance(_update_cfg, dict):
-                _mode = str(_update_cfg.get("non_interactive_local_changes", "stash")).lower()
+                _mode = str(
+                    _update_cfg.get("non_interactive_local_changes", "stash")
+                ).lower()
                 discard_local_changes = _mode == "discard"
         except Exception as exc:
             # Never let a config read failure change the safe default.
-            logger.debug("Could not read updates.non_interactive_local_changes: %s", exc)
+            logger.debug(
+                "Could not read updates.non_interactive_local_changes: %s", exc
+            )
             discard_local_changes = False
 
     print("⚕ Updating Hades Agent...")
@@ -7963,13 +8075,14 @@ def _cmd_update_impl(args, gateway_mode: bool):
             use_zip_update = True
         else:
             from hades_cli.config import detect_install_method
+
             method = detect_install_method(PROJECT_ROOT)
             if method == "pip":
                 _cmd_update_pip(args)
                 return
             print("✗ Not a git repository. Please reinstall:")
             print(
-                "  curl -fsSL https://hades-agent.nousresearch.com/install.sh | bash"
+                "  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
             )
             sys.exit(1)
 
@@ -8020,7 +8133,6 @@ def _cmd_update_impl(args, gateway_mode: bool):
 
     # Fetch and pull
     try:
-
         # Resolve the target branch up front so the fetch can be scoped to it.
         # A bare `git fetch origin` pulls every ref, and this repo carries
         # thousands of auto-generated branches — an unscoped fetch can stall for
@@ -8242,13 +8354,19 @@ def _cmd_update_impl(args, gateway_mode: bool):
                         print("  Try ``hades update`` again later once a fix lands.")
                     else:
                         print("  ✗ Rollback failed. Recover manually with:")
-                        print(f"    cd {PROJECT_ROOT} && git reset --hard {pre_pull_sha}")
+                        print(
+                            f"    cd {PROJECT_ROOT} && git reset --hard {pre_pull_sha}"
+                        )
                         if rollback_result.stderr.strip():
-                            print(f"    ({rollback_result.stderr.strip().splitlines()[0]})")
+                            print(
+                                f"    ({rollback_result.stderr.strip().splitlines()[0]})"
+                            )
                 else:
                     print()
                     print("  Could not capture pre-pull SHA — recover manually with:")
-                    print(f"    cd {PROJECT_ROOT} && git reflog && git reset --hard <prev-sha>")
+                    print(
+                        f"    cd {PROJECT_ROOT} && git reflog && git reset --hard <prev-sha>"
+                    )
                 sys.exit(1)
 
             update_succeeded = True
@@ -8316,9 +8434,13 @@ def _cmd_update_impl(args, gateway_mode: bool):
                 uv_env.pop("PYTHONPATH", None)
                 uv_env.pop("PYTHONHOME", None)
                 install_group = "termux-all"
-                print("  → Termux detected: using uv + curated termux-all optional profile...")
+                print(
+                    "  → Termux detected: using uv + curated termux-all optional profile..."
+                )
             if _is_termux_env(uv_env) and _is_android_python():
-                print("  → Termux/Android detected: prebuilding psutil with Linux source path compatibility...")
+                print(
+                    "  → Termux/Android detected: prebuilding psutil with Linux source path compatibility..."
+                )
                 _install_psutil_android_compat([uv_bin, "pip"], env=uv_env)
             _install_python_dependencies_with_optional_fallback(
                 [uv_bin, "pip"], env=uv_env, group=install_group
@@ -8344,11 +8466,17 @@ def _cmd_update_impl(args, gateway_mode: bool):
                 )
             if _is_termux_env():
                 install_group = "termux-all"
-                print("  → Termux detected: using curated termux-all optional profile...")
+                print(
+                    "  → Termux detected: using curated termux-all optional profile..."
+                )
             if _is_termux_env() and _is_android_python():
-                print("  → Termux/Android detected: prebuilding psutil with Linux source path compatibility...")
+                print(
+                    "  → Termux/Android detected: prebuilding psutil with Linux source path compatibility..."
+                )
                 _install_psutil_android_compat(pip_cmd)
-            _install_python_dependencies_with_optional_fallback(pip_cmd, group=install_group)
+            _install_python_dependencies_with_optional_fallback(
+                pip_cmd, group=install_group
+            )
 
         _refresh_active_lazy_features()
 
@@ -8363,19 +8491,37 @@ def _cmd_update_impl(args, gateway_mode: bool):
         # never run ``hades desktop`` shouldn't be forced into a full
         # Electron build by ``hades update``.
         desktop_dir = PROJECT_ROOT / "apps" / "desktop"
-        has_desktop_app = _desktop_packaged_executable(desktop_dir) is not None or _desktop_dist_exists(desktop_dir)
-        if (desktop_dir / "package.json").exists() and shutil.which("npm") and has_desktop_app:
+        has_desktop_app = _desktop_packaged_executable(
+            desktop_dir
+        ) is not None or _desktop_dist_exists(desktop_dir)
+        if (
+            (desktop_dir / "package.json").exists()
+            and shutil.which("npm")
+            and has_desktop_app
+        ):
             print("→ Checking if desktop app needs rebuilding...")
-            _desktop_build_cmd = [sys.executable, "-m", "hades_cli.main", "desktop", "--build-only"]
+            _desktop_build_cmd = [
+                sys.executable,
+                "-m",
+                "hades_cli.main",
+                "desktop",
+                "--build-only",
+            ]
             # Stream the build output live (long Electron builds otherwise
             # look hung). On the rare nonzero exit, retry once after waiting
             # again for the venv — this covers a still-settling rebuild window
             # the first wait didn't fully catch.
-            build_result = subprocess.run(_desktop_build_cmd, cwd=PROJECT_ROOT, check=False)
+            build_result = subprocess.run(
+                _desktop_build_cmd, cwd=PROJECT_ROOT, check=False
+            )
             if build_result.returncode != 0:
-                build_result = subprocess.run(_desktop_build_cmd, cwd=PROJECT_ROOT, check=False)
+                build_result = subprocess.run(
+                    _desktop_build_cmd, cwd=PROJECT_ROOT, check=False
+                )
             if build_result.returncode != 0:
-                print("  ⚠ Desktop build failed (non-fatal; run `hades desktop` to retry)")
+                print(
+                    "  ⚠ Desktop build failed (non-fatal; run `hades desktop` to retry)"
+                )
 
         print()
         print("✓ Code updated!")
@@ -8496,9 +8642,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         current_ver, latest_ver = check_config_version()
 
         has_new_options = bool(missing_env or missing_config)
-        version_bump_only = (
-            not has_new_options and current_ver < latest_ver
-        )
+        version_bump_only = not has_new_options and current_ver < latest_ver
         needs_migration = has_new_options or current_ver < latest_ver
 
         if version_bump_only:
@@ -8508,9 +8652,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
             # bumps the version and looks like a no-op (issue: ScottFive /
             # Tt2021). Apply it silently and say what actually happened.
             print()
-            print(
-                f"  ℹ Updating config format (v{current_ver} → v{latest_ver})…"
-            )
+            print(f"  ℹ Updating config format (v{current_ver} → v{latest_ver})…")
             try:
                 migrate_config(interactive=False, quiet=True)
                 print("  ✓ Config format updated (no new settings to configure)")
@@ -8519,6 +8661,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
                 print("     Run 'hades config migrate' to retry.")
         elif needs_migration:
             print()
+
             # Show WHAT changed, not just a count, so the user can make an
             # informed yes/no decision (previously the prompt named nothing).
             def _print_items(items, label, key, fallback_key=None):
@@ -8528,7 +8671,11 @@ def _cmd_update_impl(args, gateway_mode: bool):
                 shown = items[:8]
                 for it in shown:
                     if isinstance(it, dict):
-                        name = it.get(key) or (fallback_key and it.get(fallback_key)) or "?"
+                        name = (
+                            it.get(key)
+                            or (fallback_key and it.get(fallback_key))
+                            or "?"
+                        )
                         desc = (it.get("description") or "").strip()
                     else:
                         # Defensive: some callers/mocks pass bare name strings.
@@ -9047,7 +9194,9 @@ def _cmd_update_impl(args, gateway_mode: bool):
                                         restarted_services.append(svc_name)
                                         print(f"  ✓ {svc_name} recovered on retry")
                                     else:
-                                        _scope_flag = "--user " if scope == "user" else ""
+                                        _scope_flag = (
+                                            "--user " if scope == "user" else ""
+                                        )
                                         print(
                                             f"  ✗ {svc_name} failed to stay running after restart.\n"
                                             f"    Check logs: journalctl {_scope_flag}-u {svc_name} --since '2 min ago'\n"
@@ -9193,6 +9342,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
                         f"  ⚠ {len(_stuck)} gateway process(es) ignored SIGTERM — force-killing"
                     )
                     from gateway.status import terminate_pid as _terminate_pid
+
                     for pid in _stuck:
                         try:
                             # Routes through taskkill /T /F on Windows,
@@ -9397,10 +9547,7 @@ def cmd_profile(args):
             f"\n {'Profile':<16} {'Model':<28} {'Gateway':<12} "
             f"{'Alias':<12} {'Distribution'}"
         )
-        print(
-            f" {'─' * 15}    {'─' * 27}    {'─' * 11}    "
-            f"{'─' * 11}    {'─' * 20}"
-        )
+        print(f" {'─' * 15}    {'─' * 27}    {'─' * 11}    {'─' * 11}    {'─' * 20}")
 
         for p in profiles:
             marker = (
@@ -9573,7 +9720,10 @@ def cmd_profile(args):
             )
             sys.exit(2)
         if not all_flag and not name:
-            print("profile describe: profile name is required (or --all --auto)", file=sys.stderr)
+            print(
+                "profile describe: profile name is required (or --all --auto)",
+                file=sys.stderr,
+            )
             sys.exit(2)
         if text_value and auto_flag:
             print(
@@ -9587,6 +9737,7 @@ def cmd_profile(args):
             try:
                 if _profiles_mod.normalize_profile_name(name) == "default":
                     from hades_constants import get_hades_home as _hh
+
                     profile_dir = Path(_hh())
                 else:
                     profile_dir = _profiles_mod.get_profile_dir(name)
@@ -9610,6 +9761,7 @@ def cmd_profile(args):
             try:
                 if _profiles_mod.normalize_profile_name(name) == "default":
                     from hades_constants import get_hades_home as _hh
+
                     profile_dir = Path(_hh())
                 else:
                     profile_dir = _profiles_mod.get_profile_dir(name)
@@ -9694,7 +9846,9 @@ def cmd_profile(args):
             print(f"  (run `hades profile info {name}` for full manifest)")
         if alias_name:
             is_windows = sys.platform == "win32"
-            wrapper = _get_wrapper_dir() / (f"{alias_name}.bat" if is_windows else alias_name)
+            wrapper = _get_wrapper_dir() / (
+                f"{alias_name}.bat" if is_windows else alias_name
+            )
             print(f"Alias:   {alias_name} → hades -p {name}  ({wrapper})")
         print()
 
@@ -9851,8 +10005,12 @@ def cmd_profile(args):
                 if force_config:
                     print("  --force-config set: config.yaml WILL be overwritten.")
                 else:
-                    print("  config.yaml will be preserved (pass --force-config to overwrite).")
-                print("  User data (memories, sessions, auth, .env) will NOT be touched.")
+                    print(
+                        "  config.yaml will be preserved (pass --force-config to overwrite)."
+                    )
+                print(
+                    "  User data (memories, sessions, auth, .env) will NOT be touched."
+                )
                 try:
                     answer = input("\nProceed? [y/N] ").strip().lower()
                 except (EOFError, KeyboardInterrupt):
@@ -9873,7 +10031,10 @@ def cmd_profile(args):
             sys.exit(1)
 
     elif action == "info":
-        from hades_cli.profile_distribution import describe_distribution, DistributionError
+        from hades_cli.profile_distribution import (
+            describe_distribution,
+            DistributionError,
+        )
 
         try:
             data = describe_distribution(args.profile_name)
@@ -9917,6 +10078,7 @@ def cmd_profile(args):
 def _render_distribution_plan(plan) -> None:
     """Print a human-readable summary of a pending distribution install."""
     from hades_cli.profile_distribution import MANIFEST_FILENAME
+
     mf = plan.manifest
     print(f"\nDistribution: {mf.name} v{mf.version}")
     if mf.description:
@@ -9999,7 +10161,8 @@ def _report_dashboard_status() -> int:
                 if os.path.exists(cmdline_path):
                     with open(cmdline_path, "rb") as f:
                         cmdline = (
-                            f.read()
+                            f
+                            .read()
                             .replace(b"\x00", b" ")
                             .decode("utf-8", errors="replace")
                             .strip()
@@ -10037,6 +10200,7 @@ def cmd_dashboard(args):
     # the same logs directory as every other Hades surface.
     try:
         from hades_logging import setup_logging as _setup_logging_gui
+
         _setup_logging_gui(mode="gui")
     except Exception:
         pass
@@ -10075,7 +10239,9 @@ def cmd_dashboard(args):
         )
         if not (_dist_root / "index.html").exists():
             print(f"✗ --skip-build was passed but no web dist found at: {_dist_root}")
-            print("  Pre-build first:  npm install --workspace web && npm run build -w web")
+            print(
+                "  Pre-build first:  npm install --workspace web && npm run build -w web"
+            )
             print("  Or drop --skip-build to build automatically.")
             sys.exit(1)
         print(f"→ Skipping web UI build (--skip-build); using dist at {_dist_root}")
@@ -10089,6 +10255,7 @@ def cmd_dashboard(args):
     # providers (image_gen, web, dashboard_auth, …).
     try:
         from hades_cli.plugins import discover_plugins
+
         discover_plugins()
     except Exception as exc:
         # Discovery failures must not block dashboard startup outright —
@@ -10155,6 +10322,8 @@ def cmd_logs(args):
         since=getattr(args, "since", None),
         component=getattr(args, "component", None),
     )
+
+
 # Top-level subcommands that argparse knows about WITHOUT running plugin
 # discovery.  Used to short-circuit eager plugin imports (which can take
 # 500ms+ pulling in google.cloud.pubsub_v1, aiohttp, grpc, etc.) when the
@@ -10164,24 +10333,65 @@ def cmd_logs(args):
 # below in ``main()``. Missing an entry here only costs a one-time
 # discovery; extra entries here would let a plugin command silently fail
 # to parse.
-_BUILTIN_SUBCOMMANDS = frozenset(
-    {
-        "acp", "auth", "backup", "bundles", "checkpoints", "claw", "completion",
-        "computer-use",
-        "config", "cron", "curator", "dashboard", "debug", "doctor",
-        "dump", "fallback", "gateway", "hooks", "import", "insights",
-        "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate",
-        "model", "pairing", "plugins", "portal", "postinstall", "profile", "proxy",
-        "prompt-size",
-        "send", "sessions", "setup",
-        "skills", "slack", "status", "tools", "uninstall", "update",
-        "version", "webhook", "whatsapp", "chat", "secrets", "security",
-        # Help-ish invocations — plugin commands not being listed in
-        # top-level --help is an acceptable trade-off for skipping an
-        # expensive eager import of every bundled plugin module.
-        "help",
-    }
-)
+_BUILTIN_SUBCOMMANDS = frozenset({
+    "acp",
+    "auth",
+    "backup",
+    "bundles",
+    "checkpoints",
+    "claw",
+    "completion",
+    "computer-use",
+    "config",
+    "cron",
+    "curator",
+    "dashboard",
+    "debug",
+    "doctor",
+    "dump",
+    "fallback",
+    "gateway",
+    "hooks",
+    "import",
+    "insights",
+    "gui",
+    "desktop",
+    "kanban",
+    "login",
+    "logout",
+    "logs",
+    "lsp",
+    "mcp",
+    "memory",
+    "migrate",
+    "model",
+    "pairing",
+    "plugins",
+    "portal",
+    "postinstall",
+    "profile",
+    "proxy",
+    "prompt-size",
+    "send",
+    "sessions",
+    "setup",
+    "skills",
+    "slack",
+    "status",
+    "tools",
+    "uninstall",
+    "update",
+    "version",
+    "webhook",
+    "whatsapp",
+    "chat",
+    "secrets",
+    "security",
+    # Help-ish invocations — plugin commands not being listed in
+    # top-level --help is an acceptable trade-off for skipping an
+    # expensive eager import of every bundled plugin module.
+    "help",
+})
 
 
 # Top-level flags that take a value. Needed by ``_first_positional_argv``
@@ -10192,21 +10402,25 @@ _BUILTIN_SUBCOMMANDS = frozenset(
 # Correctness-safe either way: missing an entry here only makes the
 # fast-path bail out too eagerly (we run plugin discovery when we didn't
 # need to); extra entries would make us skip a real positional.
-_TOP_LEVEL_VALUE_FLAGS = frozenset(
-    {
-        "-z", "--oneshot",
-        "-m", "--model",
-        "--provider",
-        "-t", "--toolsets",
-        "-r", "--resume",
-        "-s", "--skills",
-        # ``-c / --continue`` is nargs='?' (optional value). Treat it as
-        # value-taking: if the next token is a subcommand-looking word
-        # the user almost certainly meant it as the session name, and
-        # either interpretation keeps us on the safe side.
-        "-c", "--continue",
-    }
-)
+_TOP_LEVEL_VALUE_FLAGS = frozenset({
+    "-z",
+    "--oneshot",
+    "-m",
+    "--model",
+    "--provider",
+    "-t",
+    "--toolsets",
+    "-r",
+    "--resume",
+    "-s",
+    "--skills",
+    # ``-c / --continue`` is nargs='?' (optional value). Treat it as
+    # value-taking: if the next token is a subcommand-looking word
+    # the user almost certainly meant it as the session name, and
+    # either interpretation keeps us on the safe side.
+    "-c",
+    "--continue",
+})
 
 
 def _first_positional_argv() -> str | None:
@@ -10282,7 +10496,10 @@ def _command_has_dedicated_mcp_startup(args) -> bool:
         return True
     if args.command == "gateway" and getattr(args, "gateway_command", None) == "run":
         return True
-    if args.command == "cron" and getattr(args, "cron_command", None) in {"run", "tick"}:
+    if args.command == "cron" and getattr(args, "cron_command", None) in {
+        "run",
+        "tick",
+    }:
         return True
     return False
 
@@ -10431,7 +10648,9 @@ def _try_termux_fast_cli_launch() -> bool:
 
     if args.command in {None, "chat"}:
         _set_chat_arg_defaults(args)
-        interactive_prompt = not getattr(args, "query", None) and not getattr(args, "image", None)
+        interactive_prompt = not getattr(args, "query", None) and not getattr(
+            args, "image", None
+        )
         if interactive_prompt:
             # Bare Termux CLI should reach the prompt first and do agent-only
             # discovery on the first submitted turn instead of before input.
@@ -10513,9 +10732,7 @@ def cmd_memory(args):
             files_to_reset.append(("USER.md", "user profile"))
 
         # Check what exists
-        existing = [
-            (f, desc) for f, desc in files_to_reset if (mem_dir / f).exists()
-        ]
+        existing = [(f, desc) for f, desc in files_to_reset if (mem_dir / f).exists()]
         if not existing:
             print(
                 f"\n  Nothing to reset — no memory files found in {display_hades_home()}/memories/\n"
@@ -10542,9 +10759,7 @@ def cmd_memory(args):
             (mem_dir / f).unlink()
             print(f"  ✓ Deleted {f} ({desc})")
 
-        print(
-            f"\n  Memory reset complete. New sessions will start with a blank slate."
-        )
+        print(f"\n  Memory reset complete. New sessions will start with a blank slate.")
         print(f"  Files were in: {display_hades_home()}/memories/\n")
     else:
         from hades_cli.memory_setup import memory_command
@@ -10652,6 +10867,7 @@ def main():
     # Force UTF-8 stdio on Windows before anything prints.  No-op elsewhere.
     try:
         from hades_cli.stdio import configure_windows_stdio
+
         configure_windows_stdio()
     except Exception:
         pass
@@ -10691,7 +10907,7 @@ def main():
             "Manage the fallback provider chain.  Fallback providers are tried "
             "in order when the primary model fails with rate-limit, overload, or "
             "connection errors.  See: "
-            "https://hades-agent.nousresearch.com/docs/user-guide/features/fallback-providers"
+            "https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers"
         ),
     )
     fallback_subparsers = fallback_parser.add_subparsers(dest="fallback_command")
@@ -10725,7 +10941,7 @@ def main():
             "Pull API keys from an external secret manager at process startup "
             "instead of storing them in ~/.hades/.env.  Currently supports "
             "Bitwarden Secrets Manager.  See: "
-            "https://hades-agent.nousresearch.com/docs/user-guide/secrets/bitwarden"
+            "https://hermes-agent.nousresearch.com/docs/user-guide/secrets/bitwarden"
         ),
     )
     secrets_subparsers = secrets_parser.add_subparsers(dest="secrets_command")
@@ -10799,6 +11015,7 @@ def main():
     # =========================================================================
     try:
         from agent.lsp.cli import register_subparser as _lsp_register
+
         _lsp_register(subparsers)
     except Exception as _lsp_err:  # noqa: BLE001
         # LSP is optional infrastructure — never let a registration
@@ -10829,6 +11046,7 @@ def main():
     # send command — pipe shell-script output to any configured platform
     # =========================================================================
     from hades_cli.send_cmd import register_send_subparser
+
     register_send_subparser(subparsers)
 
     # =========================================================================
@@ -10865,6 +11083,7 @@ def main():
     # portal command — Nous Portal status + Tool Gateway routing
     # =========================================================================
     from hades_cli.portal_cli import add_parser as _add_portal_parser
+
     _add_portal_parser(subparsers)
 
     # =========================================================================
@@ -10921,6 +11140,7 @@ def main():
         "space checkpoints occupy, force a prune, or wipe the base.",
     )
     from hades_cli.checkpoints import register_cli as _register_checkpoints_cli
+
     _register_checkpoints_cli(checkpoints_parser)
 
     # =========================================================================
@@ -10956,6 +11176,7 @@ def main():
         ),
     )
     from hades_cli.bundles import register_cli as _bundles_register, bundles_command
+
     _bundles_register(bundles_parser)
     bundles_parser.set_defaults(func=bundles_command)
 
@@ -11081,18 +11302,22 @@ def main():
         action = getattr(args, "computer_use_action", None)
         if action == "install":
             from hades_cli.tools_config import install_cua_driver
+
             install_cua_driver(upgrade=bool(getattr(args, "upgrade", False)))
             return
         if action == "status":
             import shutil
             import subprocess
+
             path = shutil.which("cua-driver")
             if path:
                 version = ""
                 try:
                     version = subprocess.run(
                         ["cua-driver", "--version"],
-                        capture_output=True, text=True, timeout=5,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     ).stdout.strip()
                 except Exception:
                     pass
@@ -11250,7 +11475,6 @@ def main():
                     return
                 line = _json.dumps(data, ensure_ascii=False) + "\n"
                 if args.output == "-":
-
                     sys.stdout.write(line)
                 else:
                     with open(args.output, "w", encoding="utf-8") as f:
@@ -11259,7 +11483,6 @@ def main():
             else:
                 sessions = db.export_all(source=args.source)
                 if args.output == "-":
-
                     for s in sessions:
                         sys.stdout.write(_json.dumps(s, ensure_ascii=False) + "\n")
                 else:
@@ -11341,9 +11564,7 @@ def main():
         elif action == "optimize":
             db_path = db.db_path
             before_mb = (
-                os.path.getsize(db_path) / (1024 * 1024)
-                if db_path.exists()
-                else 0.0
+                os.path.getsize(db_path) / (1024 * 1024) if db_path.exists() else 0.0
             )
             print("Optimizing session store (FTS merge + VACUUM)…")
             try:
@@ -11355,9 +11576,7 @@ def main():
                 db.close()
                 return
             after_mb = (
-                os.path.getsize(db_path) / (1024 * 1024)
-                if db_path.exists()
-                else 0.0
+                os.path.getsize(db_path) / (1024 * 1024) if db_path.exists() else 0.0
             )
             saved = before_mb - after_mb
             print(f"Optimized {n} FTS index(es).")
@@ -11446,7 +11665,6 @@ def main():
         cmd_dashboard=cmd_dashboard,
         cmd_dashboard_register=cmd_dashboard_register,
     )
-
 
     # =========================================================================
     # desktop (a.k.a. gui) command

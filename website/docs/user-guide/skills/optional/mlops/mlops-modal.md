@@ -73,10 +73,13 @@ import modal
 
 app = modal.App("hello-gpu")
 
+
 @app.function(gpu="T4")
 def gpu_info():
     import subprocess
+
     return subprocess.run(["nvidia-smi"], capture_output=True, text=True).stdout
+
 
 @app.local_entrypoint()
 def main():
@@ -93,16 +96,19 @@ import modal
 app = modal.App("text-generation")
 image = modal.Image.debian_slim().pip_install("transformers", "torch", "accelerate")
 
+
 @app.cls(gpu="A10G", image=image)
 class TextGenerator:
     @modal.enter()
     def load_model(self):
         from transformers import pipeline
+
         self.pipe = pipeline("text-generation", model="gpt2", device=0)
 
     @modal.method()
     def generate(self, prompt: str) -> str:
         return self.pipe(prompt, max_length=100)[0]["generated_text"]
+
 
 @app.local_entrypoint()
 def main():
@@ -175,8 +181,7 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
 
 # From CUDA base
 image = modal.Image.from_registry(
-    "nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04",
-    add_python="3.11"
+    "nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04", add_python="3.11"
 ).pip_install("torch", "transformers")
 
 # With system packages
@@ -188,9 +193,11 @@ image = modal.Image.debian_slim().apt_install("git", "ffmpeg").pip_install("whis
 ```python
 volume = modal.Volume.from_name("model-cache", create_if_missing=True)
 
+
 @app.function(gpu="A10G", volumes={"/models": volume})
 def load_model():
     import os
+
     model_path = "/models/llama-7b"
     if not os.path.exists(model_path):
         model = download_model()
@@ -214,11 +221,14 @@ def predict(text: str) -> dict:
 
 ```python
 from fastapi import FastAPI
+
 web_app = FastAPI()
+
 
 @web_app.post("/predict")
 async def predict(text: str):
     return {"result": await model.predict.remote.aio(text)}
+
 
 @app.function()
 @modal.asgi_app()
@@ -256,6 +266,7 @@ modal secret create huggingface HF_TOKEN=hf_xxx
 @app.function(secrets=[modal.Secret.from_name("huggingface")])
 def download_model():
     import os
+
     token = os.environ["HF_TOKEN"]
 ```
 
@@ -265,6 +276,7 @@ def download_model():
 @app.function(schedule=modal.Cron("0 0 * * *"))  # Daily midnight
 def daily_job():
     pass
+
 
 @app.function(schedule=modal.Period(hours=1))
 def hourly_job():
@@ -305,6 +317,7 @@ class Model:
 def process_item(item):
     return expensive_computation(item)
 
+
 @app.function()
 def run_parallel():
     items = list(range(1000))
@@ -318,12 +331,12 @@ def run_parallel():
 ```python
 @app.function(
     gpu="A100",
-    memory=32768,              # 32GB RAM
-    cpu=4,                     # 4 CPU cores
-    timeout=3600,              # 1 hour max
-    container_idle_timeout=120,# Keep warm 2 min
-    retries=3,                 # Retry on failure
-    concurrency_limit=10,      # Max concurrent containers
+    memory=32768,  # 32GB RAM
+    cpu=4,  # 4 CPU cores
+    timeout=3600,  # 1 hour max
+    container_idle_timeout=120,  # Keep warm 2 min
+    retries=3,  # Retry on failure
+    concurrency_limit=10,  # Max concurrent containers
 )
 def my_function():
     pass
@@ -351,8 +364,8 @@ if __name__ == "__main__":
 
 ## References
 
-- **[Advanced Usage](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/modal/references/advanced-usage.md)** - Multi-GPU, distributed training, cost optimization
-- **[Troubleshooting](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/modal/references/troubleshooting.md)** - Common issues and solutions
+- **[Advanced Usage](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/modal/references/advanced-usage.md)** - Multi-GPU, distributed training, cost optimization
+- **[Troubleshooting](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/modal/references/troubleshooting.md)** - Common issues and solutions
 
 ## Resources
 

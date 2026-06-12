@@ -162,7 +162,7 @@ import lambda_cloud_client
 # 使用 API 密钥配置
 configuration = lambda_cloud_client.Configuration(
     host="https://cloud.lambdalabs.com/api/v1",
-    access_token=os.environ["LAMBDA_API_KEY"]
+    access_token=os.environ["LAMBDA_API_KEY"],
 )
 ```
 
@@ -188,7 +188,7 @@ request = LaunchInstanceRequest(
     instance_type_name="gpu_1x_h100_sxm5",
     ssh_key_names=["my-ssh-key"],
     file_system_names=["my-filesystem"],  # 可选
-    name="training-job"
+    name="training-job",
 )
 
 response = api.launch_instance(request)
@@ -209,9 +209,7 @@ for instance in instances.data:
 ```python
 from lambda_cloud_client.models import TerminateInstanceRequest
 
-request = TerminateInstanceRequest(
-    instance_ids=[instance_id]
-)
+request = TerminateInstanceRequest(instance_ids=[instance_id])
 api.terminate_instance(request)
 ```
 
@@ -221,10 +219,7 @@ api.terminate_instance(request)
 from lambda_cloud_client.models import AddSshKeyRequest
 
 # 添加 SSH 密钥
-request = AddSshKeyRequest(
-    name="my-key",
-    public_key="ssh-rsa AAAA..."
-)
+request = AddSshKeyRequest(name="my-key", public_key="ssh-rsa AAAA...")
 api.add_ssh_key(request)
 
 # 列出密钥
@@ -394,6 +389,7 @@ import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+
 def main():
     dist.init_process_group("nccl")
     rank = dist.get_rank()
@@ -403,6 +399,7 @@ def main():
     model = DDP(model, device_ids=[device])
 
     # 训练循环...
+
 
 if __name__ == "__main__":
     main()
@@ -422,12 +419,15 @@ checkpoint_dir = "/lambda/nfs/my-storage/checkpoints"
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 # 保存检查点
-torch.save({
-    'epoch': epoch,
-    'model_state_dict': model.state_dict(),
-    'optimizer_state_dict': optimizer.state_dict(),
-    'loss': loss,
-}, f"{checkpoint_dir}/checkpoint_{epoch}.pt")
+torch.save(
+    {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "loss": loss,
+    },
+    f"{checkpoint_dir}/checkpoint_{epoch}.pt",
+)
 ```
 
 ## 1-Click Clusters
@@ -556,8 +556,8 @@ python inference.py \
 
 ## 参考资料
 
-- **[高级用法](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/lambda-labs/references/advanced-usage.md)** — 多节点训练、API 自动化
-- **[故障排查](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/lambda-labs/references/troubleshooting.md)** — 常见问题及解决方案
+- **[高级用法](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/lambda-labs/references/advanced-usage.md)** — 多节点训练、API 自动化
+- **[故障排查](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/lambda-labs/references/troubleshooting.md)** — 常见问题及解决方案
 
 ## 资源
 

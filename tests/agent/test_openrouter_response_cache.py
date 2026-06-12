@@ -10,6 +10,7 @@ import pytest
 # build_or_headers
 # ---------------------------------------------------------------------------
 
+
 class TestBuildOrHeaders:
     """Test the build_or_headers() helper in agent/auxiliary_client.py."""
 
@@ -18,7 +19,7 @@ class TestBuildOrHeaders:
         from agent.auxiliary_client import build_or_headers
 
         headers = build_or_headers(or_config={"response_cache": False})
-        assert headers["HTTP-Referer"] == "https://hades-agent.nousresearch.com"
+        assert headers["HTTP-Referer"] == "https://hermes-agent.nousresearch.com"
         assert headers["X-Title"] == "Hades Agent"
         assert headers["X-OpenRouter-Categories"] == "productivity,cli-agent"
 
@@ -48,28 +49,36 @@ class TestBuildOrHeaders:
         """Default TTL (300) is included when cache is enabled."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 300})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 300}
+        )
         assert headers["X-OpenRouter-Cache-TTL"] == "300"
 
     def test_ttl_custom(self):
         """Custom TTL values within range are sent."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 3600})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 3600}
+        )
         assert headers["X-OpenRouter-Cache-TTL"] == "3600"
 
     def test_ttl_max(self):
         """Maximum TTL (86400) is accepted."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 86400})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 86400}
+        )
         assert headers["X-OpenRouter-Cache-TTL"] == "86400"
 
     def test_ttl_out_of_range_too_high(self):
         """TTL above 86400 is silently ignored (no TTL header sent)."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 100000})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 100000}
+        )
         assert "X-OpenRouter-Cache-TTL" not in headers
         # But cache is still enabled
         assert headers["X-OpenRouter-Cache"] == "true"
@@ -78,28 +87,36 @@ class TestBuildOrHeaders:
         """TTL of 0 is below minimum — no TTL header sent."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 0})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 0}
+        )
         assert "X-OpenRouter-Cache-TTL" not in headers
 
     def test_ttl_negative(self):
         """Negative TTL is ignored."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": -5})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": -5}
+        )
         assert "X-OpenRouter-Cache-TTL" not in headers
 
     def test_ttl_not_a_number(self):
         """Non-numeric TTL is ignored."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": "five"})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": "five"}
+        )
         assert "X-OpenRouter-Cache-TTL" not in headers
 
     def test_ttl_float_truncated(self):
         """Float TTL values are truncated to int."""
         from agent.auxiliary_client import build_or_headers
 
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 600.7})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 600.7}
+        )
         assert headers["X-OpenRouter-Cache-TTL"] == "600"
 
     def test_returns_fresh_dict(self):
@@ -138,6 +155,7 @@ class TestBuildOrHeaders:
 # ---------------------------------------------------------------------------
 # Environment variable overrides
 # ---------------------------------------------------------------------------
+
 
 class TestEnvVarOverrides:
     """Test env var precedence over config.yaml for response caching."""
@@ -216,9 +234,12 @@ class TestEnvVarOverrides:
 
         monkeypatch.delenv("HADES_OPENROUTER_CACHE", raising=False)
         monkeypatch.delenv("HADES_OPENROUTER_CACHE_TTL", raising=False)
-        headers = build_or_headers(or_config={"response_cache": True, "response_cache_ttl": 600})
+        headers = build_or_headers(
+            or_config={"response_cache": True, "response_cache_ttl": 600}
+        )
         assert headers["X-OpenRouter-Cache"] == "true"
         assert headers["X-OpenRouter-Cache-TTL"] == "600"
+
 
 class TestDefaultConfig:
     """Verify the openrouter config section is in DEFAULT_CONFIG."""
@@ -235,6 +256,7 @@ class TestDefaultConfig:
 # ---------------------------------------------------------------------------
 # _check_openrouter_cache_status
 # ---------------------------------------------------------------------------
+
 
 class TestCheckOpenrouterCacheStatus:
     """Test the _check_openrouter_cache_status method on AIAgent."""

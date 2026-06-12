@@ -75,7 +75,7 @@ tokenizer = Tokenizer.from_pretrained("bert-base-uncased")
 # 对文本编码
 output = tokenizer.encode("Hello, how are you?")
 print(output.tokens)  # ['hello', ',', 'how', 'are', 'you', '?']
-print(output.ids)     # [7592, 1010, 2129, 2024, 2017, 1029]
+print(output.ids)  # [7592, 1010, 2129, 2024, 2017, 1029]
 
 # 解码还原
 text = tokenizer.decode(output.ids)
@@ -98,7 +98,7 @@ tokenizer.pre_tokenizer = Whitespace()
 trainer = BpeTrainer(
     vocab_size=30000,
     special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
-    min_frequency=2
+    min_frequency=2,
 )
 
 # 在文件上训练
@@ -149,9 +149,7 @@ tokenizer = Tokenizer(BPE(unk_token="<|endoftext|>"))
 tokenizer.pre_tokenizer = ByteLevel()
 
 trainer = BpeTrainer(
-    vocab_size=50257,
-    special_tokens=["<|endoftext|>"],
-    min_frequency=2
+    vocab_size=50257, special_tokens=["<|endoftext|>"], min_frequency=2
 )
 
 tokenizer.train(files=["data.txt"], trainer=trainer)
@@ -190,7 +188,7 @@ tokenizer.pre_tokenizer = Whitespace()
 trainer = WordPieceTrainer(
     vocab_size=30522,
     special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
-    continuing_subword_prefix="##"
+    continuing_subword_prefix="##",
 )
 
 tokenizer.train(files=["corpus.txt"], trainer=trainer)
@@ -222,9 +220,7 @@ from tokenizers.trainers import UnigramTrainer
 tokenizer = Tokenizer(Unigram())
 
 trainer = UnigramTrainer(
-    vocab_size=8000,
-    special_tokens=["<unk>", "<s>", "</s>"],
-    unk_token="<unk>"
+    vocab_size=8000, special_tokens=["<unk>", "<s>", "</s>"], unk_token="<unk>"
 )
 
 tokenizer.train(files=["data.txt"], trainer=trainer)
@@ -251,9 +247,9 @@ tokenizer.train(files=["data.txt"], trainer=trainer)
 from tokenizers.normalizers import NFD, StripAccents, Lowercase, Sequence
 
 tokenizer.normalizer = Sequence([
-    NFD(),           # Unicode 归一化（分解）
-    Lowercase(),     # 转为小写
-    StripAccents()   # 去除重音符号
+    NFD(),  # Unicode 归一化（分解）
+    Lowercase(),  # 转为小写
+    StripAccents(),  # 去除重音符号
 ])
 
 # 输入："Héllo WORLD"
@@ -275,10 +271,7 @@ tokenizer.normalizer = Sequence([
 from tokenizers.pre_tokenizers import Whitespace, Punctuation, Sequence, ByteLevel
 
 # 按空白和标点拆分
-tokenizer.pre_tokenizer = Sequence([
-    Whitespace(),
-    Punctuation()
-])
+tokenizer.pre_tokenizer = Sequence([Whitespace(), Punctuation()])
 
 # 输入："Hello, world!"
 # 预分词后：["Hello", ",", "world", "!"]
@@ -312,16 +305,13 @@ tokenizer.post_processor = TemplateProcessing(
 **常见模式**：
 ```python
 # GPT-2：sentence <|endoftext|>
-TemplateProcessing(
-    single="$A <|endoftext|>",
-    special_tokens=[("<|endoftext|>", 50256)]
-)
+TemplateProcessing(single="$A <|endoftext|>", special_tokens=[("<|endoftext|>", 50256)])
 
 # RoBERTa：<s> sentence </s>
 TemplateProcessing(
     single="<s> $A </s>",
     pair="<s> $A </s> </s> $B </s>",
-    special_tokens=[("<s>", 0), ("</s>", 2)]
+    special_tokens=[("<s>", 0), ("</s>", 2)],
 )
 ```
 
@@ -385,16 +375,12 @@ transformers_tokenizer = PreTrainedTokenizerFast(
     pad_token="[PAD]",
     cls_token="[CLS]",
     sep_token="[SEP]",
-    mask_token="[MASK]"
+    mask_token="[MASK]",
 )
 
 # 像使用任何 transformers tokenizer 一样使用
 outputs = transformers_tokenizer(
-    "Hello world",
-    padding=True,
-    truncation=True,
-    max_length=512,
-    return_tensors="pt"
+    "Hello world", padding=True, truncation=True, max_length=512, return_tensors="pt"
 )
 ```
 
@@ -408,16 +394,18 @@ from datasets import load_dataset
 # 加载数据集
 dataset = load_dataset("wikitext", "wikitext-103-raw-v1", split="train")
 
+
 # 创建批量迭代器
 def batch_iterator(batch_size=1000):
     for i in range(0, len(dataset), batch_size):
-        yield dataset[i:i + batch_size]["text"]
+        yield dataset[i : i + batch_size]["text"]
+
 
 # 训练 tokenizer
 tokenizer.train_from_iterator(
     batch_iterator(),
     trainer=trainer,
-    length=len(dataset)  # 用于进度条
+    length=len(dataset),  # 用于进度条
 )
 ```
 
@@ -433,7 +421,7 @@ tokenizer.enable_truncation(max_length=512)
 tokenizer.enable_padding(
     pad_id=tokenizer.token_to_id("[PAD]"),
     pad_token="[PAD]",
-    length=512  # 固定长度，或 None 表示批次最大长度
+    length=512,  # 固定长度，或 None 表示批次最大长度
 )
 
 # 同时编码
@@ -450,14 +438,16 @@ from multiprocessing import Pool
 # 加载 tokenizer
 tokenizer = Tokenizer.from_file("tokenizer.json")
 
+
 def encode_batch(texts):
     return tokenizer.encode_batch(texts)
+
 
 # 并行处理大型语料库
 with Pool(8) as pool:
     # 将语料库拆分为块
     chunk_size = 1000
-    chunks = [corpus[i:i+chunk_size] for i in range(0, len(corpus), chunk_size)]
+    chunks = [corpus[i : i + chunk_size] for i in range(0, len(corpus), chunk_size)]
 
     # 并行编码
     results = pool.map(encode_batch, chunks)
@@ -521,10 +511,10 @@ with Pool(8) as pool:
 
 ## 参考资料
 
-- **[训练指南](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/training.md)** — 训练自定义 tokenizer、配置训练器、处理大型数据集
-- **[算法深度解析](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/algorithms.md)** — BPE、WordPiece、Unigram 详细说明
-- **[流水线组件](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/pipeline.md)** — 归一化器、预分词器、后处理器、解码器
-- **[Transformers 集成](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/integration.md)** — AutoTokenizer、PreTrainedTokenizerFast、特殊 token
+- **[训练指南](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/training.md)** — 训练自定义 tokenizer、配置训练器、处理大型数据集
+- **[算法深度解析](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/algorithms.md)** — BPE、WordPiece、Unigram 详细说明
+- **[流水线组件](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/pipeline.md)** — 归一化器、预分词器、后处理器、解码器
+- **[Transformers 集成](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/integration.md)** — AutoTokenizer、PreTrainedTokenizerFast、特殊 token
 
 ## 资源
 

@@ -75,18 +75,20 @@ from datasets import load_dataset
 
 # Load base model
 model_name = "meta-llama/Llama-3.1-8B"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+model = AutoModelForCausalLM.from_pretrained(
+    model_name, torch_dtype="auto", device_map="auto"
+)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.pad_token = tokenizer.eos_token
 
 # LoRA configuration
 lora_config = LoraConfig(
     task_type=TaskType.CAUSAL_LM,
-    r=16,                          # Rank (8-64, higher = more capacity)
-    lora_alpha=32,                 # Scaling factor (typically 2*r)
-    lora_dropout=0.05,             # Dropout for regularization
+    r=16,  # Rank (8-64, higher = more capacity)
+    lora_alpha=32,  # Scaling factor (typically 2*r)
+    lora_dropout=0.05,  # Dropout for regularization
     target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],  # Attention layers
-    bias="none"                    # Don't train biases
+    bias="none",  # Don't train biases
 )
 
 # Apply LoRA
@@ -97,9 +99,11 @@ model.print_trainable_parameters()
 # Prepare dataset
 dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
 
+
 def tokenize(example):
     text = f"### Instruction:\n{example['instruction']}\n\n### Response:\n{example['response']}"
     return tokenizer(text, truncation=True, max_length=512, padding="max_length")
+
 
 tokenized = dataset.map(tokenize, remove_columns=dataset.column_names)
 
@@ -112,16 +116,18 @@ training_args = TrainingArguments(
     learning_rate=2e-4,
     fp16=True,
     logging_steps=10,
-    save_strategy="epoch"
+    save_strategy="epoch",
 )
 
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized,
-    data_collator=lambda data: {"input_ids": torch.stack([f["input_ids"] for f in data]),
-                                 "attention_mask": torch.stack([f["attention_mask"] for f in data]),
-                                 "labels": torch.stack([f["input_ids"] for f in data])}
+    data_collator=lambda data: {
+        "input_ids": torch.stack([f["input_ids"] for f in data]),
+        "attention_mask": torch.stack([f["attention_mask"] for f in data]),
+        "labels": torch.stack([f["input_ids"] for f in data]),
+    },
 )
 
 trainer.train()
@@ -139,16 +145,14 @@ from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 # 4-bit quantization config
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",           # NormalFloat4 (best for LLMs)
-    bnb_4bit_compute_dtype="bfloat16",   # Compute in bf16
-    bnb_4bit_use_double_quant=True       # Nested quantization
+    bnb_4bit_quant_type="nf4",  # NormalFloat4 (best for LLMs)
+    bnb_4bit_compute_dtype="bfloat16",  # Compute in bf16
+    bnb_4bit_use_double_quant=True,  # Nested quantization
 )
 
 # Load quantized model
 model = AutoModelForCausalLM.from_pretrained(
-    "meta-llama/Llama-3.1-70B",
-    quantization_config=bnb_config,
-    device_map="auto"
+    "meta-llama/Llama-3.1-70B", quantization_config=bnb_config, device_map="auto"
 )
 
 # Prepare for training (enables gradient checkpointing)
@@ -156,12 +160,20 @@ model = prepare_model_for_kbit_training(model)
 
 # LoRA config for QLoRA
 lora_config = LoraConfig(
-    r=64,                              # Higher rank for 70B
+    r=64,  # Higher rank for 70B
     lora_alpha=128,
     lora_dropout=0.1,
-    target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    target_modules=[
+        "q_proj",
+        "v_proj",
+        "k_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+    ],
     bias="none",
-    task_type="CAUSAL_LM"
+    task_type="CAUSAL_LM",
 )
 
 model = get_peft_model(model, lora_config)
@@ -193,7 +205,15 @@ LoraConfig(r=16, lora_alpha=64)  # Aggressive (higher learning rate effect)
 
 ```python
 # Llama / Mistral / Qwen
-target_modules = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+target_modules = [
+    "q_proj",
+    "v_proj",
+    "k_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+]
 
 # GPT-2 / GPT-Neo
 target_modules = ["c_attn", "c_proj", "c_fc"]
@@ -222,8 +242,7 @@ model = PeftModel.from_pretrained(base_model, "./lora-llama-adapter")
 
 # Option 2: Load directly (recommended)
 model = AutoPeftModelForCausalLM.from_pretrained(
-    "./lora-llama-adapter",
-    device_map="auto"
+    "./lora-llama-adapter", device_map="auto"
 )
 ```
 
@@ -284,7 +303,7 @@ from peft import IA3Config
 
 ia3_config = IA3Config(
     target_modules=["q_proj", "v_proj", "k_proj", "down_proj"],
-    feedforward_modules=["down_proj"]
+    feedforward_modules=["down_proj"],
 )
 model = get_peft_model(model, ia3_config)
 # Trains only 0.01% of parameters!
@@ -297,8 +316,8 @@ from peft import PrefixTuningConfig
 
 prefix_config = PrefixTuningConfig(
     task_type="CAUSAL_LM",
-    num_virtual_tokens=20,      # Prepended tokens
-    prefix_projection=True       # Use MLP projection
+    num_virtual_tokens=20,  # Prepended tokens
+    prefix_projection=True,  # Use MLP projection
 )
 model = get_peft_model(model, prefix_config)
 ```
@@ -349,8 +368,7 @@ llm = LLM(model="meta-llama/Llama-3.1-8B", enable_lora=True)
 
 # Serve with adapter
 outputs = llm.generate(
-    prompts,
-    lora_request=LoRARequest("adapter1", 1, "./lora-adapter")
+    prompts, lora_request=LoRARequest("adapter1", 1, "./lora-adapter")
 )
 ```
 
@@ -389,13 +407,11 @@ outputs = llm.generate(
 model.gradient_checkpointing_enable()
 
 # Solution 2: Reduce batch size + increase accumulation
-TrainingArguments(
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=16
-)
+TrainingArguments(per_device_train_batch_size=1, gradient_accumulation_steps=16)
 
 # Solution 3: Use QLoRA
 from transformers import BitsAndBytesConfig
+
 bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4")
 ```
 
@@ -440,8 +456,8 @@ TrainingArguments(learning_rate=1e-4)
 
 ## References
 
-- **[Advanced Usage](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/peft/references/advanced-usage.md)** - DoRA, LoftQ, rank stabilization, custom modules
-- **[Troubleshooting](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/peft/references/troubleshooting.md)** - Common errors, debugging, optimization
+- **[Advanced Usage](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/peft/references/advanced-usage.md)** - DoRA, LoftQ, rank stabilization, custom modules
+- **[Troubleshooting](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/peft/references/troubleshooting.md)** - Common errors, debugging, optimization
 
 ## Resources
 

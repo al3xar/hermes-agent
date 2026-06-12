@@ -579,7 +579,7 @@ for row_idx, wacc_value in enumerate(wacc_range):
     for col_idx, term_growth_value in enumerate(term_growth_range):
         # Build formula that uses wacc_value and term_growth_value
         formula = f"=<DCF recalc using {wacc_value} and {term_growth_value}>"
-        ws.cell(row=start_row+row_idx, column=start_col+col_idx).value = formula
+        ws.cell(row=start_row + row_idx, column=start_col + col_idx).value = formula
 ```
 
 **敏感性表格在模型打开时必须立即可用，无需用户进行任何手动步骤。**
@@ -1196,7 +1196,7 @@ WACC = (Cost of Equity × Equity Weight) + (After-tax Cost of Debt × Debt Weigh
 
 ## 故障排除
 
-**如果遇到错误或不合理的结果，请阅读 [TROUBLESHOOTING.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) 获取详细的调试指导。**
+**如果遇到错误或不合理的结果，请阅读 [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) 获取详细的调试指导。**
 
 ## 工作流集成
 
@@ -1234,7 +1234,7 @@ WACC = (Cost of Equity × Equity Weight) + (After-tax Cost of Debt × Debt Weigh
 
 3. **检查输出**：
    - 如果 `status` 为 `"success"` → 继续第 4 步
-   - 如果 `status` 为 `"errors_found"` → 检查 `error_summary` 并阅读 [TROUBLESHOOTING.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) 获取调试指导
+   - 如果 `status` 为 `"errors_found"` → 检查 `error_summary` 并阅读 [TROUBLESHOOTING.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/finance/dcf-model/TROUBLESHOOTING.md) 获取调试指导
 
 4. **修复错误并重新运行 recalc.py**，直到状态为"success"
 

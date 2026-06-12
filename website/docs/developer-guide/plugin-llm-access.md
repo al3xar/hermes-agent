@@ -39,8 +39,11 @@ plugin follows them automatically.
 ```python
 result = ctx.llm.complete(
     messages=[
-        {"role": "system", "content": "Rewrite errors as one short sentence a non-engineer can act on."},
-        {"role": "user",   "content": traceback_text},
+        {
+            "role": "system",
+            "content": "Rewrite errors as one short sentence a non-engineer can act on.",
+        },
+        {"role": "user", "content": traceback_text},
     ],
     max_tokens=64,
     purpose="hooks.error-rewrite",
@@ -118,8 +121,10 @@ def _tldr(ctx, raw_args: str) -> str:
         return "Usage: /tldr <text to summarise>"
     result = ctx.llm.complete(
         messages=[
-            {"role": "system",
-             "content": "Summarise the user's text in one tight paragraph. No preamble."},
+            {
+                "role": "system",
+                "content": "Summarise the user's text in one tight paragraph. No preamble.",
+            },
             {"role": "user", "content": text},
         ],
         max_tokens=256,
@@ -152,9 +157,9 @@ _TASKS_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "owner":  {"type": "string"},
+                    "owner": {"type": "string"},
                     "action": {"type": "string"},
-                    "due":    {"type": "string", "description": "ISO date or empty"},
+                    "due": {"type": "string", "description": "ISO date or empty"},
                 },
                 "required": ["action"],
             },
@@ -181,7 +186,9 @@ def _paste_to_tasks(ctx, raw_args: str) -> str:
     )
     if result.parsed is None:
         return f"Couldn't parse a response. Raw output:\n{result.text}"
-    lines = [f"- [{t.get('owner') or '?'}] {t['action']}" for t in result.parsed["tasks"]]
+    lines = [
+        f"- [{t.get('owner') or '?'}] {t['action']}" for t in result.parsed["tasks"]
+    ]
     return "\n".join(lines) or "(no tasks found)"
 ```
 
@@ -215,13 +222,13 @@ timeout, vision routing — is the same across all four.
 ```python
 result = ctx.llm.complete(
     messages=[{"role": "user", "content": "Hi"}],
-    provider=None,         # optional, gated — Hades provider id (e.g. "openrouter")
-    model=None,            # optional, gated — whatever string that provider expects
+    provider=None,  # optional, gated — Hades provider id (e.g. "openrouter")
+    model=None,  # optional, gated — whatever string that provider expects
     temperature=None,
     max_tokens=None,
-    timeout=None,          # seconds
-    agent_id=None,         # optional, gated
-    profile=None,          # optional, gated — explicit auth-profile name
+    timeout=None,  # seconds
+    agent_id=None,  # optional, gated
+    profile=None,  # optional, gated — explicit auth-profile name
     purpose="optional-audit-string",
 )
 # → PluginLlmCompleteResult(text, provider, model, agent_id, usage, audit)
@@ -244,16 +251,16 @@ without operator opt-in raises `PluginLlmTrustError`.
 result = ctx.llm.complete_structured(
     instructions="What you want extracted.",
     input=[
-        {"type": "text",  "text": "..."},
+        {"type": "text", "text": "..."},
         {"type": "image", "data": b"...", "mime_type": "image/png"},
-        {"type": "image", "url":  "https://..."},
+        {"type": "image", "url": "https://..."},
     ],
-    json_schema={...},     # optional — triggers parsed result + validation
-    json_mode=False,       # set True without a schema to ask for JSON anyway
-    schema_name=None,      # optional human-readable schema name
+    json_schema={...},  # optional — triggers parsed result + validation
+    json_mode=False,  # set True without a schema to ask for JSON anyway
+    schema_name=None,  # optional human-readable schema name
     system_prompt=None,
-    provider=None,         # optional, gated
-    model=None,            # optional, gated
+    provider=None,  # optional, gated
+    model=None,  # optional, gated
     temperature=None,
     max_tokens=None,
     timeout=None,
@@ -292,17 +299,18 @@ already running on an asyncio loop.
 ```python
 @dataclass
 class PluginLlmCompleteResult:
-    text: str                    # the assistant's response
-    provider: str                # e.g. "openrouter", "anthropic"
-    model: str                   # whatever the provider returned for this call
-    agent_id: str                # whose model/auth was used
-    usage: PluginLlmUsage        # tokens + cache + cost estimate
-    audit: Dict[str, Any]        # plugin_id, purpose, profile
+    text: str  # the assistant's response
+    provider: str  # e.g. "openrouter", "anthropic"
+    model: str  # whatever the provider returned for this call
+    agent_id: str  # whose model/auth was used
+    usage: PluginLlmUsage  # tokens + cache + cost estimate
+    audit: Dict[str, Any]  # plugin_id, purpose, profile
+
 
 @dataclass
 class PluginLlmStructuredResult(PluginLlmCompleteResult):
-    parsed: Optional[Any]        # JSON object when content_type == "json"
-    content_type: str            # "json" or "text"
+    parsed: Optional[Any]  # JSON object when content_type == "json"
+    content_type: str  # "json" or "text"
     # audit also carries schema_name when supplied
 ```
 
@@ -456,8 +464,8 @@ own model call — for any reason, structured or not — `ctx.llm`.
 
 ## Reference
 
-* Implementation: [`agent/plugin_llm.py`](https://github.com/NousResearch/hades-agent/blob/main/agent/plugin_llm.py)
-* Tests: [`tests/agent/test_plugin_llm.py`](https://github.com/NousResearch/hades-agent/blob/main/tests/agent/test_plugin_llm.py)
+* Implementation: [`agent/plugin_llm.py`](https://github.com/NousResearch/hermes-agent/blob/main/agent/plugin_llm.py)
+* Tests: [`tests/agent/test_plugin_llm.py`](https://github.com/NousResearch/hermes-agent/blob/main/tests/agent/test_plugin_llm.py)
 * Reference plugins (companion repo):
   * [`plugin-llm-example`](https://github.com/NousResearch/hades-example-plugins/tree/main/plugin-llm-example) — sync structured extraction with image input
   * [`plugin-llm-async-example`](https://github.com/NousResearch/hades-example-plugins/tree/main/plugin-llm-async-example) — async with `asyncio.gather()`

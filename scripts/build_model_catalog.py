@@ -17,7 +17,7 @@ Usage::
 Output: ``website/static/api/model-catalog.json``
 
 Live URL (after ``deploy-site.yml`` runs on merge to main):
-``https://hades-agent.nousresearch.com/docs/api/model-catalog.json``
+``https://hermes-agent.nousresearch.com/docs/api/model-catalog.json``
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def build_catalog() -> dict:
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
             "source": "hades-agent repo",
-            "docs": "https://hades-agent.nousresearch.com/docs/reference/model-catalog",
+            "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog",
         },
         "providers": {
             "openrouter": {
@@ -57,8 +57,7 @@ def build_catalog() -> dict:
                     ),
                 },
                 "models": [
-                    {"id": mid, "description": desc}
-                    for mid, desc in OPENROUTER_MODELS
+                    {"id": mid, "description": desc} for mid, desc in OPENROUTER_MODELS
                 ],
             },
             "nous": {
@@ -69,10 +68,7 @@ def build_catalog() -> dict:
                         "(partition_nous_models_by_tier), not this manifest."
                     ),
                 },
-                "models": [
-                    {"id": mid}
-                    for mid in _PROVIDER_MODELS.get("nous", [])
-                ],
+                "models": [{"id": mid} for mid in _PROVIDER_MODELS.get("nous", [])],
             },
         },
     }

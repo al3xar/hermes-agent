@@ -18,8 +18,14 @@
   const { React } = SDK;
   const h = React.createElement;
   const {
-    Card, CardContent,
-    Badge, Button, Input, Label, Select, SelectOption,
+    Card,
+    CardContent,
+    Badge,
+    Button,
+    Input,
+    Label,
+    Select,
+    SelectOption,
   } = SDK.components;
   const { useState, useEffect, useCallback, useMemo, useRef } = SDK.hooks;
   const { cn, timeAgo } = SDK.utils;
@@ -28,24 +34,36 @@
   // Fall back to a native <input type="checkbox"> shim so older hosts that
   // predate the design-system rollout still render. The shim normalises
   // Radix's onCheckedChange(checked) signature to native onChange(event).
-  const Checkbox = SDK.components.Checkbox || function (props) {
-    const { checked, onCheckedChange, className, onClick, ...rest } = props;
-    return h("input", Object.assign({
-      type: "checkbox",
-      checked: !!checked,
-      className: className,
-      onClick: onClick,
-      onChange: function (e) {
-        if (onCheckedChange) onCheckedChange(e.target.checked);
-      },
-    }, rest));
-  };
+  const Checkbox =
+    SDK.components.Checkbox ||
+    function (props) {
+      const { checked, onCheckedChange, className, onClick, ...rest } = props;
+      return h(
+        "input",
+        Object.assign(
+          {
+            type: "checkbox",
+            checked: !!checked,
+            className: className,
+            onClick: onClick,
+            onChange: function (e) {
+              if (onCheckedChange) onCheckedChange(e.target.checked);
+            },
+          },
+          rest,
+        ),
+      );
+    };
 
   // useI18n is a hook each component calls locally. Older host dashboards
   // may not expose it yet; fall back to a shim so the bundle still renders
   // English against an older host SDK. English fallback strings live
   // alongside each call site (passed as the third arg of tx()).
-  const useI18n = SDK.useI18n || function () { return { t: { kanban: null }, locale: "en" }; };
+  const useI18n =
+    SDK.useI18n ||
+    function () {
+      return { t: { kanban: null }, locale: "en" };
+    };
 
   // Resolve a translation by dotted path under the kanban namespace
   // (e.g. "columnLabels.triage"); fall back to the English string passed in.
@@ -56,10 +74,13 @@
       for (let i = 0; i < parts.length; i++) {
         if (node && typeof node === "object" && parts[i] in node) {
           node = node[parts[i]];
-        } else { node = null; break; }
+        } else {
+          node = null;
+          break;
+        }
       }
     }
-    let str = (typeof node === "string") ? node : fallback;
+    let str = typeof node === "string" ? node : fallback;
     if (vars) {
       for (const k in vars) {
         str = str.replace(new RegExp("\\{" + k + "\\}", "g"), vars[k]);
@@ -73,21 +94,34 @@
   // human-readable message out so banners/toasts don't have to leak HTTP
   // plumbing at the user (e.g. ``409: {"detail":"…"}``).  See #26744.
   function parseApiErrorMessage(err) {
-    const raw = (err && err.message) ? String(err.message) : String(err || "");
+    const raw = err && err.message ? String(err.message) : String(err || "");
     const m = raw.match(/^(\d{3}):\s*(.*)$/s);
     const body = m ? m[2] : raw;
     try {
       const parsed = JSON.parse(body);
       if (parsed && typeof parsed.detail === "string") return parsed.detail;
-      if (parsed && parsed.detail && typeof parsed.detail.message === "string") {
+      if (
+        parsed &&
+        parsed.detail &&
+        typeof parsed.detail.message === "string"
+      ) {
         return parsed.detail.message;
       }
-    } catch (_e) { /* not JSON — fall through to raw body */ }
+    } catch (_e) {
+      /* not JSON — fall through to raw body */
+    }
     return body || raw;
   }
 
   // Order matches BOARD_COLUMNS in plugin_api.py.
-  const COLUMN_ORDER = ["triage", "todo", "ready", "running", "blocked", "done"];
+  const COLUMN_ORDER = [
+    "triage",
+    "todo",
+    "ready",
+    "running",
+    "blocked",
+    "done",
+  ];
   // English fallback dictionaries — used when the i18n catalog is missing
   // a key, and as defaults for the get*() helpers below so callers running
   // outside any React component (where there's no `t`) still get sane text.
@@ -135,7 +169,11 @@
   };
 
   function getColumnLabel(t, status) {
-    return tx(t, "columnLabels." + status, FALLBACK_COLUMN_LABEL[status] || status);
+    return tx(
+      t,
+      "columnLabels." + status,
+      FALLBACK_COLUMN_LABEL[status] || status,
+    );
   }
   function getColumnHelp(t, status) {
     return tx(t, "columnHelp." + status, FALLBACK_COLUMN_HELP[status] || "");
@@ -162,7 +200,10 @@
   };
 
   function isDiagnosticEvent(kind) {
-    return Object.prototype.hasOwnProperty.call(FALLBACK_DIAGNOSTIC_EVENT_LABELS, kind);
+    return Object.prototype.hasOwnProperty.call(
+      FALLBACK_DIAGNOSTIC_EVENT_LABELS,
+      kind,
+    );
   }
 
   function phantomIdsFromEvent(ev) {
@@ -175,18 +216,27 @@
   // outside React components can pass null and fall through to English.
   function withCompletionSummary(patch, count, t) {
     if (!patch || patch.status !== "done") return patch;
-    const label = count && count > 1 ? `${count} selected task(s)` : "this task";
+    const label =
+      count && count > 1 ? `${count} selected task(s)` : "this task";
     const value = window.prompt(
-      tx(t, "completionSummary",
+      tx(
+        t,
+        "completionSummary",
         "Completion summary for {label}. This is stored as the task result.",
-        { label: label }),
+        { label: label },
+      ),
       "",
     );
     if (value === null) return null;
     const summary = value.trim();
     if (!summary) {
-      window.alert(tx(t, "completionSummaryRequired",
-        "Completion summary is required before marking a task done."));
+      window.alert(
+        tx(
+          t,
+          "completionSummaryRequired",
+          "Completion summary is required before marking a task done.",
+        ),
+      );
       return null;
     }
     return Object.assign({}, patch, { result: summary, summary });
@@ -198,8 +248,10 @@
   // Docs link — surfaced as a `?` icon next to the board switcher and as
   // `title=` hints on unlabelled controls. Kept in one place so rebrands or
   // path changes are a single edit.
-  const DOCS_URL = "https://hades-agent.nousresearch.com/docs/user-guide/features/kanban";
-  const DOCS_TUTORIAL_URL = "https://hades-agent.nousresearch.com/docs/user-guide/features/kanban-tutorial";
+  const DOCS_URL =
+    "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban";
+  const DOCS_TUTORIAL_URL =
+    "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban-tutorial";
 
   // localStorage key for the user's selected board. Independent of the
   // CLI's on-disk ``<root>/kanban/current`` pointer so browser users
@@ -211,7 +263,9 @@
     try {
       const v = window.localStorage.getItem(LS_BOARD_KEY);
       return (v || "").trim() || null;
-    } catch (_e) { return null; }
+    } catch (_e) {
+      return null;
+    }
   }
 
   function writeSelectedBoard(slug) {
@@ -229,7 +283,9 @@
       // design intent. Regression: #20879.
       if (slug) window.localStorage.setItem(LS_BOARD_KEY, slug);
       else window.localStorage.removeItem(LS_BOARD_KEY);
-    } catch (_e) { /* ignore quota / private mode */ }
+    } catch (_e) {
+      /* ignore quota / private mode */
+    }
   }
 
   function withBoard(url, board) {
@@ -253,7 +309,9 @@
   //   h(Select, {..., ...selectChangeHandler(setState), ...})
   function selectChangeHandler(setter) {
     return {
-      onValueChange: function (v) { setter(v == null ? "" : v); },
+      onValueChange: function (v) {
+        setter(v == null ? "" : v);
+      },
       onChange: function (e) {
         const v = e && e.target ? e.target.value : e;
         setter(v == null ? "" : v);
@@ -281,19 +339,21 @@
   function renderInline(esc) {
     // Fenced code has already been extracted before this runs; process
     // inline replacements on the escaped string.
-    return esc
-      // inline code
-      .replace(/`([^`\n]+)`/g, (_m, c) => `<code>${c}</code>`)
-      // bold
-      .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
-      // italic
-      .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
-      // safe links — only http(s) and mailto
-      .replace(
-        /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
-        (_m, text, href) =>
-          `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`,
-      );
+    return (
+      esc
+        // inline code
+        .replace(/`([^`\n]+)`/g, (_m, c) => `<code>${c}</code>`)
+        // bold
+        .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+        // italic
+        .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+        // safe links — only http(s) and mailto
+        .replace(
+          /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
+          (_m, text, href) =>
+            `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`,
+        )
+    );
   }
   function renderMarkdown(src) {
     if (!src) return "";
@@ -312,11 +372,17 @@
       const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
       const heading = /^(#{1,4})\s+(.*)$/.exec(line);
       if (bullet) {
-        if (!inList) { out.push("<ul>"); inList = true; }
+        if (!inList) {
+          out.push("<ul>");
+          inList = true;
+        }
         out.push(`<li>${renderInline(bullet[1])}</li>`);
         continue;
       }
-      if (inList) { out.push("</ul>"); inList = false; }
+      if (inList) {
+        out.push("</ul>");
+        inList = false;
+      }
       if (heading) {
         const level = heading[1].length;
         out.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
@@ -329,8 +395,10 @@
     if (inList) out.push("</ul>");
     let html = out.join("\n");
     // Re-insert fenced code blocks.
-    html = html.replace(/\u0000CODE(\d+)\u0000/g, (_m, i) =>
-      `<pre class="hades-kanban-md-code"><code>${escapeHtml(blocks[Number(i)])}</code></pre>`,
+    html = html.replace(
+      /\u0000CODE(\d+)\u0000/g,
+      (_m, i) =>
+        `<pre class="hades-kanban-md-code"><code>${escapeHtml(blocks[Number(i)])}</code></pre>`,
     );
     return html;
   }
@@ -371,11 +439,14 @@
         proxy.style.display = "none";
         const under = document.elementFromPoint(ev.clientX, ev.clientY);
         proxy.style.display = "";
-        const col = under && under.closest && under.closest("[data-kanban-column]");
-        const trash = under && under.closest && under.closest("[data-kanban-trash]");
+        const col =
+          under && under.closest && under.closest("[data-kanban-column]");
+        const trash =
+          under && under.closest && under.closest("[data-kanban-trash]");
         const target = col || trash;
         if (target !== lastTarget) {
-          if (lastTarget) lastTarget.classList.remove("hades-kanban-column--drop");
+          if (lastTarget)
+            lastTarget.classList.remove("hades-kanban-column--drop");
           if (target) target.classList.add("hades-kanban-column--drop");
           lastTarget = target;
         }
@@ -389,15 +460,19 @@
           const status = lastTarget.getAttribute("data-kanban-column");
           const isTrash = lastTarget.hasAttribute("data-kanban-trash");
           if (isTrash) {
-            lastTarget.dispatchEvent(new CustomEvent("hades-kanban:delete", {
-              detail: { taskId },
-              bubbles: true,
-            }));
+            lastTarget.dispatchEvent(
+              new CustomEvent("hades-kanban:delete", {
+                detail: { taskId },
+                bubbles: true,
+              }),
+            );
           } else if (status) {
-            lastTarget.dispatchEvent(new CustomEvent("hades-kanban:drop", {
-              detail: { taskId, status },
-              bubbles: true,
-            }));
+            lastTarget.dispatchEvent(
+              new CustomEvent("hades-kanban:drop", {
+                detail: { taskId, status },
+                bubbles: true,
+              }),
+            );
           }
         }
         proxy.remove();
@@ -415,7 +490,9 @@
       document.addEventListener("pointercancel", up);
     }
     el.addEventListener("pointerdown", onDown);
-    return function () { el.removeEventListener("pointerdown", onDown); };
+    return function () {
+      el.removeEventListener("pointerdown", onDown);
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -426,23 +503,42 @@
   // call useI18n() — class components can't use hooks directly.
   function ErrorBoundaryFallback(props) {
     const { t } = useI18n();
-    return h(Card, null,
-      h(CardContent, { className: "p-6 text-sm" },
-        h("div", { className: "text-destructive font-semibold mb-1" },
-          tx(t, "renderingError", "Kanban tab hit a rendering error")),
-        h("div", { className: "text-muted-foreground text-xs mb-3" },
-          props.message),
-        h(Button, {
-          onClick: props.onReset,
-          size: "sm",
-        }, tx(t, "reloadView", "Reload view")),
+    return h(
+      Card,
+      null,
+      h(
+        CardContent,
+        { className: "p-6 text-sm" },
+        h(
+          "div",
+          { className: "text-destructive font-semibold mb-1" },
+          tx(t, "renderingError", "Kanban tab hit a rendering error"),
+        ),
+        h(
+          "div",
+          { className: "text-muted-foreground text-xs mb-3" },
+          props.message,
+        ),
+        h(
+          Button,
+          {
+            onClick: props.onReset,
+            size: "sm",
+          },
+          tx(t, "reloadView", "Reload view"),
+        ),
       ),
     );
   }
 
   class ErrorBoundary extends React.Component {
-    constructor(props) { super(props); this.state = { error: null }; }
-    static getDerivedStateFromError(error) { return { error }; }
+    constructor(props) {
+      super(props);
+      this.state = { error: null };
+    }
+    static getDerivedStateFromError(error) {
+      return { error };
+    }
     componentDidCatch(error, info) {
       // eslint-disable-next-line no-console
       console.error("Kanban plugin crashed:", error, info);
@@ -450,7 +546,9 @@
     render() {
       if (this.state.error) {
         return h(ErrorBoundaryFallback, {
-          message: String(this.state.error && this.state.error.message || this.state.error),
+          message: String(
+            (this.state.error && this.state.error.message) || this.state.error,
+          ),
           onReset: () => this.setState({ error: null }),
         });
       }
@@ -465,10 +563,10 @@
   function KanbanPage() {
     const { t } = useI18n();
     const [board, setBoard] = useState(() => readSelectedBoard() || null);
-    const [boardList, setBoardList] = useState([]);      // [{slug, name, counts, ...}]
+    const [boardList, setBoardList] = useState([]); // [{slug, name, counts, ...}]
     const [showNewBoard, setShowNewBoard] = useState(false);
 
-    const [kanbanBoard, setKanbanBoard] = useState(null);  // the grid data
+    const [kanbanBoard, setKanbanBoard] = useState(null); // the grid data
     // Alias so the rest of the function can keep using `board` semantically
     // for the grid data (card columns + tenants + assignees) without
     // colliding with the selected-board slug above. History: the old
@@ -493,8 +591,12 @@
     const [lastSelectedId, setLastSelectedId] = useState(null);
     const [failedIds, setFailedIds] = useState(() => new Set());
     const [draggingTaskId, setDraggingTaskId] = useState(null);
-    const handleDragStart = useCallback(function (taskId) { setDraggingTaskId(taskId); }, []);
-    const handleDragEnd = useCallback(function () { setDraggingTaskId(null); }, []);
+    const handleDragStart = useCallback(function (taskId) {
+      setDraggingTaskId(taskId);
+    }, []);
+    const handleDragEnd = useCallback(function () {
+      setDraggingTaskId(null);
+    }, []);
     // Per-task event counter incremented whenever the WS stream reports
     // a new event for that task id. TaskDrawer useEffect-depends on its
     // own task's counter so it reloads itself on live events instead of
@@ -514,13 +616,17 @@
           setConfig(c);
           if (!configApplied) {
             if (c.default_tenant) setTenantFilter(c.default_tenant);
-            if (typeof c.lane_by_profile === "boolean") setLaneByProfile(c.lane_by_profile);
-            if (typeof c.include_archived_by_default === "boolean") setIncludeArchived(c.include_archived_by_default);
+            if (typeof c.lane_by_profile === "boolean")
+              setLaneByProfile(c.lane_by_profile);
+            if (typeof c.include_archived_by_default === "boolean")
+              setIncludeArchived(c.include_archived_by_default);
             setConfigApplied(true);
           }
         })
-        .catch(function () { setConfig({ render_markdown: true }); });
-    }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+        .catch(function () {
+          setConfig({ render_markdown: true });
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- fetch full board ---------------------------------------------------
     const loadBoard = useCallback(() => {
@@ -537,241 +643,340 @@
         .catch(function (err) {
           setError(String(err && err.message ? err.message : err));
         })
-        .finally(function () { setLoading(false); });
+        .finally(function () {
+          setLoading(false);
+        });
     }, [tenantFilter, includeArchived, board]);
 
     // --- load list of boards for the switcher ------------------------------
-    const loadBoardList = useCallback(function () {
-      return SDK.fetchJSON(withBoard(`${API}/boards`, board))
-        .then(function (data) {
-          const boards = (data && data.boards) || [];
-          const storedBoard = readSelectedBoard();
-          setBoardList(boards);
-          if (!storedBoard && !board && data && data.current) {
-            setBoard(data.current);
-            return;
-          }
-          // If the stored slug isn't in the list any longer (board was
-          // deleted in the CLI while dashboard was open), fall back to
-          // default so the UI doesn't hang on a 404.
-          if (board && board !== "default" && !boards.find(function (b) { return b.slug === board; })) {
-            setBoard("default");
-            writeSelectedBoard("default");
-          }
-        })
-        .catch(function () { /* non-fatal */ });
-    }, [board]);
-
-    useEffect(function () { loadBoardList(); }, [loadBoardList]);
-
-    const scheduleReload = useCallback(function () {
-      if (reloadTimerRef.current) return;
-      reloadTimerRef.current = setTimeout(function () {
-        reloadTimerRef.current = null;
-        loadBoard();
-      }, 250);
-    }, [loadBoard]);
-
-    useEffect(function () {
-      loadBoard();
-      return function () {
-        if (reloadTimerRef.current) {
-          clearTimeout(reloadTimerRef.current);
-          reloadTimerRef.current = null;
-        }
-      };
-    }, [loadBoard]);
-
-    // --- WebSocket ---------------------------------------------------------
-    useEffect(function () {
-      if (!boardData) return undefined;
-      wsClosedRef.current = false;
-      function openWs() {
-        if (wsClosedRef.current) return;
-        // Build the WS URL via the host SDK so the correct auth param is used
-        // in BOTH modes: single-use ?ticket= in gated OAuth mode, ?token= in
-        // loopback. Reading window.__HADES_SESSION_TOKEN__ directly (the old
-        // path) sends an empty token and is rejected in gated mode. buildWsUrl
-        // also applies the dashboard base-path prefix for reverse-proxied
-        // deployments, which the old inline URL did not. It's async (gated
-        // mode mints a fresh ticket per connect), so resolve then open.
-        const wsParams = { since: String(cursorRef.current || 0) };
-        // Pin the WS stream to the currently-selected board so events
-        // from other boards don't bleed in. Includes "default" so the
-        // dashboard's own board pin always wins over the server-side
-        // ``current`` file — same rationale as ``withBoard()`` above.
-        // Regression: #20879.
-        if (board) wsParams.board = board;
-        SDK.buildWsUrl(`${API}/events`, wsParams).then(function (url) {
-          if (wsClosedRef.current) return;
-          let ws;
-          try { ws = new WebSocket(url); } catch (_e) { return; }
-          wsRef.current = ws;
-          ws.onopen = function () { wsBackoffRef.current = 1000; };
-          ws.onmessage = function (ev) {
-            try {
-              const msg = JSON.parse(ev.data);
-              if (msg && Array.isArray(msg.events) && msg.events.length > 0) {
-                cursorRef.current = msg.cursor || cursorRef.current;
-                // Stamp per-task signal so the TaskDrawer can reload itself.
-                setTaskEventTick(function (prev) {
-                  const next = Object.assign({}, prev);
-                  for (const e of msg.events) {
-                    if (e && e.task_id) next[e.task_id] = (next[e.task_id] || 0) + 1;
-                  }
-                  return next;
-                });
-                scheduleReload();
-              }
-            } catch (_e) { /* ignore */ }
-          };
-          ws.onclose = function (ev) {
-            if (wsClosedRef.current) return;
-            if (ev && ev.code === 1008) {
-              setError(tx(t, "wsAuthFailed",
-                "WebSocket auth failed — reload the page to refresh the session token."));
+    const loadBoardList = useCallback(
+      function () {
+        return SDK.fetchJSON(withBoard(`${API}/boards`, board))
+          .then(function (data) {
+            const boards = (data && data.boards) || [];
+            const storedBoard = readSelectedBoard();
+            setBoardList(boards);
+            if (!storedBoard && !board && data && data.current) {
+              setBoard(data.current);
               return;
             }
-            const delay = Math.min(wsBackoffRef.current, 30000);
-            wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
-            setTimeout(openWs, delay);
-          };
-        }).catch(function () {
-          // Ticket mint / URL build failed (e.g. session expired). Back off
-          // and retry; a hard auth failure surfaces via the 1008 close path.
+            // If the stored slug isn't in the list any longer (board was
+            // deleted in the CLI while dashboard was open), fall back to
+            // default so the UI doesn't hang on a 404.
+            if (
+              board &&
+              board !== "default" &&
+              !boards.find(function (b) {
+                return b.slug === board;
+              })
+            ) {
+              setBoard("default");
+              writeSelectedBoard("default");
+            }
+          })
+          .catch(function () {
+            /* non-fatal */
+          });
+      },
+      [board],
+    );
+
+    useEffect(
+      function () {
+        loadBoardList();
+      },
+      [loadBoardList],
+    );
+
+    const scheduleReload = useCallback(
+      function () {
+        if (reloadTimerRef.current) return;
+        reloadTimerRef.current = setTimeout(function () {
+          reloadTimerRef.current = null;
+          loadBoard();
+        }, 250);
+      },
+      [loadBoard],
+    );
+
+    useEffect(
+      function () {
+        loadBoard();
+        return function () {
+          if (reloadTimerRef.current) {
+            clearTimeout(reloadTimerRef.current);
+            reloadTimerRef.current = null;
+          }
+        };
+      },
+      [loadBoard],
+    );
+
+    // --- WebSocket ---------------------------------------------------------
+    useEffect(
+      function () {
+        if (!boardData) return undefined;
+        wsClosedRef.current = false;
+        function openWs() {
           if (wsClosedRef.current) return;
-          const delay = Math.min(wsBackoffRef.current, 30000);
-          wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
-          setTimeout(openWs, delay);
-        });
-      }
-      openWs();
-      return function () {
-        wsClosedRef.current = true;
-        try { wsRef.current && wsRef.current.close(); } catch (_e) { /* noop */ }
-      };
-    }, [!!boardData, board, scheduleReload]);
+          // Build the WS URL via the host SDK so the correct auth param is used
+          // in BOTH modes: single-use ?ticket= in gated OAuth mode, ?token= in
+          // loopback. Reading window.__HADES_SESSION_TOKEN__ directly (the old
+          // path) sends an empty token and is rejected in gated mode. buildWsUrl
+          // also applies the dashboard base-path prefix for reverse-proxied
+          // deployments, which the old inline URL did not. It's async (gated
+          // mode mints a fresh ticket per connect), so resolve then open.
+          const wsParams = { since: String(cursorRef.current || 0) };
+          // Pin the WS stream to the currently-selected board so events
+          // from other boards don't bleed in. Includes "default" so the
+          // dashboard's own board pin always wins over the server-side
+          // ``current`` file — same rationale as ``withBoard()`` above.
+          // Regression: #20879.
+          if (board) wsParams.board = board;
+          SDK.buildWsUrl(`${API}/events`, wsParams)
+            .then(function (url) {
+              if (wsClosedRef.current) return;
+              let ws;
+              try {
+                ws = new WebSocket(url);
+              } catch (_e) {
+                return;
+              }
+              wsRef.current = ws;
+              ws.onopen = function () {
+                wsBackoffRef.current = 1000;
+              };
+              ws.onmessage = function (ev) {
+                try {
+                  const msg = JSON.parse(ev.data);
+                  if (
+                    msg &&
+                    Array.isArray(msg.events) &&
+                    msg.events.length > 0
+                  ) {
+                    cursorRef.current = msg.cursor || cursorRef.current;
+                    // Stamp per-task signal so the TaskDrawer can reload itself.
+                    setTaskEventTick(function (prev) {
+                      const next = Object.assign({}, prev);
+                      for (const e of msg.events) {
+                        if (e && e.task_id)
+                          next[e.task_id] = (next[e.task_id] || 0) + 1;
+                      }
+                      return next;
+                    });
+                    scheduleReload();
+                  }
+                } catch (_e) {
+                  /* ignore */
+                }
+              };
+              ws.onclose = function (ev) {
+                if (wsClosedRef.current) return;
+                if (ev && ev.code === 1008) {
+                  setError(
+                    tx(
+                      t,
+                      "wsAuthFailed",
+                      "WebSocket auth failed — reload the page to refresh the session token.",
+                    ),
+                  );
+                  return;
+                }
+                const delay = Math.min(wsBackoffRef.current, 30000);
+                wsBackoffRef.current = Math.min(
+                  wsBackoffRef.current * 2,
+                  30000,
+                );
+                setTimeout(openWs, delay);
+              };
+            })
+            .catch(function () {
+              // Ticket mint / URL build failed (e.g. session expired). Back off
+              // and retry; a hard auth failure surfaces via the 1008 close path.
+              if (wsClosedRef.current) return;
+              const delay = Math.min(wsBackoffRef.current, 30000);
+              wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
+              setTimeout(openWs, delay);
+            });
+        }
+        openWs();
+        return function () {
+          wsClosedRef.current = true;
+          try {
+            wsRef.current && wsRef.current.close();
+          } catch (_e) {
+            /* noop */
+          }
+        };
+      },
+      [!!boardData, board, scheduleReload],
+    );
 
     // --- filtering ----------------------------------------------------------
-    const filteredBoard = useMemo(function () {
-      if (!boardData) return null;
-      const q = search.trim().toLowerCase();
-      const filterTask = function (t) {
-        if (tenantFilter && t.tenant !== tenantFilter) return false;
-        if (assigneeFilter && t.assignee !== assigneeFilter) return false;
-        if (q) {
-          const hay = `${t.id} ${t.title || ""} ${t.body || ""} ${t.result || ""} ${t.latest_summary || ""} ${t.assignee || ""} ${t.tenant || ""}`.toLowerCase();
-          if (hay.indexOf(q) === -1) return false;
-        }
-        return true;
-      };
-      return Object.assign({}, boardData, {
-        columns: boardData.columns.map(function (col) {
-          return Object.assign({}, col, { tasks: col.tasks.filter(filterTask) });
-        }),
-      });
-    }, [boardData, tenantFilter, assigneeFilter, search]);
+    const filteredBoard = useMemo(
+      function () {
+        if (!boardData) return null;
+        const q = search.trim().toLowerCase();
+        const filterTask = function (t) {
+          if (tenantFilter && t.tenant !== tenantFilter) return false;
+          if (assigneeFilter && t.assignee !== assigneeFilter) return false;
+          if (q) {
+            const hay =
+              `${t.id} ${t.title || ""} ${t.body || ""} ${t.result || ""} ${t.latest_summary || ""} ${t.assignee || ""} ${t.tenant || ""}`.toLowerCase();
+            if (hay.indexOf(q) === -1) return false;
+          }
+          return true;
+        };
+        return Object.assign({}, boardData, {
+          columns: boardData.columns.map(function (col) {
+            return Object.assign({}, col, {
+              tasks: col.tasks.filter(filterTask),
+            });
+          }),
+        });
+      },
+      [boardData, tenantFilter, assigneeFilter, search],
+    );
 
     // --- actions ------------------------------------------------------------
-    const moveTask = useCallback(function (taskId, newStatus) {
-      const confirmMsg = getDestructiveConfirm(t, newStatus);
-      if (confirmMsg && !window.confirm(confirmMsg)) return;
-      const patch = withCompletionSummary({ status: newStatus }, 1, t);
-      if (!patch) return;
-      setBoardData(function (b) {
-        if (!b) return b;
-        let moved = null;
-        const columns = b.columns.map(function (col) {
-          const next = col.tasks.filter(function (t) {
-            if (t.id === taskId) { moved = Object.assign({}, t, { status: newStatus }); return false; }
-            return true;
+    const moveTask = useCallback(
+      function (taskId, newStatus) {
+        const confirmMsg = getDestructiveConfirm(t, newStatus);
+        if (confirmMsg && !window.confirm(confirmMsg)) return;
+        const patch = withCompletionSummary({ status: newStatus }, 1, t);
+        if (!patch) return;
+        setBoardData(function (b) {
+          if (!b) return b;
+          let moved = null;
+          const columns = b.columns.map(function (col) {
+            const next = col.tasks.filter(function (t) {
+              if (t.id === taskId) {
+                moved = Object.assign({}, t, { status: newStatus });
+                return false;
+              }
+              return true;
+            });
+            return Object.assign({}, col, { tasks: next });
           });
-          return Object.assign({}, col, { tasks: next });
+          if (moved) {
+            const dest = columns.find(function (c) {
+              return c.name === newStatus;
+            });
+            if (dest) dest.tasks = [moved].concat(dest.tasks);
+          }
+          return Object.assign({}, b, { columns });
         });
-        if (moved) {
-          const dest = columns.find(function (c) { return c.name === newStatus; });
-          if (dest) dest.tasks = [moved].concat(dest.tasks);
-        }
-        return Object.assign({}, b, { columns });
-      });
-      SDK.fetchJSON(withBoard(`${API}/tasks/${encodeURIComponent(taskId)}`, board), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      }).catch(function (err) {
-        setError(tx(t, "moveFailed", "Move failed: ") + parseApiErrorMessage(err));
-        loadBoard();
-      });
-    }, [loadBoard, board, t]);
+        SDK.fetchJSON(
+          withBoard(`${API}/tasks/${encodeURIComponent(taskId)}`, board),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          },
+        ).catch(function (err) {
+          setError(
+            tx(t, "moveFailed", "Move failed: ") + parseApiErrorMessage(err),
+          );
+          loadBoard();
+        });
+      },
+      [loadBoard, board, t],
+    );
 
     const clearSelected = useCallback(function () {
       setSelectedIds(new Set());
       setLastSelectedId(null);
       setFailedIds(new Set());
     }, []);
-    const moveSelected = useCallback(function (newStatus) {
-      const confirmMsg = DESTRUCTIVE_TRANSITIONS[newStatus];
-      if (confirmMsg && !window.confirm(confirmMsg)) return;
-      if (selectedIds.size === 0) return;
-      const patch = withCompletionSummary({ status: newStatus }, selectedIds.size);
-      if (!patch) return;
-      const ids = Array.from(selectedIds);
-      // Optimistic UI: remove selected from all columns and prepend to target.
-      setBoardData(function (b) {
-        if (!b) return b;
-        const moved = [];
-        const columns = b.columns.map(function (col) {
-          const kept = [];
-          for (const t of col.tasks) {
-            if (selectedIds.has(t.id)) moved.push(Object.assign({}, t, { status: newStatus }));
-            else kept.push(t);
-          }
-          return Object.assign({}, col, { tasks: kept });
+    const moveSelected = useCallback(
+      function (newStatus) {
+        const confirmMsg = DESTRUCTIVE_TRANSITIONS[newStatus];
+        if (confirmMsg && !window.confirm(confirmMsg)) return;
+        if (selectedIds.size === 0) return;
+        const patch = withCompletionSummary(
+          { status: newStatus },
+          selectedIds.size,
+        );
+        if (!patch) return;
+        const ids = Array.from(selectedIds);
+        // Optimistic UI: remove selected from all columns and prepend to target.
+        setBoardData(function (b) {
+          if (!b) return b;
+          const moved = [];
+          const columns = b.columns.map(function (col) {
+            const kept = [];
+            for (const t of col.tasks) {
+              if (selectedIds.has(t.id))
+                moved.push(Object.assign({}, t, { status: newStatus }));
+              else kept.push(t);
+            }
+            return Object.assign({}, col, { tasks: kept });
+          });
+          const dest = columns.find(function (c) {
+            return c.name === newStatus;
+          });
+          if (dest) dest.tasks = moved.concat(dest.tasks);
+          return Object.assign({}, b, { columns });
         });
-        const dest = columns.find(function (c) { return c.name === newStatus; });
-        if (dest) dest.tasks = moved.concat(dest.tasks);
-        return Object.assign({}, b, { columns });
-      });
-      SDK.fetchJSON(withBoard(`${API}/tasks/bulk`, board), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.assign({ ids }, patch)),
-      }).then(function (res) {
-        const failed = (res.results || []).filter(function (r) { return !r.ok; });
-        if (failed.length > 0) {
-          setError(`Bulk move: ${failed.length} of ${res.results.length} failed`);
-          setFailedIds(new Set(failed.map(function (f) { return f.id; })));
-        } else {
-          setFailedIds(new Set());
-        }
-        setSelectedIds(new Set());
-        setLastSelectedId(null);
-        loadBoard();
-      }).catch(function (err) {
-        setError(`Move failed: ${err.message || err}`);
-        setFailedIds(new Set(selectedIds));
-        loadBoard();
-      });
-    }, [selectedIds, loadBoard, board]);
+        SDK.fetchJSON(withBoard(`${API}/tasks/bulk`, board), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ ids }, patch)),
+        })
+          .then(function (res) {
+            const failed = (res.results || []).filter(function (r) {
+              return !r.ok;
+            });
+            if (failed.length > 0) {
+              setError(
+                `Bulk move: ${failed.length} of ${res.results.length} failed`,
+              );
+              setFailedIds(
+                new Set(
+                  failed.map(function (f) {
+                    return f.id;
+                  }),
+                ),
+              );
+            } else {
+              setFailedIds(new Set());
+            }
+            setSelectedIds(new Set());
+            setLastSelectedId(null);
+            loadBoard();
+          })
+          .catch(function (err) {
+            setError(`Move failed: ${err.message || err}`);
+            setFailedIds(new Set(selectedIds));
+            loadBoard();
+          });
+      },
+      [selectedIds, loadBoard, board],
+    );
 
-    const createTask = useCallback(function (body) {
-      return SDK.fetchJSON(withBoard(`${API}/tasks`, board), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }).then(function (res) {
-        // Surface dispatcher-presence warnings (e.g. "no gateway is
-        // running") via the existing error banner channel. Not fatal —
-        // the task was created successfully — but the user should know
-        // their ready task will sit idle until the gateway is up.
-        if (res && res.warning) {
-          setError(tx(t, "taskCreatedWarning", "Task created, but: ") + res.warning);
-        }
-        loadBoard();
-        loadBoardList();  // refresh counts in the switcher
-        return res;
-      });
-    }, [loadBoard, loadBoardList, board, t]);
+    const createTask = useCallback(
+      function (body) {
+        return SDK.fetchJSON(withBoard(`${API}/tasks`, board), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(function (res) {
+          // Surface dispatcher-presence warnings (e.g. "no gateway is
+          // running") via the existing error banner channel. Not fatal —
+          // the task was created successfully — but the user should know
+          // their ready task will sit idle until the gateway is up.
+          if (res && res.warning) {
+            setError(
+              tx(t, "taskCreatedWarning", "Task created, but: ") + res.warning,
+            );
+          }
+          loadBoard();
+          loadBoardList(); // refresh counts in the switcher
+          return res;
+        });
+      },
+      [loadBoard, loadBoardList, board, t],
+    );
 
     const toggleSelected = useCallback(function (id, additive) {
       setSelectedIds(function (prev) {
@@ -791,193 +996,291 @@
       });
     }, []);
 
-    const toggleRange = useCallback(function (toId) {
-      // Build flat visible task order from filteredBoard columns.
-      setSelectedIds(function (prev) {
-        const next = new Set(prev);
-        if (!filteredBoard || !filteredBoard.columns) return next;
-        const order = [];
-        for (const col of filteredBoard.columns) {
-          for (const t of col.tasks || []) order.push(t.id);
-        }
-        const anchor = lastSelectedId;
-        if (!anchor || anchor === toId) {
-          next.add(toId);
-          return next;
-        }
-        const aIdx = order.indexOf(anchor);
-        const bIdx = order.indexOf(toId);
-        if (aIdx === -1 || bIdx === -1) {
-          next.add(toId);
-          return next;
-        }
-        const lo = Math.min(aIdx, bIdx);
-        const hi = Math.max(aIdx, bIdx);
-        for (let i = lo; i <= hi; i++) next.add(order[i]);
-        return next;
-      });
-      setLastSelectedId(toId);
-    }, [filteredBoard, lastSelectedId]);
-
-    const selectAllVisible = useCallback(function () {
-      if (!filteredBoard || !filteredBoard.columns) return;
-      const next = new Set();
-      for (const col of filteredBoard.columns) {
-        for (const t of col.tasks || []) next.add(t.id);
-      }
-      setSelectedIds(next);
-      if (next.size > 0) {
-        const first = Array.from(next)[0];
-        setLastSelectedId(first);
-      }
-    }, [filteredBoard]);
-
-    const selectAllInColumn = useCallback(function (columnName) {
-      if (!filteredBoard || !filteredBoard.columns) return;
-      const col = filteredBoard.columns.find(function (c) { return c.name === columnName; });
-      if (!col) return;
-      const allSelected = col.tasks && col.tasks.length > 0 && col.tasks.every(function (t) { return selectedIds.has(t.id); });
-      const next = new Set(selectedIds);
-      if (allSelected) {
-        for (const t of col.tasks || []) next.delete(t.id);
-      } else {
-        for (const t of col.tasks || []) next.add(t.id);
-      }
-      setSelectedIds(next);
-      if (col.tasks && col.tasks.length > 0) setLastSelectedId(col.tasks[0].id);
-    }, [filteredBoard, selectedIds]);
-
-    const applyBulk = useCallback(function (patch, confirmMsg) {
-      if (selectedIds.size === 0) return;
-      if (confirmMsg && !window.confirm(confirmMsg)) return;
-      const finalPatch = withCompletionSummary(patch, selectedIds.size, t);
-      if (!finalPatch) return;
-      const body = Object.assign({ ids: Array.from(selectedIds) }, finalPatch);
-      // Optimistic UI for status moves (same pattern as moveSelected).
-      if (finalPatch.status) {
-        setBoardData(function (b) {
-          if (!b) return b;
-          const moved = [];
-          const columns = b.columns.map(function (col) {
-            const kept = [];
-            for (const t of col.tasks) {
-              if (selectedIds.has(t.id)) moved.push(Object.assign({}, t, { status: finalPatch.status }));
-              else kept.push(t);
-            }
-            return Object.assign({}, col, { tasks: kept });
-          });
-          const dest = columns.find(function (c) { return c.name === finalPatch.status; });
-          if (dest) dest.tasks = moved.concat(dest.tasks);
-          return Object.assign({}, b, { columns });
-        });
-      }
-      SDK.fetchJSON(withBoard(`${API}/tasks/bulk`, board), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-        .then(function (res) {
-          const failed = (res.results || []).filter(function (r) { return !r.ok; });
-          if (failed.length > 0) {
-            setError(tx(t, "bulkFailed", "Bulk: ") +
-              `${failed.length} of ${res.results.length} failed: ` +
-              failed.slice(0, 3).map(function (f) { return `${f.id} (${f.error})`; }).join("; "));
-            setFailedIds(new Set(failed.map(function (f) { return f.id; })));
-          } else {
-            setFailedIds(new Set());
+    const toggleRange = useCallback(
+      function (toId) {
+        // Build flat visible task order from filteredBoard columns.
+        setSelectedIds(function (prev) {
+          const next = new Set(prev);
+          if (!filteredBoard || !filteredBoard.columns) return next;
+          const order = [];
+          for (const col of filteredBoard.columns) {
+            for (const t of col.tasks || []) order.push(t.id);
           }
-          setSelectedIds(new Set());
-          setLastSelectedId(null);
-          loadBoard();
-        })
-        .catch(function (e) {
-          setError(String(e.message || e));
-          setFailedIds(new Set(selectedIds));
-          loadBoard();
+          const anchor = lastSelectedId;
+          if (!anchor || anchor === toId) {
+            next.add(toId);
+            return next;
+          }
+          const aIdx = order.indexOf(anchor);
+          const bIdx = order.indexOf(toId);
+          if (aIdx === -1 || bIdx === -1) {
+            next.add(toId);
+            return next;
+          }
+          const lo = Math.min(aIdx, bIdx);
+          const hi = Math.max(aIdx, bIdx);
+          for (let i = lo; i <= hi; i++) next.add(order[i]);
+          return next;
         });
-    }, [selectedIds, loadBoard, board, t]);
+        setLastSelectedId(toId);
+      },
+      [filteredBoard, lastSelectedId],
+    );
+
+    const selectAllVisible = useCallback(
+      function () {
+        if (!filteredBoard || !filteredBoard.columns) return;
+        const next = new Set();
+        for (const col of filteredBoard.columns) {
+          for (const t of col.tasks || []) next.add(t.id);
+        }
+        setSelectedIds(next);
+        if (next.size > 0) {
+          const first = Array.from(next)[0];
+          setLastSelectedId(first);
+        }
+      },
+      [filteredBoard],
+    );
+
+    const selectAllInColumn = useCallback(
+      function (columnName) {
+        if (!filteredBoard || !filteredBoard.columns) return;
+        const col = filteredBoard.columns.find(function (c) {
+          return c.name === columnName;
+        });
+        if (!col) return;
+        const allSelected =
+          col.tasks &&
+          col.tasks.length > 0 &&
+          col.tasks.every(function (t) {
+            return selectedIds.has(t.id);
+          });
+        const next = new Set(selectedIds);
+        if (allSelected) {
+          for (const t of col.tasks || []) next.delete(t.id);
+        } else {
+          for (const t of col.tasks || []) next.add(t.id);
+        }
+        setSelectedIds(next);
+        if (col.tasks && col.tasks.length > 0)
+          setLastSelectedId(col.tasks[0].id);
+      },
+      [filteredBoard, selectedIds],
+    );
+
+    const applyBulk = useCallback(
+      function (patch, confirmMsg) {
+        if (selectedIds.size === 0) return;
+        if (confirmMsg && !window.confirm(confirmMsg)) return;
+        const finalPatch = withCompletionSummary(patch, selectedIds.size, t);
+        if (!finalPatch) return;
+        const body = Object.assign(
+          { ids: Array.from(selectedIds) },
+          finalPatch,
+        );
+        // Optimistic UI for status moves (same pattern as moveSelected).
+        if (finalPatch.status) {
+          setBoardData(function (b) {
+            if (!b) return b;
+            const moved = [];
+            const columns = b.columns.map(function (col) {
+              const kept = [];
+              for (const t of col.tasks) {
+                if (selectedIds.has(t.id))
+                  moved.push(
+                    Object.assign({}, t, { status: finalPatch.status }),
+                  );
+                else kept.push(t);
+              }
+              return Object.assign({}, col, { tasks: kept });
+            });
+            const dest = columns.find(function (c) {
+              return c.name === finalPatch.status;
+            });
+            if (dest) dest.tasks = moved.concat(dest.tasks);
+            return Object.assign({}, b, { columns });
+          });
+        }
+        SDK.fetchJSON(withBoard(`${API}/tasks/bulk`, board), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+          .then(function (res) {
+            const failed = (res.results || []).filter(function (r) {
+              return !r.ok;
+            });
+            if (failed.length > 0) {
+              setError(
+                tx(t, "bulkFailed", "Bulk: ") +
+                  `${failed.length} of ${res.results.length} failed: ` +
+                  failed
+                    .slice(0, 3)
+                    .map(function (f) {
+                      return `${f.id} (${f.error})`;
+                    })
+                    .join("; "),
+              );
+              setFailedIds(
+                new Set(
+                  failed.map(function (f) {
+                    return f.id;
+                  }),
+                ),
+              );
+            } else {
+              setFailedIds(new Set());
+            }
+            setSelectedIds(new Set());
+            setLastSelectedId(null);
+            loadBoard();
+          })
+          .catch(function (e) {
+            setError(String(e.message || e));
+            setFailedIds(new Set(selectedIds));
+            loadBoard();
+          });
+      },
+      [selectedIds, loadBoard, board, t],
+    );
 
     // --- board switching ----------------------------------------------------
-    const switchBoard = useCallback(function (nextSlug) {
-      if (!nextSlug || nextSlug === board) return;
-      // Optimistic UI: clear the current grid + show loading, reset the
-      // event cursor so the WS reopens aligned to the new board's
-      // latest_event_id on the next loadBoard.
-      setBoardData(null);
-      cursorRef.current = 0;
-      setLoading(true);
-      setBoard(nextSlug);
-      writeSelectedBoard(nextSlug);
-      // Reset filters so stale search/tenant/assignee don't persist across boards.
-      setSearch("");
-      setTenantFilter("");
-      setAssigneeFilter("");
-      setIncludeArchived(false);
-      clearSelected();
-    }, [board, clearSelected]);
+    const switchBoard = useCallback(
+      function (nextSlug) {
+        if (!nextSlug || nextSlug === board) return;
+        // Optimistic UI: clear the current grid + show loading, reset the
+        // event cursor so the WS reopens aligned to the new board's
+        // latest_event_id on the next loadBoard.
+        setBoardData(null);
+        cursorRef.current = 0;
+        setLoading(true);
+        setBoard(nextSlug);
+        writeSelectedBoard(nextSlug);
+        // Reset filters so stale search/tenant/assignee don't persist across boards.
+        setSearch("");
+        setTenantFilter("");
+        setAssigneeFilter("");
+        setIncludeArchived(false);
+        clearSelected();
+      },
+      [board, clearSelected],
+    );
 
-    const createNewBoard = useCallback(function (payload) {
-      return SDK.fetchJSON(`${API}/boards`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).then(function (res) {
-        loadBoardList();
-        const slug = res && res.board && res.board.slug;
-        if (slug && payload.switch) switchBoard(slug);
-        return res;
-      });
-    }, [loadBoardList, switchBoard, board]);
+    const createNewBoard = useCallback(
+      function (payload) {
+        return SDK.fetchJSON(`${API}/boards`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).then(function (res) {
+          loadBoardList();
+          const slug = res && res.board && res.board.slug;
+          if (slug && payload.switch) switchBoard(slug);
+          return res;
+        });
+      },
+      [loadBoardList, switchBoard, board],
+    );
 
-    const deleteBoard = useCallback(function (slug) {
-      if (!slug || slug === "default") return Promise.resolve();
-      return SDK.fetchJSON(`${API}/boards/${encodeURIComponent(slug)}`, {
-        method: "DELETE",
-      }).then(function () {
-        loadBoardList();
-        if (board === slug) switchBoard("default");
-      });
-    }, [board, loadBoardList, switchBoard]);
+    const deleteBoard = useCallback(
+      function (slug) {
+        if (!slug || slug === "default") return Promise.resolve();
+        return SDK.fetchJSON(`${API}/boards/${encodeURIComponent(slug)}`, {
+          method: "DELETE",
+        }).then(function () {
+          loadBoardList();
+          if (board === slug) switchBoard("default");
+        });
+      },
+      [board, loadBoardList, switchBoard],
+    );
 
-   const deleteTask = useCallback(function (taskId) {
-     if (!window.confirm(tx(t, "trash.confirm", FALLBACK_TRASH.confirm))) return Promise.resolve();
-     return SDK.fetchJSON(`${API}/tasks/${encodeURIComponent(taskId)}`, {
-       method: "DELETE",
-     }).then(function () {
-       loadBoard();
-       setSelectedIds(function (prev) {
-         const next = new Set(prev);
-         next.delete(taskId);
-         return next;
-       });
-     }).catch(function (e) { setError(String(e.message || e)); });
-   }, [board, loadBoard, t]);
+    const deleteTask = useCallback(
+      function (taskId) {
+        if (!window.confirm(tx(t, "trash.confirm", FALLBACK_TRASH.confirm)))
+          return Promise.resolve();
+        return SDK.fetchJSON(`${API}/tasks/${encodeURIComponent(taskId)}`, {
+          method: "DELETE",
+        })
+          .then(function () {
+            loadBoard();
+            setSelectedIds(function (prev) {
+              const next = new Set(prev);
+              next.delete(taskId);
+              return next;
+            });
+          })
+          .catch(function (e) {
+            setError(String(e.message || e));
+          });
+      },
+      [board, loadBoard, t],
+    );
 
-    const deleteSelected = useCallback(function (count) {
-      if (selectedIds.size === 0) return Promise.resolve();
-      if (!window.confirm(tx(t, "trash.confirmMany", "Permanently delete {n} selected tasks? This cannot be undone.", { n: count }))) return Promise.resolve();
-      const ids = Array.from(selectedIds);
-      setSelectedIds(new Set());
-      return Promise.all(ids.map(function (id) {
-        return SDK.fetchJSON(`${API}/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
-      })).then(function () {
-        loadBoard();
-      }).catch(function (e) { setError(String(e.message || e)); });
-    }, [selectedIds, board, loadBoard, t]);
+    const deleteSelected = useCallback(
+      function (count) {
+        if (selectedIds.size === 0) return Promise.resolve();
+        if (
+          !window.confirm(
+            tx(
+              t,
+              "trash.confirmMany",
+              "Permanently delete {n} selected tasks? This cannot be undone.",
+              { n: count },
+            ),
+          )
+        )
+          return Promise.resolve();
+        const ids = Array.from(selectedIds);
+        setSelectedIds(new Set());
+        return Promise.all(
+          ids.map(function (id) {
+            return SDK.fetchJSON(`${API}/tasks/${encodeURIComponent(id)}`, {
+              method: "DELETE",
+            });
+          }),
+        )
+          .then(function () {
+            loadBoard();
+          })
+          .catch(function (e) {
+            setError(String(e.message || e));
+          });
+      },
+      [selectedIds, board, loadBoard, t],
+    );
 
     // --- render -------------------------------------------------------------
     if (loading && !boardData) {
-      return h("div", { className: "p-8 text-sm text-muted-foreground" },
-        tx(t, "loading", "Loading Kanban board…"));
+      return h(
+        "div",
+        { className: "p-8 text-sm text-muted-foreground" },
+        tx(t, "loading", "Loading Kanban board…"),
+      );
     }
     if (error && !boardData) {
-      return h(Card, null,
-        h(CardContent, { className: "p-6" },
-          h("div", { className: "text-sm text-destructive" },
-            tx(t, "loadFailed", "Failed to load Kanban board: "), error),
-          h("div", { className: "text-xs text-muted-foreground mt-2" },
-            tx(t, "loadFailedHint",
-              "The backend auto-creates kanban.db on first read. If this persists, check the dashboard logs.")),
+      return h(
+        Card,
+        null,
+        h(
+          CardContent,
+          { className: "p-6" },
+          h(
+            "div",
+            { className: "text-sm text-destructive" },
+            tx(t, "loadFailed", "Failed to load Kanban board: "),
+            error,
+          ),
+          h(
+            "div",
+            { className: "text-xs text-muted-foreground mt-2" },
+            tx(
+              t,
+              "loadFailedHint",
+              "The backend auto-creates kanban.db on first read. If this persists, check the dashboard logs.",
+            ),
+          ),
         ),
       );
     }
@@ -985,21 +1288,33 @@
 
     const renderMd = !config || config.render_markdown !== false;
 
-    return h(ErrorBoundary, null,
-      h("div", { className: "hades-kanban flex flex-col gap-4" },
+    return h(
+      ErrorBoundary,
+      null,
+      h(
+        "div",
+        { className: "hades-kanban flex flex-col gap-4" },
         h(BoardSwitcher, {
           board: board,
           boardList: boardList,
           onSwitch: switchBoard,
-          onNewClick: function () { setShowNewBoard(true); },
+          onNewClick: function () {
+            setShowNewBoard(true);
+          },
           onDeleteBoard: deleteBoard,
         }),
-        showNewBoard ? h(NewBoardDialog, {
-          onCancel: function () { setShowNewBoard(false); },
-          onCreate: function (payload) {
-            return createNewBoard(payload).then(function () { setShowNewBoard(false); });
-          },
-        }) : null,
+        showNewBoard
+          ? h(NewBoardDialog, {
+              onCancel: function () {
+                setShowNewBoard(false);
+              },
+              onCreate: function (payload) {
+                return createNewBoard(payload).then(function () {
+                  setShowNewBoard(false);
+                });
+              },
+            })
+          : null,
         h(OrchestrationPanel, null),
         h(AttentionStrip, {
           boardData,
@@ -1007,27 +1322,40 @@
         }),
         h(BoardToolbar, {
           board: boardData,
-          tenantFilter, setTenantFilter,
-          assigneeFilter, setAssigneeFilter,
-          includeArchived, setIncludeArchived,
-          laneByProfile, setLaneByProfile,
-          search, setSearch,
+          tenantFilter,
+          setTenantFilter,
+          assigneeFilter,
+          setAssigneeFilter,
+          includeArchived,
+          setIncludeArchived,
+          laneByProfile,
+          setLaneByProfile,
+          search,
+          setSearch,
           onNudgeDispatch: function () {
-            SDK.fetchJSON(withBoard(`${API}/dispatch?max=8`, board), { method: "POST" })
+            SDK.fetchJSON(withBoard(`${API}/dispatch?max=8`, board), {
+              method: "POST",
+            })
               .then(loadBoard)
-              .catch(function (e) { setError(String(e.message || e)); });
+              .catch(function (e) {
+                setError(String(e.message || e));
+              });
           },
           onRefresh: loadBoard,
         }),
-       selectedIds.size > 0 ? h(BulkActionBar, {
-         count: selectedIds.size,
-         assignees: (boardData && boardData.assignees) || [],
-         onApply: applyBulk,
-         onClear: clearSelected,
-         onSelectAllVisible: selectAllVisible,
-         onDelete: deleteSelected,
-       }) : null,
-        error ? h("div", { className: "text-xs text-destructive px-2" }, error) : null,
+        selectedIds.size > 0
+          ? h(BulkActionBar, {
+              count: selectedIds.size,
+              assignees: (boardData && boardData.assignees) || [],
+              onApply: applyBulk,
+              onClear: clearSelected,
+              onSelectAllVisible: selectAllVisible,
+              onDelete: deleteSelected,
+            })
+          : null,
+        error
+          ? h("div", { className: "text-xs text-destructive px-2" }, error)
+          : null,
         h(BoardColumns, {
           board: filteredBoard,
           laneByProfile,
@@ -1044,18 +1372,26 @@
           onDelete: deleteTask,
           onOpen: setSelectedTaskId,
           onCreate: createTask,
-          allTasks: boardData.columns.reduce(function (acc, c) { return acc.concat(c.tasks); }, []),
+          allTasks: boardData.columns.reduce(function (acc, c) {
+            return acc.concat(c.tasks);
+          }, []),
         }),
-        selectedTaskId ? h(TaskDrawer, {
-          taskId: selectedTaskId,
-          boardSlug: board,
-          onClose: function () { setSelectedTaskId(null); },
-          onRefresh: loadBoard,
-          renderMarkdown: renderMd,
-          allTasks: boardData.columns.reduce(function (acc, c) { return acc.concat(c.tasks); }, []),
-          assignees: (boardData && boardData.assignees) || [],
-          eventTick: taskEventTick[selectedTaskId] || 0,
-        }) : null,
+        selectedTaskId
+          ? h(TaskDrawer, {
+              taskId: selectedTaskId,
+              boardSlug: board,
+              onClose: function () {
+                setSelectedTaskId(null);
+              },
+              onRefresh: loadBoard,
+              renderMarkdown: renderMd,
+              allTasks: boardData.columns.reduce(function (acc, c) {
+                return acc.concat(c.tasks);
+              }, []),
+              assignees: (boardData && boardData.assignees) || [],
+              eventTick: taskEventTick[selectedTaskId] || 0,
+            })
+          : null,
       ),
     );
   }
@@ -1085,8 +1421,12 @@
       return 0;
     };
     out.sort(function (a, b) {
-      const aSev = sevIdx((a.warnings && a.warnings.highest_severity) || "warning");
-      const bSev = sevIdx((b.warnings && b.warnings.highest_severity) || "warning");
+      const aSev = sevIdx(
+        (a.warnings && a.warnings.highest_severity) || "warning",
+      );
+      const bSev = sevIdx(
+        (b.warnings && b.warnings.highest_severity) || "warning",
+      );
       if (aSev !== bSev) return bSev - aSev;
       const aLa = (a.warnings && a.warnings.latest_at) || 0;
       const bLa = (b.warnings && b.warnings.latest_at) || 0;
@@ -1100,71 +1440,130 @@
     const [expanded, setExpanded] = useState(false);
     const [dismissed, setDismissed] = useState(false);
     const diagTasks = useMemo(
-      function () { return collectDiagTasks(props.boardData); },
-      [props.boardData]
+      function () {
+        return collectDiagTasks(props.boardData);
+      },
+      [props.boardData],
     );
     if (dismissed || diagTasks.length === 0) return null;
     // Pick the highest severity present so we can colour the strip.
     let topSev = "warning";
     for (const td of diagTasks) {
       const s = (td.warnings && td.warnings.highest_severity) || "warning";
-      if (s === "critical") { topSev = "critical"; break; }
+      if (s === "critical") {
+        topSev = "critical";
+        break;
+      }
       if (s === "error" && topSev !== "critical") topSev = "error";
     }
-    return h("div", {
-      className: cn(
-        "hades-kanban-attention",
-        "hades-kanban-attention--" + topSev,
-      ),
-    },
-      h("div", { className: "hades-kanban-attention-bar" },
-        h("span", { className: "hades-kanban-attention-icon" },
-          topSev === "critical" ? "!!!" : topSev === "error" ? "!!" : "⚠"),
-        h("span", { className: "hades-kanban-attention-text" },
+    return h(
+      "div",
+      {
+        className: cn(
+          "hades-kanban-attention",
+          "hades-kanban-attention--" + topSev,
+        ),
+      },
+      h(
+        "div",
+        { className: "hades-kanban-attention-bar" },
+        h(
+          "span",
+          { className: "hades-kanban-attention-icon" },
+          topSev === "critical" ? "!!!" : topSev === "error" ? "!!" : "⚠",
+        ),
+        h(
+          "span",
+          { className: "hades-kanban-attention-text" },
           diagTasks.length === 1
             ? tx(t, "taskNeedsAttention", "1 task needs attention")
-            : tx(t, "tasksNeedAttention", "{n} tasks need attention",
-                { n: diagTasks.length }),
+            : tx(t, "tasksNeedAttention", "{n} tasks need attention", {
+                n: diagTasks.length,
+              }),
         ),
-        h("button", {
-          className: "hades-kanban-attention-toggle",
-          onClick: function () { setExpanded(function (x) { return !x; }); },
-          type: "button",
-        }, expanded ? tx(t, "hide", "Hide") : tx(t, "show", "Show")),
-        h("button", {
-          className: "hades-kanban-attention-dismiss",
-          onClick: function () { setDismissed(true); },
-          title: "Hide until next page reload",
-          type: "button",
-        }, "\u2715"),
+        h(
+          "button",
+          {
+            className: "hades-kanban-attention-toggle",
+            onClick: function () {
+              setExpanded(function (x) {
+                return !x;
+              });
+            },
+            type: "button",
+          },
+          expanded ? tx(t, "hide", "Hide") : tx(t, "show", "Show"),
+        ),
+        h(
+          "button",
+          {
+            className: "hades-kanban-attention-dismiss",
+            onClick: function () {
+              setDismissed(true);
+            },
+            title: "Hide until next page reload",
+            type: "button",
+          },
+          "\u2715",
+        ),
       ),
       expanded
-        ? h("div", { className: "hades-kanban-attention-list" },
+        ? h(
+            "div",
+            { className: "hades-kanban-attention-list" },
             diagTasks.map(function (task) {
-              const sev = (task.warnings && task.warnings.highest_severity) || "warning";
-              const kinds = task.warnings && task.warnings.kinds ? Object.keys(task.warnings.kinds) : [];
-              return h("div", {
-                key: task.id,
-                className: cn(
-                  "hades-kanban-attention-row",
-                  "hades-kanban-attention-row--" + sev,
+              const sev =
+                (task.warnings && task.warnings.highest_severity) || "warning";
+              const kinds =
+                task.warnings && task.warnings.kinds
+                  ? Object.keys(task.warnings.kinds)
+                  : [];
+              return h(
+                "div",
+                {
+                  key: task.id,
+                  className: cn(
+                    "hades-kanban-attention-row",
+                    "hades-kanban-attention-row--" + sev,
+                  ),
+                },
+                h(
+                  "span",
+                  { className: "hades-kanban-attention-row-sev" },
+                  sev === "critical" ? "!!!" : sev === "error" ? "!!" : "⚠",
                 ),
-              },
-                h("span", { className: "hades-kanban-attention-row-sev" },
-                  sev === "critical" ? "!!!" : sev === "error" ? "!!" : "⚠"),
-                h("span", { className: "hades-kanban-attention-row-id" }, task.id),
-                h("span", { className: "hades-kanban-attention-row-title" },
-                  task.title || tx(t, "untitled", "(untitled)")),
-                h("span", { className: "hades-kanban-attention-row-meta" },
-                  task.assignee ? "@" + task.assignee : tx(t, "unassigned", "unassigned"),
+                h(
+                  "span",
+                  { className: "hades-kanban-attention-row-id" },
+                  task.id,
+                ),
+                h(
+                  "span",
+                  { className: "hades-kanban-attention-row-title" },
+                  task.title || tx(t, "untitled", "(untitled)"),
+                ),
+                h(
+                  "span",
+                  { className: "hades-kanban-attention-row-meta" },
+                  task.assignee
+                    ? "@" + task.assignee
+                    : tx(t, "unassigned", "unassigned"),
                   " \u00b7 ",
-                  kinds.length > 0 ? kinds.join(", ") : tx(t, "diagnostic", "diagnostic"),
+                  kinds.length > 0
+                    ? kinds.join(", ")
+                    : tx(t, "diagnostic", "diagnostic"),
                 ),
-                h("button", {
-                  className: "hades-kanban-attention-row-btn",
-                  onClick: function () { props.onOpen(task.id); },
-                  type: "button",
-                }, tx(t, "open", "Open")),
+                h(
+                  "button",
+                  {
+                    className: "hades-kanban-attention-row-btn",
+                    onClick: function () {
+                      props.onOpen(task.id);
+                    },
+                    type: "button",
+                  },
+                  tx(t, "open", "Open"),
+                ),
               );
             }),
           )
@@ -1198,42 +1597,70 @@
       "hades-kanban-diag-action-btn",
       action.suggested ? "hades-kanban-diag-action-btn--suggested" : "",
     );
-    if (action.kind === "reclaim" || action.kind === "reassign" ||
-        action.kind === "unblock") {
-      return h("button", {
-        className: cls,
-        disabled: busy || (extra && extra.disabled),
-        onClick: function () { onExec(action); },
-        type: "button",
-      }, label);
+    if (
+      action.kind === "reclaim" ||
+      action.kind === "reassign" ||
+      action.kind === "unblock"
+    ) {
+      return h(
+        "button",
+        {
+          className: cls,
+          disabled: busy || (extra && extra.disabled),
+          onClick: function () {
+            onExec(action);
+          },
+          type: "button",
+        },
+        label,
+      );
     }
     if (action.kind === "cli_hint") {
-      return h("button", {
-        className: cls,
-        disabled: busy,
-        onClick: function () { onExec(action); },
-        type: "button",
-        title: tx(t, "copyCommand", "Copy command to clipboard"),
-      }, (extra && extra.copied) ? tx(t, "copied", "Copied") : label);
+      return h(
+        "button",
+        {
+          className: cls,
+          disabled: busy,
+          onClick: function () {
+            onExec(action);
+          },
+          type: "button",
+          title: tx(t, "copyCommand", "Copy command to clipboard"),
+        },
+        extra && extra.copied ? tx(t, "copied", "Copied") : label,
+      );
     }
     if (action.kind === "comment") {
-      return h("button", {
-        className: cls,
-        onClick: function () { onExec(action); },
-        type: "button",
-      }, label);
+      return h(
+        "button",
+        {
+          className: cls,
+          onClick: function () {
+            onExec(action);
+          },
+          type: "button",
+        },
+        label,
+      );
     }
     if (action.kind === "open_docs") {
-      return h("a", {
-        className: cls,
-        href: (action.payload && action.payload.url) || "#",
-        target: "_blank",
-        rel: "noreferrer",
-      }, label);
+      return h(
+        "a",
+        {
+          className: cls,
+          href: (action.payload && action.payload.url) || "#",
+          target: "_blank",
+          rel: "noreferrer",
+        },
+        label,
+      );
     }
     // Unknown kind — render informational, non-interactive.
-    return h("span", { className: cls + " hades-kanban-diag-action-btn--unknown" },
-      label);
+    return h(
+      "span",
+      { className: cls + " hades-kanban-diag-action-btn--unknown" },
+      label,
+    );
   }
 
   function DiagnosticCard(props) {
@@ -1248,13 +1675,17 @@
       if (busy) return;
       if (action.kind === "cli_hint") {
         const cmd = (action.payload && action.payload.command) || action.label;
-        const fallback = function () { window.prompt("Copy this command:", cmd); };
+        const fallback = function () {
+          window.prompt("Copy this command:", cmd);
+        };
         try {
           const p = navigator.clipboard && navigator.clipboard.writeText(cmd);
           if (p && p.then) {
             p.then(function () {
               setCopiedKey(action.label);
-              setTimeout(function () { setCopiedKey(null); }, 2000);
+              setTimeout(function () {
+                setCopiedKey(null);
+              }, 2000);
             }).catch(fallback);
           } else {
             fallback();
@@ -1267,7 +1698,9 @@
       if (action.kind === "comment") {
         // Scroll the comment input into view; the drawer already has one
         // at the bottom. Focus it so the operator can start typing.
-        const ta = document.querySelector(".hades-kanban-drawer-comment-row input, .hades-kanban-drawer-comment-row textarea");
+        const ta = document.querySelector(
+          ".hades-kanban-drawer-comment-row input, .hades-kanban-drawer-comment-row textarea",
+        );
         if (ta) {
           ta.scrollIntoView({ behavior: "smooth", block: "nearest" });
           ta.focus();
@@ -1275,44 +1708,93 @@
         return;
       }
       if (action.kind === "unblock") {
-        setBusy(true); setMsg(null);
-        const url = withBoard(`${API}/tasks/${encodeURIComponent(task.id)}`, boardSlug);
+        setBusy(true);
+        setMsg(null);
+        const url = withBoard(
+          `${API}/tasks/${encodeURIComponent(task.id)}`,
+          boardSlug,
+        );
         SDK.fetchJSON(url, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "ready" }),
-        }).then(function () {
-          setMsg({ ok: true, text: tx(t, "unblockedMessage",
-            "Unblocked {id}. Task is ready for the next tick.", { id: task.id }) });
-          if (onRefresh) onRefresh();
-        }).catch(function (err) {
-          setMsg({ ok: false, text: tx(t, "unblockFailed", "Unblock failed: ") + (err.message || err) });
-        }).then(function () { setBusy(false); });
+        })
+          .then(function () {
+            setMsg({
+              ok: true,
+              text: tx(
+                t,
+                "unblockedMessage",
+                "Unblocked {id}. Task is ready for the next tick.",
+                { id: task.id },
+              ),
+            });
+            if (onRefresh) onRefresh();
+          })
+          .catch(function (err) {
+            setMsg({
+              ok: false,
+              text:
+                tx(t, "unblockFailed", "Unblock failed: ") +
+                (err.message || err),
+            });
+          })
+          .then(function () {
+            setBusy(false);
+          });
         return;
       }
       if (action.kind === "reclaim") {
-        setBusy(true); setMsg(null);
-        const url = withBoard(`${API}/tasks/${encodeURIComponent(task.id)}/reclaim`, boardSlug);
+        setBusy(true);
+        setMsg(null);
+        const url = withBoard(
+          `${API}/tasks/${encodeURIComponent(task.id)}/reclaim`,
+          boardSlug,
+        );
         SDK.fetchJSON(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reason: `recovery action for ${diag.kind}` }),
-        }).then(function () {
-          setMsg({ ok: true, text: tx(t, "reclaimedMessage",
-            "Reclaimed {id}. Task is back to ready.", { id: task.id }) });
-          if (onRefresh) onRefresh();
-        }).catch(function (err) {
-          setMsg({ ok: false, text: tx(t, "reclaimFailed", "Reclaim failed: ") + (err.message || err) });
-        }).then(function () { setBusy(false); });
+        })
+          .then(function () {
+            setMsg({
+              ok: true,
+              text: tx(
+                t,
+                "reclaimedMessage",
+                "Reclaimed {id}. Task is back to ready.",
+                { id: task.id },
+              ),
+            });
+            if (onRefresh) onRefresh();
+          })
+          .catch(function (err) {
+            setMsg({
+              ok: false,
+              text:
+                tx(t, "reclaimFailed", "Reclaim failed: ") +
+                (err.message || err),
+            });
+          })
+          .then(function () {
+            setBusy(false);
+          });
         return;
       }
       if (action.kind === "reassign") {
         if (!reassignProfile) {
-          setMsg({ ok: false, text: tx(t, "pickProfileFirst", "Pick a profile first.") });
+          setMsg({
+            ok: false,
+            text: tx(t, "pickProfileFirst", "Pick a profile first."),
+          });
           return;
         }
-        setBusy(true); setMsg(null);
-        const url = withBoard(`${API}/tasks/${encodeURIComponent(task.id)}/reassign`, boardSlug);
+        setBusy(true);
+        setMsg(null);
+        const url = withBoard(
+          `${API}/tasks/${encodeURIComponent(task.id)}/reassign`,
+          boardSlug,
+        );
         const body = {
           profile: reassignProfile || null,
           reclaim_first: !!(action.payload && action.payload.reclaim_first),
@@ -1322,16 +1804,30 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
-        }).then(function () {
-          setMsg({
-            ok: true,
-            text: tx(t, "reassignedMessage", "Reassigned {id} to {profile}.",
-              { id: task.id, profile: reassignProfile }),
+        })
+          .then(function () {
+            setMsg({
+              ok: true,
+              text: tx(
+                t,
+                "reassignedMessage",
+                "Reassigned {id} to {profile}.",
+                { id: task.id, profile: reassignProfile },
+              ),
+            });
+            if (onRefresh) onRefresh();
+          })
+          .catch(function (err) {
+            setMsg({
+              ok: false,
+              text:
+                tx(t, "reassignFailed", "Reassign failed: ") +
+                (err.message || err),
+            });
+          })
+          .then(function () {
+            setBusy(false);
           });
-          if (onRefresh) onRefresh();
-        }).catch(function (err) {
-          setMsg({ ok: false, text: tx(t, "reassignFailed", "Reassign failed: ") + (err.message || err) });
-        }).then(function () { setBusy(false); });
         return;
       }
     };
@@ -1342,36 +1838,66 @@
     });
 
     const sevClass = "hades-kanban-diag--" + (diag.severity || "warning");
-    return h("div", { className: cn("hades-kanban-diag", sevClass) },
-      h("div", { className: "hades-kanban-diag-header" },
-        h("span", { className: "hades-kanban-diag-sev" },
-          diag.severity === "critical" ? "!!!" :
-          diag.severity === "error" ? "!!" : "\u26a0"),
-        h("span", { className: "hades-kanban-diag-title" },
-          diag.title),
+    return h(
+      "div",
+      { className: cn("hades-kanban-diag", sevClass) },
+      h(
+        "div",
+        { className: "hades-kanban-diag-header" },
+        h(
+          "span",
+          { className: "hades-kanban-diag-sev" },
+          diag.severity === "critical"
+            ? "!!!"
+            : diag.severity === "error"
+              ? "!!"
+              : "\u26a0",
+        ),
+        h("span", { className: "hades-kanban-diag-title" }, diag.title),
       ),
-      h("div", { className: "hades-kanban-diag-detail" },
-        diag.detail),
+      h("div", { className: "hades-kanban-diag-detail" }, diag.detail),
       diag.data && Object.keys(diag.data).length > 0
-        ? h("div", { className: "hades-kanban-diag-data" },
+        ? h(
+            "div",
+            { className: "hades-kanban-diag-data" },
             Object.keys(diag.data).map(function (k) {
               const v = diag.data[k];
-              if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string" &&
-                  v[0].indexOf("t_") === 0) {
+              if (
+                Array.isArray(v) &&
+                v.length > 0 &&
+                typeof v[0] === "string" &&
+                v[0].indexOf("t_") === 0
+              ) {
                 // Task-id list — render as chips.
-                return h("div", { key: k, className: "hades-kanban-diag-data-row" },
-                  h("span", { className: "hades-kanban-diag-data-key" }, k + ":"),
+                return h(
+                  "div",
+                  { key: k, className: "hades-kanban-diag-data-row" },
+                  h(
+                    "span",
+                    { className: "hades-kanban-diag-data-key" },
+                    k + ":",
+                  ),
                   v.map(function (x) {
-                    return h("code", {
-                      key: x, className: "hades-kanban-event-phantom-chip",
-                    }, x);
+                    return h(
+                      "code",
+                      {
+                        key: x,
+                        className: "hades-kanban-event-phantom-chip",
+                      },
+                      x,
+                    );
                   }),
                 );
               }
-              return h("div", { key: k, className: "hades-kanban-diag-data-row" },
+              return h(
+                "div",
+                { key: k, className: "hades-kanban-diag-data-row" },
                 h("span", { className: "hades-kanban-diag-data-key" }, k + ":"),
-                h("span", { className: "hades-kanban-diag-data-val" },
-                  Array.isArray(v) ? v.join(", ") : String(v)),
+                h(
+                  "span",
+                  { className: "hades-kanban-diag-data-val" },
+                  Array.isArray(v) ? v.join(", ") : String(v),
+                ),
               );
             }),
           )
@@ -1379,14 +1905,23 @@
       // Inline reassign picker — only shown when the diagnostic offers
       // a reassign action. Profile list comes from the board payload.
       reassignAction
-        ? h("div", { className: "hades-kanban-diag-reassign-row" },
-            h("span", { className: "hades-kanban-diag-reassign-label" },
-              tx(t, "reassignTo", "Reassign to:")),
-            h("select", {
-              className: "hades-kanban-recovery-select",
-              value: reassignProfile,
-              onChange: function (e) { setReassignProfile(e.target.value); },
-            },
+        ? h(
+            "div",
+            { className: "hades-kanban-diag-reassign-row" },
+            h(
+              "span",
+              { className: "hades-kanban-diag-reassign-label" },
+              tx(t, "reassignTo", "Reassign to:"),
+            ),
+            h(
+              "select",
+              {
+                className: "hades-kanban-recovery-select",
+                value: reassignProfile,
+                onChange: function (e) {
+                  setReassignProfile(e.target.value);
+                },
+              },
               h("option", { value: "" }, "(unassigned)"),
               (assignees || []).map(function (a) {
                 return h("option", { key: a, value: a }, a);
@@ -1394,7 +1929,9 @@
             ),
           )
         : null,
-      h("div", { className: "hades-kanban-diag-actions" },
+      h(
+        "div",
+        { className: "hades-kanban-diag-actions" },
         (diag.actions || []).map(function (a, i) {
           return h(DiagnosticActionButton, {
             key: a.kind + i,
@@ -1403,18 +1940,24 @@
             busy: busy,
             extra: {
               copied: copiedKey === a.label,
-              disabled: (a.kind === "reassign" && !reassignProfile),
+              disabled: a.kind === "reassign" && !reassignProfile,
             },
           });
         }),
       ),
       msg
-        ? h("div", {
-            className: cn(
-              "hades-kanban-diag-msg",
-              msg.ok ? "hades-kanban-diag-msg--ok" : "hades-kanban-diag-msg--err",
-            ),
-          }, msg.text)
+        ? h(
+            "div",
+            {
+              className: cn(
+                "hades-kanban-diag-msg",
+                msg.ok
+                  ? "hades-kanban-diag-msg--ok"
+                  : "hades-kanban-diag-msg--err",
+              ),
+            },
+            msg.text,
+          )
         : null,
     );
   }
@@ -1424,30 +1967,52 @@
     const diags = props.diagnostics || [];
     const hasOpenDiags = diags.length > 0;
     const [open, setOpen] = useState(hasOpenDiags);
-    useEffect(function () {
-      if (hasOpenDiags) setOpen(true);
-    }, [hasOpenDiags]);
+    useEffect(
+      function () {
+        if (hasOpenDiags) setOpen(true);
+      },
+      [hasOpenDiags],
+    );
     if (!hasOpenDiags && !props.alwaysVisible) {
       // Nothing active. Collapse the section entirely rather than showing
       // an empty "Recovery" header — keeps clean tasks visually clean.
       return null;
     }
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head-row" },
-        h("span", { className: "hades-kanban-section-head" },
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head-row" },
+        h(
+          "span",
+          { className: "hades-kanban-section-head" },
           hasOpenDiags
-            ? h("span", { className: "hades-kanban-section-head-warning" },
-                `\u26a0 ${tx(t, "diagnostics", "Diagnostics")} (${diags.length})`)
+            ? h(
+                "span",
+                { className: "hades-kanban-section-head-warning" },
+                `\u26a0 ${tx(t, "diagnostics", "Diagnostics")} (${diags.length})`,
+              )
             : tx(t, "diagnostics", "Diagnostics"),
         ),
-        h("button", {
-          className: "hades-kanban-section-toggle",
-          onClick: function () { setOpen(function (x) { return !x; }); },
-          type: "button",
-        }, open ? tx(t, "hide", "Hide") : tx(t, "show", "Show")),
+        h(
+          "button",
+          {
+            className: "hades-kanban-section-toggle",
+            onClick: function () {
+              setOpen(function (x) {
+                return !x;
+              });
+            },
+            type: "button",
+          },
+          open ? tx(t, "hide", "Hide") : tx(t, "show", "Show"),
+        ),
       ),
       open
-        ? h("div", { className: "hades-kanban-diag-list" },
+        ? h(
+            "div",
+            { className: "hades-kanban-diag-list" },
             diags.map(function (d, i) {
               return h(DiagnosticCard, {
                 key: props.task.id + ":" + d.kind + i,
@@ -1463,7 +2028,7 @@
     );
   }
 
-    // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Board switcher (multi-project)
   // -------------------------------------------------------------------------
 
@@ -1471,14 +2036,18 @@
   // page in a new tab so users can look up what any of the widgets mean
   // without losing the current board view.
   function DocsLink() {
-    return h("a", {
-      href: DOCS_URL,
-      target: "_blank",
-      rel: "noopener noreferrer",
-      className: "hades-kanban-docs-link",
-      title: "Open Hades Kanban docs in a new tab",
-      "aria-label": "Hades Kanban documentation",
-    }, "?");
+    return h(
+      "a",
+      {
+        href: DOCS_URL,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        className: "hades-kanban-docs-link",
+        title: "Open Hades Kanban docs in a new tab",
+        "aria-label": "Hades Kanban documentation",
+      },
+      "?",
+    );
   }
 
   // ---------------------------------------------------------------------
@@ -1499,20 +2068,28 @@
       Promise.all([
         SDK.fetchJSON(`${API}/orchestration`),
         SDK.fetchJSON(`${API}/profiles`),
-      ]).then(function (results) {
-        setSettings(results[0] || null);
-        setProfiles((results[1] && results[1].profiles) || []);
-        setMsg(null);
-      }).catch(function (err) {
-        setMsg({ ok: false, text: "Failed to load: " + (err.message || String(err)) });
-      });
+      ])
+        .then(function (results) {
+          setSettings(results[0] || null);
+          setProfiles((results[1] && results[1].profiles) || []);
+          setMsg(null);
+        })
+        .catch(function (err) {
+          setMsg({
+            ok: false,
+            text: "Failed to load: " + (err.message || String(err)),
+          });
+        });
     }, []);
 
-    useEffect(function () {
-      // Load on mount so the collapsed pill shows the real mode without
-      // requiring the user to expand the panel first.
-      if (settings === null) loadAll();
-    }, [settings, loadAll]);
+    useEffect(
+      function () {
+        // Load on mount so the collapsed pill shows the real mode without
+        // requiring the user to expand the panel first.
+        if (settings === null) loadAll();
+      },
+      [settings, loadAll],
+    );
 
     const saveSettings = function (patch) {
       setMsg(null);
@@ -1520,56 +2097,89 @@
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
-      }).then(function (res) {
-        setSettings(res);
-        setMsg({ ok: true, text: "Settings saved." });
-        return res;
-      }).catch(function (err) {
-        setMsg({ ok: false, text: "Save failed: " + (err.message || String(err)) });
-      });
+      })
+        .then(function (res) {
+          setSettings(res);
+          setMsg({ ok: true, text: "Settings saved." });
+          return res;
+        })
+        .catch(function (err) {
+          setMsg({
+            ok: false,
+            text: "Save failed: " + (err.message || String(err)),
+          });
+        });
     };
 
     const saveProfileDescription = function (name, description) {
-      setBusy(function (b) { return Object.assign({}, b, { [name]: "save" }); });
+      setBusy(function (b) {
+        return Object.assign({}, b, { [name]: "save" });
+      });
       return SDK.fetchJSON(`${API}/profiles/${encodeURIComponent(name)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: description }),
-      }).then(function () {
-        loadAll();
-        setMsg({ ok: true, text: `Description saved for ${name}.` });
-      }).catch(function (err) {
-        setMsg({ ok: false, text: "Save failed: " + (err.message || String(err)) });
-      }).then(function () {
-        setBusy(function (b) {
-          const next = Object.assign({}, b); delete next[name]; return next;
+      })
+        .then(function () {
+          loadAll();
+          setMsg({ ok: true, text: `Description saved for ${name}.` });
+        })
+        .catch(function (err) {
+          setMsg({
+            ok: false,
+            text: "Save failed: " + (err.message || String(err)),
+          });
+        })
+        .then(function () {
+          setBusy(function (b) {
+            const next = Object.assign({}, b);
+            delete next[name];
+            return next;
+          });
         });
-      });
     };
 
     const autoGenerateDescription = function (name, overwrite) {
-      setBusy(function (b) { return Object.assign({}, b, { [name]: "auto" }); });
-      return SDK.fetchJSON(`${API}/profiles/${encodeURIComponent(name)}/describe-auto`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ overwrite: !!overwrite }),
-      }).then(function (res) {
-        if (res && res.ok) {
-          loadAll();
-          setMsg({ ok: true, text: `Auto-generated description for ${name}.` });
-        } else {
+      setBusy(function (b) {
+        return Object.assign({}, b, { [name]: "auto" });
+      });
+      return SDK.fetchJSON(
+        `${API}/profiles/${encodeURIComponent(name)}/describe-auto`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ overwrite: !!overwrite }),
+        },
+      )
+        .then(function (res) {
+          if (res && res.ok) {
+            loadAll();
+            setMsg({
+              ok: true,
+              text: `Auto-generated description for ${name}.`,
+            });
+          } else {
+            setMsg({
+              ok: false,
+              text:
+                "Auto-generate failed: " +
+                ((res && res.reason) || "unknown error"),
+            });
+          }
+        })
+        .catch(function (err) {
           setMsg({
             ok: false,
-            text: "Auto-generate failed: " + ((res && res.reason) || "unknown error"),
+            text: "Auto-generate failed: " + (err.message || String(err)),
           });
-        }
-      }).catch(function (err) {
-        setMsg({ ok: false, text: "Auto-generate failed: " + (err.message || String(err)) });
-      }).then(function () {
-        setBusy(function (b) {
-          const next = Object.assign({}, b); delete next[name]; return next;
+        })
+        .then(function () {
+          setBusy(function (b) {
+            const next = Object.assign({}, b);
+            delete next[name];
+            return next;
+          });
         });
-      });
     };
 
     const headerLabel = expanded
@@ -1582,39 +2192,55 @@
     // each triage card (or runs `hades kanban decompose <id>`) and tasks
     // stay in triage until then.
     const autoOn = !!(settings && settings.auto_decompose);
-    const modePillTitle = settings === null
-      ? "Loading mode…"
-      : (autoOn
+    const modePillTitle =
+      settings === null
+        ? "Loading mode…"
+        : autoOn
           ? "Orchestration: Auto — the dispatcher decomposes new triage tasks automatically every tick. Click to switch to Manual (pre-PR behavior)."
-          : "Orchestration: Manual — triage tasks stay in triage until you click ⚗ Decompose on each card. Click to switch to Auto.");
-    const modePill = h("button", {
-      type: "button",
-      onClick: function () {
-        if (settings === null) return;  // not loaded yet
-        saveSettings({ auto_decompose: !autoOn });
+          : "Orchestration: Manual — triage tasks stay in triage until you click ⚗ Decompose on each card. Click to switch to Auto.";
+    const modePill = h(
+      "button",
+      {
+        type: "button",
+        onClick: function () {
+          if (settings === null) return; // not loaded yet
+          saveSettings({ auto_decompose: !autoOn });
+        },
+        disabled: settings === null,
+        title: modePillTitle,
+        className:
+          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 " +
+          "text-xs font-medium " +
+          (autoOn
+            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : "border-muted-foreground/30 bg-muted/30 text-muted-foreground"),
       },
-      disabled: settings === null,
-      title: modePillTitle,
-      className: "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 "
-                 + "text-xs font-medium "
-                 + (autoOn
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                    : "border-muted-foreground/30 bg-muted/30 text-muted-foreground"),
-    },
       "Orchestration: ",
-      h("span", { className: "ml-1 font-semibold" },
-        settings === null ? "…" : (autoOn ? "Auto" : "Manual"))
+      h(
+        "span",
+        { className: "ml-1 font-semibold" },
+        settings === null ? "…" : autoOn ? "Auto" : "Manual",
+      ),
     );
 
     if (!expanded) {
-      return h("div", { className: "flex items-center gap-3 text-xs" },
+      return h(
+        "div",
+        { className: "flex items-center gap-3 text-xs" },
         modePill,
-        h("button", {
-          type: "button",
-          onClick: function () { setExpanded(true); },
-          className: "underline text-muted-foreground hover:text-foreground",
-          title: "Configure the kanban orchestrator (profile picker, default assignee, auto-decompose, profile descriptions)",
-        }, headerLabel),
+        h(
+          "button",
+          {
+            type: "button",
+            onClick: function () {
+              setExpanded(true);
+            },
+            className: "underline text-muted-foreground hover:text-foreground",
+            title:
+              "Configure the kanban orchestrator (profile picker, default assignee, auto-decompose, profile descriptions)",
+          },
+          headerLabel,
+        ),
       );
     }
 
@@ -1623,84 +2249,173 @@
       return h(SelectOption, { key: p.name, value: p.name }, p.name + tag);
     });
 
-    return h(Card, { className: "p-3" },
-      h(CardContent, { className: "p-2 flex flex-col gap-3" },
-        h("div", { className: "flex items-center justify-between" },
-          h("button", {
-            type: "button",
-            onClick: function () { setExpanded(false); },
-            className: "text-sm font-medium underline-offset-2 hover:underline",
-          }, headerLabel),
+    return h(
+      Card,
+      { className: "p-3" },
+      h(
+        CardContent,
+        { className: "p-2 flex flex-col gap-3" },
+        h(
+          "div",
+          { className: "flex items-center justify-between" },
+          h(
+            "button",
+            {
+              type: "button",
+              onClick: function () {
+                setExpanded(false);
+              },
+              className:
+                "text-sm font-medium underline-offset-2 hover:underline",
+            },
+            headerLabel,
+          ),
           modePill,
           h(Button, { onClick: loadAll, size: "sm" }, "Reload"),
         ),
-        msg ? h("div", {
-          className: msg.ok ? "hades-kanban-msg-ok" : "hades-kanban-msg-err",
-        }, msg.text) : null,
+        msg
+          ? h(
+              "div",
+              {
+                className: msg.ok
+                  ? "hades-kanban-msg-ok"
+                  : "hades-kanban-msg-err",
+              },
+              msg.text,
+            )
+          : null,
 
-        settings ? h("div", { className: "grid gap-3 sm:grid-cols-3" },
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs text-muted-foreground" },
-              "Orchestrator profile"),
-            h(Select, Object.assign({
-              value: settings.orchestrator_profile || "",
-              className: "h-8",
-            }, selectChangeHandler(function (v) {
-              saveSettings({ orchestrator_profile: v });
-            })),
-              h(SelectOption, { value: "" },
-                "(default: " + (settings.active_profile || "default") + ")"),
-              profileOptions,
+        settings
+          ? h(
+              "div",
+              { className: "grid gap-3 sm:grid-cols-3" },
+              h(
+                "div",
+                { className: "flex flex-col gap-1" },
+                h(
+                  Label,
+                  { className: "text-xs text-muted-foreground" },
+                  "Orchestrator profile",
+                ),
+                h(
+                  Select,
+                  Object.assign(
+                    {
+                      value: settings.orchestrator_profile || "",
+                      className: "h-8",
+                    },
+                    selectChangeHandler(function (v) {
+                      saveSettings({ orchestrator_profile: v });
+                    }),
+                  ),
+                  h(
+                    SelectOption,
+                    { value: "" },
+                    "(default: " + (settings.active_profile || "default") + ")",
+                  ),
+                  profileOptions,
+                ),
+                h(
+                  "div",
+                  { className: "text-[10px] text-muted-foreground" },
+                  "Resolved: " +
+                    (settings.resolved_orchestrator_profile || "default"),
+                ),
+                h(
+                  "div",
+                  { className: "text-[10px] text-muted-foreground" },
+                  "Owns the root task after fan-out (wakes back up to judge completion). Does not drive how tasks split — configure the decomposer model under auxiliary.kanban_decomposer.",
+                ),
+              ),
+              h(
+                "div",
+                { className: "flex flex-col gap-1" },
+                h(
+                  Label,
+                  { className: "text-xs text-muted-foreground" },
+                  "Default assignee",
+                ),
+                h(
+                  Select,
+                  Object.assign(
+                    {
+                      value: settings.default_assignee || "",
+                      className: "h-8",
+                    },
+                    selectChangeHandler(function (v) {
+                      saveSettings({ default_assignee: v });
+                    }),
+                  ),
+                  h(
+                    SelectOption,
+                    { value: "" },
+                    "(default: " + (settings.active_profile || "default") + ")",
+                  ),
+                  profileOptions,
+                ),
+                h(
+                  "div",
+                  { className: "text-[10px] text-muted-foreground" },
+                  "Resolved: " +
+                    (settings.resolved_default_assignee || "default"),
+                ),
+              ),
+              h(
+                "div",
+                { className: "flex flex-col gap-1" },
+                h(
+                  Label,
+                  { className: "text-xs text-muted-foreground" },
+                  "Orchestration mode",
+                ),
+                h(
+                  "label",
+                  { className: "flex items-center gap-2 text-xs h-8" },
+                  h(Checkbox, {
+                    checked: !!settings.auto_decompose,
+                    onCheckedChange: function (checked) {
+                      saveSettings({ auto_decompose: checked === true });
+                    },
+                  }),
+                  "Auto-decompose triage tasks",
+                ),
+                h(
+                  "div",
+                  { className: "text-[10px] text-muted-foreground" },
+                  settings.auto_decompose
+                    ? "The dispatcher decomposes new triage tasks automatically."
+                    : "Triage tasks stay in triage until you click ⚗ Decompose.",
+                ),
+              ),
+            )
+          : h(
+              "div",
+              { className: "text-xs text-muted-foreground" },
+              "Loading…",
             ),
-            h("div", { className: "text-[10px] text-muted-foreground" },
-              "Resolved: " + (settings.resolved_orchestrator_profile || "default")),
-            h("div", { className: "text-[10px] text-muted-foreground" },
-              "Owns the root task after fan-out (wakes back up to judge completion). Does not drive how tasks split — configure the decomposer model under auxiliary.kanban_decomposer."),
-          ),
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs text-muted-foreground" },
-              "Default assignee"),
-            h(Select, Object.assign({
-              value: settings.default_assignee || "",
-              className: "h-8",
-            }, selectChangeHandler(function (v) {
-              saveSettings({ default_assignee: v });
-            })),
-              h(SelectOption, { value: "" },
-                "(default: " + (settings.active_profile || "default") + ")"),
-              profileOptions,
-            ),
-            h("div", { className: "text-[10px] text-muted-foreground" },
-              "Resolved: " + (settings.resolved_default_assignee || "default")),
-          ),
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs text-muted-foreground" },
-              "Orchestration mode"),
-            h("label", { className: "flex items-center gap-2 text-xs h-8" },
-              h(Checkbox, {
-                checked: !!settings.auto_decompose,
-                onCheckedChange: function (checked) {
-                  saveSettings({ auto_decompose: checked === true });
-                },
-              }),
-              "Auto-decompose triage tasks",
-            ),
-            h("div", { className: "text-[10px] text-muted-foreground" },
-              settings.auto_decompose
-                ? "The dispatcher decomposes new triage tasks automatically."
-                : "Triage tasks stay in triage until you click ⚗ Decompose."),
-          ),
-        ) : h("div", { className: "text-xs text-muted-foreground" },
-          "Loading…"),
 
-        h("div", { className: "border-t pt-3" },
-          h(Label, { className: "text-xs text-muted-foreground" },
-            "Profile descriptions"),
-          h("div", { className: "text-[10px] text-muted-foreground pb-2" },
-            "Descriptions guide the decomposer's routing. Click ⚗ to auto-generate, or edit and save."),
+        h(
+          "div",
+          { className: "border-t pt-3" },
+          h(
+            Label,
+            { className: "text-xs text-muted-foreground" },
+            "Profile descriptions",
+          ),
+          h(
+            "div",
+            { className: "text-[10px] text-muted-foreground pb-2" },
+            "Descriptions guide the decomposer's routing. Click ⚗ to auto-generate, or edit and save.",
+          ),
           profiles.length === 0
-            ? h("div", { className: "text-xs text-muted-foreground" }, "No profiles installed.")
-            : h("div", { className: "flex flex-col gap-2" },
+            ? h(
+                "div",
+                { className: "text-xs text-muted-foreground" },
+                "No profiles installed.",
+              )
+            : h(
+                "div",
+                { className: "flex flex-col gap-2" },
                 profiles.map(function (p) {
                   return h(ProfileDescriptionRow, {
                     key: p.name,
@@ -1722,42 +2437,82 @@
     const busy = props.busy;
     // Re-sync the local draft if the server-side description changes (e.g.
     // after auto-generate). Cheap because re-runs only happen on prop change.
-    useEffect(function () {
-      setDraft(p.description || "");
-    }, [p.description]);
+    useEffect(
+      function () {
+        setDraft(p.description || "");
+      },
+      [p.description],
+    );
 
     const tag = p.description_auto && p.description ? " [auto, review]" : "";
-    return h("div", { className: "flex flex-col gap-1 border-l-2 pl-2",
-      style: { borderColor: p.description ? "#888" : "#cc6" } },
-      h("div", { className: "flex items-center gap-2 text-xs" },
+    return h(
+      "div",
+      {
+        className: "flex flex-col gap-1 border-l-2 pl-2",
+        style: { borderColor: p.description ? "#888" : "#cc6" },
+      },
+      h(
+        "div",
+        { className: "flex items-center gap-2 text-xs" },
         h("span", { className: "font-medium" }, p.name),
-        p.is_default ? h("span", { className: "text-[10px] text-muted-foreground" }, "(default)") : null,
+        p.is_default
+          ? h(
+              "span",
+              { className: "text-[10px] text-muted-foreground" },
+              "(default)",
+            )
+          : null,
         p.description_auto && p.description
-          ? h("span", { className: "text-[10px] text-yellow-600" }, "auto — review")
+          ? h(
+              "span",
+              { className: "text-[10px] text-yellow-600" },
+              "auto — review",
+            )
           : null,
         !p.description
-          ? h("span", { className: "text-[10px] text-yellow-600" }, "⚠ no description")
+          ? h(
+              "span",
+              { className: "text-[10px] text-yellow-600" },
+              "⚠ no description",
+            )
           : null,
       ),
-      h("div", { className: "flex items-center gap-2" },
+      h(
+        "div",
+        { className: "flex items-center gap-2" },
         h(Input, {
           value: draft,
-          onChange: function (e) { setDraft(e.target.value); },
+          onChange: function (e) {
+            setDraft(e.target.value);
+          },
           placeholder: "What is this profile good at?",
           className: "h-7 text-xs flex-1",
         }),
-        h(Button, {
-          onClick: function () { props.onSave(p.name, draft); },
-          size: "sm",
-          disabled: !!busy || draft === (p.description || ""),
-          title: "Save the description above as user-authored",
-        }, busy === "save" ? "Saving…" : "Save"),
-        h(Button, {
-          onClick: function () { props.onAuto(p.name, true); },
-          size: "sm",
-          disabled: !!busy,
-          title: "Auto-generate a description from this profile's skills and model",
-        }, busy === "auto" ? "Generating…" : "⚗ Auto"),
+        h(
+          Button,
+          {
+            onClick: function () {
+              props.onSave(p.name, draft);
+            },
+            size: "sm",
+            disabled: !!busy || draft === (p.description || ""),
+            title: "Save the description above as user-authored",
+          },
+          busy === "save" ? "Saving…" : "Save",
+        ),
+        h(
+          Button,
+          {
+            onClick: function () {
+              props.onAuto(p.name, true);
+            },
+            size: "sm",
+            disabled: !!busy,
+            title:
+              "Auto-generate a description from this profile's skills and model",
+          },
+          busy === "auto" ? "Generating…" : "⚗ Auto",
+        ),
       ),
     );
   }
@@ -1765,7 +2520,9 @@
   function BoardSwitcher(props) {
     const { t } = useI18n();
     const list = props.boardList || [];
-    const current = list.find(function (b) { return b.slug === props.board; });
+    const current = list.find(function (b) {
+      return b.slug === props.board;
+    });
     const currentName = current && current.name ? current.name : props.board;
     const currentTotal = current ? current.total : 0;
     const hasMultipleBoards = list.length > 1;
@@ -1775,65 +2532,112 @@
     // We show the [+ New board] affordance as soon as any board has a
     // task (so the user can discover multi-project before they need it)
     // OR when any non-default board exists.
-    const totalAcrossAllBoards = list.reduce(function (n, b) { return n + (b.total || 0); }, 0);
+    const totalAcrossAllBoards = list.reduce(function (n, b) {
+      return n + (b.total || 0);
+    }, 0);
     const shouldShow = hasMultipleBoards || totalAcrossAllBoards > 0;
     if (!shouldShow) {
-      return h("div", {
-        className: "hades-kanban-boardswitcher-compact",
-        title: tx(t, "boardSwitcherHint", "Boards let you separate unrelated streams of work"),
-      },
-        h(Button, {
-          onClick: props.onNewClick,
-          size: "sm",
-          className: "h-7 text-xs",
-        }, tx(t, "newBoard", "+ New board")),
+      return h(
+        "div",
+        {
+          className: "hades-kanban-boardswitcher-compact",
+          title: tx(
+            t,
+            "boardSwitcherHint",
+            "Boards let you separate unrelated streams of work",
+          ),
+        },
+        h(
+          Button,
+          {
+            onClick: props.onNewClick,
+            size: "sm",
+            className: "h-7 text-xs",
+          },
+          tx(t, "newBoard", "+ New board"),
+        ),
         h(DocsLink, null),
       );
     }
 
-    return h("div", { className: "hades-kanban-boardswitcher" },
-      h("div", { className: "hades-kanban-boardswitcher-inner" },
-        h("div", { className: "flex flex-col gap-0.5" },
-          h("div", { className: "text-[11px] tracking-wider text-muted-foreground" },
-            tx(t, "board", "Board")),
-          h("div", { className: "flex items-center gap-2" },
-            h(Select, Object.assign({
-              value: props.board,
-              className: "h-8 min-w-[220px]",
-              "aria-label": "Switch kanban board",
-              title: "Boards are independent work streams. Each board has its own tasks, tenants, and assignees.",
-            }, selectChangeHandler(function (v) { if (v) props.onSwitch(v); })),
+    return h(
+      "div",
+      { className: "hades-kanban-boardswitcher" },
+      h(
+        "div",
+        { className: "hades-kanban-boardswitcher-inner" },
+        h(
+          "div",
+          { className: "flex flex-col gap-0.5" },
+          h(
+            "div",
+            { className: "text-[11px] tracking-wider text-muted-foreground" },
+            tx(t, "board", "Board"),
+          ),
+          h(
+            "div",
+            { className: "flex items-center gap-2" },
+            h(
+              Select,
+              Object.assign(
+                {
+                  value: props.board,
+                  className: "h-8 min-w-[220px]",
+                  "aria-label": "Switch kanban board",
+                  title:
+                    "Boards are independent work streams. Each board has its own tasks, tenants, and assignees.",
+                },
+                selectChangeHandler(function (v) {
+                  if (v) props.onSwitch(v);
+                }),
+              ),
               list.map(function (b) {
-                const label = b.total > 0
-                  ? `${b.name || b.slug} · ${b.total}`
-                  : (b.name || b.slug);
+                const label =
+                  b.total > 0
+                    ? `${b.name || b.slug} · ${b.total}`
+                    : b.name || b.slug;
                 return h(SelectOption, { key: b.slug, value: b.slug }, label);
               }),
             ),
-            h("span", { className: "text-xs text-muted-foreground" },
-              `${currentTotal || 0} task${currentTotal === 1 ? "" : "s"}`),
+            h(
+              "span",
+              { className: "text-xs text-muted-foreground" },
+              `${currentTotal || 0} task${currentTotal === 1 ? "" : "s"}`,
+            ),
           ),
         ),
         h("div", { className: "flex-1" }),
         h(DocsLink, null),
-        h(Button, {
-          onClick: props.onNewClick,
-          size: "sm",
-          className: "h-8",
-          title: "Create a new board. Useful when you want an unrelated work stream (different project, different team, isolated scratch area).",
-        }, tx(t, "newBoard", "+ New board")),
-        props.board !== "default"
-          ? h(Button, {
-            onClick: function () {
-              const msg = tx(t, "archiveBoardConfirm",
-                "Archive board '{name}'? It will be moved to boards/_archived/ so you can recover it later. Tasks on this board will no longer appear anywhere in the UI.",
-                { name: currentName });
-              if (window.confirm(msg)) props.onDeleteBoard(props.board);
-            },
+        h(
+          Button,
+          {
+            onClick: props.onNewClick,
             size: "sm",
             className: "h-8",
-            title: tx(t, "archiveBoardTitle", "Archive this board"),
-          }, tx(t, "archive", "Archive"))
+            title:
+              "Create a new board. Useful when you want an unrelated work stream (different project, different team, isolated scratch area).",
+          },
+          tx(t, "newBoard", "+ New board"),
+        ),
+        props.board !== "default"
+          ? h(
+              Button,
+              {
+                onClick: function () {
+                  const msg = tx(
+                    t,
+                    "archiveBoardConfirm",
+                    "Archive board '{name}'? It will be moved to boards/_archived/ so you can recover it later. Tasks on this board will no longer appear anywhere in the UI.",
+                    { name: currentName },
+                  );
+                  if (window.confirm(msg)) props.onDeleteBoard(props.board);
+                },
+                size: "sm",
+                className: "h-8",
+                title: tx(t, "archiveBoardTitle", "Archive this board"),
+              },
+              tx(t, "archive", "Archive"),
+            )
           : null,
       ),
     );
@@ -1850,112 +2654,212 @@
     const [err, setErr] = useState(null);
 
     // Auto-derive a name from the slug if the user hasn't typed one.
-    const autoName = useMemo(function () {
-      if (!slug) return "";
-      return slug.replace(/[-_]+/g, " ")
-        .split(" ")
-        .filter(Boolean)
-        .map(function (w) { return w[0].toUpperCase() + w.slice(1); })
-        .join(" ");
-    }, [slug]);
+    const autoName = useMemo(
+      function () {
+        if (!slug) return "";
+        return slug
+          .replace(/[-_]+/g, " ")
+          .split(" ")
+          .filter(Boolean)
+          .map(function (w) {
+            return w[0].toUpperCase() + w.slice(1);
+          })
+          .join(" ");
+      },
+      [slug],
+    );
 
     function onSubmit(ev) {
       if (ev) ev.preventDefault();
-      if (!slug.trim()) { setErr("slug is required"); return; }
+      if (!slug.trim()) {
+        setErr("slug is required");
+        return;
+      }
       setSubmitting(true);
       setErr(null);
-      props.onCreate({
-        slug: slug.trim(),
-        name: name.trim() || autoName || undefined,
-        description: description.trim() || undefined,
-        icon: icon.trim() || undefined,
-        switch: switchTo,
-      }).catch(function (e) {
-        setErr(String(e && e.message ? e.message : e));
-        setSubmitting(false);
-      });
+      props
+        .onCreate({
+          slug: slug.trim(),
+          name: name.trim() || autoName || undefined,
+          description: description.trim() || undefined,
+          icon: icon.trim() || undefined,
+          switch: switchTo,
+        })
+        .catch(function (e) {
+          setErr(String(e && e.message ? e.message : e));
+          setSubmitting(false);
+        });
     }
 
-    return h("div", {
-      className: "hades-kanban-dialog-backdrop",
-      onClick: function (e) { if (e.target === e.currentTarget) props.onCancel(); },
-    },
-      h("form", {
-        className: "hades-kanban-dialog",
-        onSubmit: onSubmit,
+    return h(
+      "div",
+      {
+        className: "hades-kanban-dialog-backdrop",
+        onClick: function (e) {
+          if (e.target === e.currentTarget) props.onCancel();
+        },
       },
-        h("div", { className: "hades-kanban-dialog-title" },
-          tx(t, "newBoardTitle", "New board")),
-        h("div", { className: "text-xs text-muted-foreground mb-2" },
-          tx(t, "newBoardDescription",
-            "Boards let you separate unrelated streams of work — one per project, repo, or domain. Workers on one board never see another board's tasks.")),
-        h("div", { className: "flex flex-col gap-3" },
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs" }, tx(t, "slug", "Slug"), " ",
-              h("span", { className: "text-muted-foreground" },
-                tx(t, "slugHint", "— lowercase, hyphens, e.g. atm10-server"))),
+      h(
+        "form",
+        {
+          className: "hades-kanban-dialog",
+          onSubmit: onSubmit,
+        },
+        h(
+          "div",
+          { className: "hades-kanban-dialog-title" },
+          tx(t, "newBoardTitle", "New board"),
+        ),
+        h(
+          "div",
+          { className: "text-xs text-muted-foreground mb-2" },
+          tx(
+            t,
+            "newBoardDescription",
+            "Boards let you separate unrelated streams of work — one per project, repo, or domain. Workers on one board never see another board's tasks.",
+          ),
+        ),
+        h(
+          "div",
+          { className: "flex flex-col gap-3" },
+          h(
+            "div",
+            { className: "flex flex-col gap-1" },
+            h(
+              Label,
+              { className: "text-xs" },
+              tx(t, "slug", "Slug"),
+              " ",
+              h(
+                "span",
+                { className: "text-muted-foreground" },
+                tx(t, "slugHint", "— lowercase, hyphens, e.g. atm10-server"),
+              ),
+            ),
             h(Input, {
               value: slug,
-              onChange: function (e) { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-_]/g, "-")); },
+              onChange: function (e) {
+                setSlug(
+                  e.target.value.toLowerCase().replace(/[^a-z0-9\-_]/g, "-"),
+                );
+              },
               placeholder: "atm10-server",
               autoFocus: true,
               className: "h-8",
             }),
           ),
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs" }, tx(t, "displayName", "Display name"), " ",
-              h("span", { className: "text-muted-foreground" },
-                tx(t, "displayNameHint", "(optional)"))),
+          h(
+            "div",
+            { className: "flex flex-col gap-1" },
+            h(
+              Label,
+              { className: "text-xs" },
+              tx(t, "displayName", "Display name"),
+              " ",
+              h(
+                "span",
+                { className: "text-muted-foreground" },
+                tx(t, "displayNameHint", "(optional)"),
+              ),
+            ),
             h(Input, {
               value: name,
-              onChange: function (e) { setName(e.target.value); },
+              onChange: function (e) {
+                setName(e.target.value);
+              },
               placeholder: autoName || tx(t, "displayName", "Display name"),
               className: "h-8",
             }),
           ),
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs" }, tx(t, "description", "Description"), " ",
-              h("span", { className: "text-muted-foreground" },
-                tx(t, "descriptionHint", "(optional)"))),
+          h(
+            "div",
+            { className: "flex flex-col gap-1" },
+            h(
+              Label,
+              { className: "text-xs" },
+              tx(t, "description", "Description"),
+              " ",
+              h(
+                "span",
+                { className: "text-muted-foreground" },
+                tx(t, "descriptionHint", "(optional)"),
+              ),
+            ),
             h(Input, {
               value: description,
-              onChange: function (e) { setDescription(e.target.value); },
+              onChange: function (e) {
+                setDescription(e.target.value);
+              },
               placeholder: "What goes on this board?",
               className: "h-8",
             }),
           ),
-          h("div", { className: "flex flex-col gap-1" },
-            h(Label, { className: "text-xs" }, tx(t, "icon", "Icon"), " ",
-              h("span", { className: "text-muted-foreground" },
-                tx(t, "iconHint", "(single character or emoji)"))),
+          h(
+            "div",
+            { className: "flex flex-col gap-1" },
+            h(
+              Label,
+              { className: "text-xs" },
+              tx(t, "icon", "Icon"),
+              " ",
+              h(
+                "span",
+                { className: "text-muted-foreground" },
+                tx(t, "iconHint", "(single character or emoji)"),
+              ),
+            ),
             h(Input, {
               value: icon,
-              onChange: function (e) { setIcon(e.target.value.slice(0, 4)); },
+              onChange: function (e) {
+                setIcon(e.target.value.slice(0, 4));
+              },
               placeholder: "📦",
               className: "h-8 w-24",
             }),
           ),
-          h("label", { className: "flex items-center gap-2 text-xs" },
+          h(
+            "label",
+            { className: "flex items-center gap-2 text-xs" },
             h(Checkbox, {
               checked: switchTo,
-              onCheckedChange: function (checked) { setSwitchTo(checked === true); },
+              onCheckedChange: function (checked) {
+                setSwitchTo(checked === true);
+              },
             }),
-            tx(t, "switchAfterCreate", "Switch to this board after creating it"),
+            tx(
+              t,
+              "switchAfterCreate",
+              "Switch to this board after creating it",
+            ),
           ),
         ),
-        err ? h("div", { className: "text-xs text-destructive mt-2" }, err) : null,
-        h("div", { className: "hades-kanban-dialog-actions" },
-          h(Button, {
-            type: "button",
-            onClick: props.onCancel,
-            size: "sm",
-            disabled: submitting,
-          }, tx(t, "cancel", "Cancel")),
-          h(Button, {
-            type: "submit",
-            size: "sm",
-            disabled: submitting || !slug.trim(),
-          }, submitting ? tx(t, "creating", "Creating…") : tx(t, "createBoard", "Create board")),
+        err
+          ? h("div", { className: "text-xs text-destructive mt-2" }, err)
+          : null,
+        h(
+          "div",
+          { className: "hades-kanban-dialog-actions" },
+          h(
+            Button,
+            {
+              type: "button",
+              onClick: props.onCancel,
+              size: "sm",
+              disabled: submitting,
+            },
+            tx(t, "cancel", "Cancel"),
+          ),
+          h(
+            Button,
+            {
+              type: "submit",
+              size: "sm",
+              disabled: submitting || !slug.trim(),
+            },
+            submitting
+              ? tx(t, "creating", "Creating…")
+              : tx(t, "createBoard", "Create board"),
+          ),
         ),
       ),
     );
@@ -1969,80 +2873,149 @@
     const { t } = useI18n();
     const tenants = (props.board && props.board.tenants) || [];
     const assignees = (props.board && props.board.assignees) || [];
-    return h("div", { className: "flex flex-wrap items-end gap-3" },
-      h("div", { className: "flex flex-col gap-1",
-                 title: "Fuzzy-match tasks by id, title, or description. Matches across all columns." },
-        h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "search", "Search")),
+    return h(
+      "div",
+      { className: "flex flex-wrap items-end gap-3" },
+      h(
+        "div",
+        {
+          className: "flex flex-col gap-1",
+          title:
+            "Fuzzy-match tasks by id, title, or description. Matches across all columns.",
+        },
+        h(
+          Label,
+          { className: "text-xs text-muted-foreground" },
+          tx(t, "search", "Search"),
+        ),
         h(Input, {
           placeholder: tx(t, "filterCards", "Filter cards…"),
           value: props.search,
-          onChange: function (e) { props.setSearch(e.target.value); },
+          onChange: function (e) {
+            props.setSearch(e.target.value);
+          },
           className: "w-56 h-8",
         }),
       ),
-      h("div", { className: "flex flex-col gap-1",
-                 title: "Tenants are free-form tags on a task (e.g. customer, project, team). Set them via the task drawer or kanban_create." },
-        h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "tenant", "Tenant")),
-        h(Select, Object.assign({
-          value: props.tenantFilter,
-          className: "h-8",
-        }, selectChangeHandler(props.setTenantFilter)),
+      h(
+        "div",
+        {
+          className: "flex flex-col gap-1",
+          title:
+            "Tenants are free-form tags on a task (e.g. customer, project, team). Set them via the task drawer or kanban_create.",
+        },
+        h(
+          Label,
+          { className: "text-xs text-muted-foreground" },
+          tx(t, "tenant", "Tenant"),
+        ),
+        h(
+          Select,
+          Object.assign(
+            {
+              value: props.tenantFilter,
+              className: "h-8",
+            },
+            selectChangeHandler(props.setTenantFilter),
+          ),
           h(SelectOption, { value: "" }, tx(t, "allTenants", "All tenants")),
           tenants.map(function (tn) {
             return h(SelectOption, { key: tn, value: tn }, tn);
           }),
         ),
       ),
-      h("div", { className: "flex flex-col gap-1",
-                 title: "Filter by assigned Hades profile. Profiles are the named agent identities that claim and work on tasks." },
-        h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "assignee", "Assignee")),
-        h(Select, Object.assign({
-          value: props.assigneeFilter,
-          className: "h-8",
-        }, selectChangeHandler(props.setAssigneeFilter)),
+      h(
+        "div",
+        {
+          className: "flex flex-col gap-1",
+          title:
+            "Filter by assigned Hades profile. Profiles are the named agent identities that claim and work on tasks.",
+        },
+        h(
+          Label,
+          { className: "text-xs text-muted-foreground" },
+          tx(t, "assignee", "Assignee"),
+        ),
+        h(
+          Select,
+          Object.assign(
+            {
+              value: props.assigneeFilter,
+              className: "h-8",
+            },
+            selectChangeHandler(props.setAssigneeFilter),
+          ),
           h(SelectOption, { value: "" }, tx(t, "allProfiles", "All profiles")),
           assignees.map(function (a) {
             return h(SelectOption, { key: a, value: a }, a);
           }),
         ),
       ),
-      h("label", { className: "flex items-center gap-2 text-xs",
-                   title: "Include archived tasks in the board view. Archived tasks are hidden by default." },
+      h(
+        "label",
+        {
+          className: "flex items-center gap-2 text-xs",
+          title:
+            "Include archived tasks in the board view. Archived tasks are hidden by default.",
+        },
         h(Checkbox, {
           checked: props.includeArchived,
-          onCheckedChange: function (checked) { props.setIncludeArchived(checked === true); },
+          onCheckedChange: function (checked) {
+            props.setIncludeArchived(checked === true);
+          },
         }),
         tx(t, "showArchived", "Show archived"),
       ),
-      h("label", { className: "flex items-center gap-2 text-xs",
-                   title: "Group the Running column by assigned profile" },
+      h(
+        "label",
+        {
+          className: "flex items-center gap-2 text-xs",
+          title: "Group the Running column by assigned profile",
+        },
         h(Checkbox, {
           checked: props.laneByProfile,
-          onCheckedChange: function (checked) { props.setLaneByProfile(checked === true); },
+          onCheckedChange: function (checked) {
+            props.setLaneByProfile(checked === true);
+          },
         }),
         tx(t, "lanesByProfile", "Lanes by profile"),
       ),
       h("div", { className: "flex-1" }),
-      h(Button, {
-        onClick: props.onNudgeDispatch,
-        size: "sm",
-        title: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick. Use this after adding tasks if you want them picked up immediately.",
-      }, tx(t, "nudgeDispatcher", "Nudge dispatcher")),
-      h(Button, {
-        onClick: props.onRefresh,
-        size: "sm",
-        title: "Reload the board from the database. The board auto-refreshes on task events; this is for forcing a re-read.",
-      }, tx(t, "refresh", "Refresh")),
-      h(Button, {
-        onClick: function () {
-          props.setSearch("");
-          props.setTenantFilter("");
-          props.setAssigneeFilter("");
-          props.setIncludeArchived(false);
+      h(
+        Button,
+        {
+          onClick: props.onNudgeDispatch,
+          size: "sm",
+          title:
+            "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick. Use this after adding tasks if you want them picked up immediately.",
         },
-        size: "sm",
-        title: "Clear all active filters (search, tenant, assignee, archived).",
-      }, tx(t, "clearFilters", "Clear filters")),
+        tx(t, "nudgeDispatcher", "Nudge dispatcher"),
+      ),
+      h(
+        Button,
+        {
+          onClick: props.onRefresh,
+          size: "sm",
+          title:
+            "Reload the board from the database. The board auto-refreshes on task events; this is for forcing a re-read.",
+        },
+        tx(t, "refresh", "Refresh"),
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.setSearch("");
+            props.setTenantFilter("");
+            props.setAssigneeFilter("");
+            props.setIncludeArchived(false);
+          },
+          size: "sm",
+          title:
+            "Clear all active filters (search, tenant, assignee, archived).",
+        },
+        tx(t, "clearFilters", "Clear filters"),
+      ),
     );
   }
 
@@ -2055,115 +3028,211 @@
     const [assignee, setAssignee] = useState("");
     const [reclaimFirst, setReclaimFirst] = useState(false);
     const [priority, setPriority] = useState("");
-    return h("div", { className: "hades-kanban-bulk" },
-      h("span", { className: "hades-kanban-bulk-count" },
-        `${props.count} ${tx(t, "selected", "selected")}`),
-      h(Button, {
-        onClick: function () { props.onApply({ status: "todo" }); },
-        size: "sm",
-        title: "Move selected tasks to Todo.",
-      }, "→ todo"),
-      h(Button, {
-        onClick: function () { props.onApply({ status: "ready" }); },
-        size: "sm",
-        title: "Move selected tasks to Ready. Ready tasks are picked up by the dispatcher on the next tick.",
-      }, "→ ready"),
-      h(Button, {
-        onClick: function () { props.onApply({ status: "blocked" },
-          `Block ${props.count} task(s)?`); },
-        size: "sm",
-        title: "Block selected tasks. Releases any active claims.",
-      }, "Block"),
-      h(Button, {
-        onClick: function () { props.onApply({ status: "ready" },
-          `Unblock ${props.count} task(s)?`); },
-        size: "sm",
-        title: "Unblock selected tasks (promote to Ready).",
-      }, "Unblock"),
-      h(Button, {
-        onClick: function () {
-          props.onApply({ status: "done" },
-            tx(t, "markDone", "Mark {n} task(s) as done?", { n: props.count }));
+    return h(
+      "div",
+      { className: "hades-kanban-bulk" },
+      h(
+        "span",
+        { className: "hades-kanban-bulk-count" },
+        `${props.count} ${tx(t, "selected", "selected")}`,
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onApply({ status: "todo" });
+          },
+          size: "sm",
+          title: "Move selected tasks to Todo.",
         },
-        size: "sm",
-        title: "Mark selected tasks as done. Releases any claims and unblocks dependent children. You'll be asked for a completion summary.",
-      }, tx(t, "complete", "Complete")),
-      h(Button, {
-        onClick: function () {
-          props.onApply({ archive: true },
-            tx(t, "markArchived", "Archive {n} task(s)?", { n: props.count }));
+        "→ todo",
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onApply({ status: "ready" });
+          },
+          size: "sm",
+          title:
+            "Move selected tasks to Ready. Ready tasks are picked up by the dispatcher on the next tick.",
         },
-        size: "sm",
-        title: "Archive selected tasks. They disappear from the default board view but remain in the database.",
-      }, tx(t, "archive", "Archive")),
-      h(Button, {
-        onClick: function () {
-          props.onDelete(props.count);
+        "→ ready",
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onApply(
+              { status: "blocked" },
+              `Block ${props.count} task(s)?`,
+            );
+          },
+          size: "sm",
+          title: "Block selected tasks. Releases any active claims.",
         },
-        size: "sm",
-        variant: "destructive",
-        title: "Permanently delete selected tasks. This cannot be undone.",
-      }, tx(t, "delete", "Delete")),
-      h("div", { className: "hades-kanban-bulk-priority",
-                 title: "Set priority on selected tasks. Higher = claimed first." },
+        "Block",
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onApply(
+              { status: "ready" },
+              `Unblock ${props.count} task(s)?`,
+            );
+          },
+          size: "sm",
+          title: "Unblock selected tasks (promote to Ready).",
+        },
+        "Unblock",
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onApply(
+              { status: "done" },
+              tx(t, "markDone", "Mark {n} task(s) as done?", {
+                n: props.count,
+              }),
+            );
+          },
+          size: "sm",
+          title:
+            "Mark selected tasks as done. Releases any claims and unblocks dependent children. You'll be asked for a completion summary.",
+        },
+        tx(t, "complete", "Complete"),
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onApply(
+              { archive: true },
+              tx(t, "markArchived", "Archive {n} task(s)?", { n: props.count }),
+            );
+          },
+          size: "sm",
+          title:
+            "Archive selected tasks. They disappear from the default board view but remain in the database.",
+        },
+        tx(t, "archive", "Archive"),
+      ),
+      h(
+        Button,
+        {
+          onClick: function () {
+            props.onDelete(props.count);
+          },
+          size: "sm",
+          variant: "destructive",
+          title: "Permanently delete selected tasks. This cannot be undone.",
+        },
+        tx(t, "delete", "Delete"),
+      ),
+      h(
+        "div",
+        {
+          className: "hades-kanban-bulk-priority",
+          title: "Set priority on selected tasks. Higher = claimed first.",
+        },
         h(Input, {
           type: "number",
           value: priority,
-          onChange: function (e) { setPriority(e.target.value); },
+          onChange: function (e) {
+            setPriority(e.target.value);
+          },
           placeholder: tx(t, "priority", "pri"),
           className: "h-7 text-xs w-16",
         }),
-        h(Button, {
-          onClick: function () {
-            if (priority === "") return;
-            props.onApply({ priority: Number(priority) });
-            setPriority("");
+        h(
+          Button,
+          {
+            onClick: function () {
+              if (priority === "") return;
+              props.onApply({ priority: Number(priority) });
+              setPriority("");
+            },
+            disabled: priority === "",
+            size: "sm",
           },
-          disabled: priority === "",
-          size: "sm",
-        }, tx(t, "setPriority", "Set priority")),
+          tx(t, "setPriority", "Set priority"),
+        ),
       ),
-      h("div", { className: "hades-kanban-bulk-reassign",
-                 title: "Reassign selected tasks to a different Hades profile. Pick a profile (or unassign) and click Apply." },
-        h(Select, Object.assign({
-          value: assignee,
-          className: "h-7 text-xs",
-        }, selectChangeHandler(setAssignee)),
+      h(
+        "div",
+        {
+          className: "hades-kanban-bulk-reassign",
+          title:
+            "Reassign selected tasks to a different Hades profile. Pick a profile (or unassign) and click Apply.",
+        },
+        h(
+          Select,
+          Object.assign(
+            {
+              value: assignee,
+              className: "h-7 text-xs",
+            },
+            selectChangeHandler(setAssignee),
+          ),
           h(SelectOption, { value: "" }, "— reassign —"),
           h(SelectOption, { value: "__none__" }, "(unassign)"),
           props.assignees.map(function (a) {
             return h(SelectOption, { key: a, value: a }, a);
           }),
         ),
-        h(Button, {
-          onClick: function () {
-            if (!assignee) return;
-            props.onApply({ assignee: assignee === "__none__" ? "" : assignee, reclaim_first: reclaimFirst });
-            setAssignee("");
+        h(
+          Button,
+          {
+            onClick: function () {
+              if (!assignee) return;
+              props.onApply({
+                assignee: assignee === "__none__" ? "" : assignee,
+                reclaim_first: reclaimFirst,
+              });
+              setAssignee("");
+            },
+            disabled: !assignee,
+            size: "sm",
+            title: "Apply the selected assignee to all selected tasks.",
           },
-          disabled: !assignee,
-          size: "sm",
-          title: "Apply the selected assignee to all selected tasks.",
-        }, tx(t, "apply", "Apply")),
+          tx(t, "apply", "Apply"),
+        ),
       ),
-      h("label", { className: "hades-kanban-bulk-reclaim-first", title: "Reclaim any active claims before reassigning" },
+      h(
+        "label",
+        {
+          className: "hades-kanban-bulk-reclaim-first",
+          title: "Reclaim any active claims before reassigning",
+        },
         h(Checkbox, {
           checked: reclaimFirst,
-          onCheckedChange: function (checked) { setReclaimFirst(checked === true); },
+          onCheckedChange: function (checked) {
+            setReclaimFirst(checked === true);
+          },
         }),
         "Reclaim first",
       ),
       h("div", { className: "flex-1" }),
-      h(Button, {
-        onClick: props.onSelectAllVisible,
-        size: "sm",
-        title: "Select all visible cards across columns.",
-      }, "Select all visible"),
-      h(Button, {
-        onClick: props.onClear,
-        size: "sm",
-        title: "Deselect all tasks and hide this bar.",
-      }, tx(t, "clear", "Clear")),
+      h(
+        Button,
+        {
+          onClick: props.onSelectAllVisible,
+          size: "sm",
+          title: "Select all visible cards across columns.",
+        },
+        "Select all visible",
+      ),
+      h(
+        Button,
+        {
+          onClick: props.onClear,
+          size: "sm",
+          title: "Deselect all tasks and hide this bar.",
+        },
+        tx(t, "clear", "Clear"),
+      ),
     );
   }
 
@@ -2176,53 +3245,82 @@
     const [dragOver, setDragOver] = useState(false);
     const zoneRef = useRef(null);
 
-    useEffect(function () {
-      if (!zoneRef.current) return undefined;
-      const el = zoneRef.current;
-      function onTouchDelete(e) {
-        const taskId = e.detail && e.detail.taskId;
-        if (taskId && props.onDelete) props.onDelete(taskId);
-      }
-      el.addEventListener("hades-kanban:delete", onTouchDelete);
-      return function () { el.removeEventListener("hades-kanban:delete", onTouchDelete); };
-    }, [props.onDelete]);
+    useEffect(
+      function () {
+        if (!zoneRef.current) return undefined;
+        const el = zoneRef.current;
+        function onTouchDelete(e) {
+          const taskId = e.detail && e.detail.taskId;
+          if (taskId && props.onDelete) props.onDelete(taskId);
+        }
+        el.addEventListener("hades-kanban:delete", onTouchDelete);
+        return function () {
+          el.removeEventListener("hades-kanban:delete", onTouchDelete);
+        };
+      },
+      [props.onDelete],
+    );
 
     const handleDragOver = function (e) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       if (!dragOver) setDragOver(true);
     };
-    const handleDragLeave = function () { setDragOver(false); };
+    const handleDragLeave = function () {
+      setDragOver(false);
+    };
     const handleDrop = function (e) {
       e.preventDefault();
       setDragOver(false);
       const taskId = e.dataTransfer.getData(MIME_TASK);
       if (!taskId) return;
-      if (props.selectedIds && props.selectedIds.has(taskId) && props.selectedIds.size > 1) {
-        if (window.confirm(tx(t, "trash.confirmMany", "Permanently delete {n} selected tasks? This cannot be undone.", { n: props.selectedIds.size }))) {
+      if (
+        props.selectedIds &&
+        props.selectedIds.has(taskId) &&
+        props.selectedIds.size > 1
+      ) {
+        if (
+          window.confirm(
+            tx(
+              t,
+              "trash.confirmMany",
+              "Permanently delete {n} selected tasks? This cannot be undone.",
+              { n: props.selectedIds.size },
+            ),
+          )
+        ) {
           const ids = Array.from(props.selectedIds);
-          Promise.all(ids.map(function (id) { return props.onDelete(id); })).catch(function () {});
+          Promise.all(
+            ids.map(function (id) {
+              return props.onDelete(id);
+            }),
+          ).catch(function () {});
         }
       } else {
         props.onDelete(taskId);
       }
     };
 
-    return h("div", {
-      ref: zoneRef,
-      "data-kanban-trash": "true",
-      className: cn(
-        "hades-kanban-trash",
-        dragOver ? "hades-kanban-trash--drop" : "",
-        props.draggingTaskId ? "hades-kanban-trash--active" : "",
-      ),
-      onDragOver: handleDragOver,
-      onDragLeave: handleDragLeave,
-      onDrop: handleDrop,
-    },
+    return h(
+      "div",
+      {
+        ref: zoneRef,
+        "data-kanban-trash": "true",
+        className: cn(
+          "hades-kanban-trash",
+          dragOver ? "hades-kanban-trash--drop" : "",
+          props.draggingTaskId ? "hades-kanban-trash--active" : "",
+        ),
+        onDragOver: handleDragOver,
+        onDragLeave: handleDragLeave,
+        onDrop: handleDrop,
+      },
       h("span", { className: "hades-kanban-trash-icon" }, "🗑️"),
-      h("span", { className: "hades-kanban-trash-label" },
-        tx(t, "trash.dropHint", FALLBACK_TRASH.dropHint)),
+      h(
+        "span",
+        { className: "hades-kanban-trash-label" },
+        tx(t, "trash.dropHint", FALLBACK_TRASH.dropHint),
+      ),
     );
   }
 
@@ -2231,16 +3329,28 @@
   // -------------------------------------------------------------------------
 
   function BoardColumns(props) {
-    const handleDragStart = useCallback(function (e) {
-      const card = e.target.closest && e.target.closest(".hades-kanban-card");
-      if (!card) return;
-      const taskId = card.getAttribute("data-task-id");
-      if (taskId && props.onDragStart) props.onDragStart(taskId);
-    }, [props.onDragStart]);
-    const handleDragEnd = useCallback(function () {
-      if (props.onDragEnd) props.onDragEnd();
-    }, [props.onDragEnd]);
-    return h("div", { className: "hades-kanban-columns", onDragStart: handleDragStart, onDragEnd: handleDragEnd },
+    const handleDragStart = useCallback(
+      function (e) {
+        const card = e.target.closest && e.target.closest(".hades-kanban-card");
+        if (!card) return;
+        const taskId = card.getAttribute("data-task-id");
+        if (taskId && props.onDragStart) props.onDragStart(taskId);
+      },
+      [props.onDragStart],
+    );
+    const handleDragEnd = useCallback(
+      function () {
+        if (props.onDragEnd) props.onDragEnd();
+      },
+      [props.onDragEnd],
+    );
+    return h(
+      "div",
+      {
+        className: "hades-kanban-columns",
+        onDragStart: handleDragStart,
+        onDragEnd: handleDragEnd,
+      },
       props.board.columns.map(function (col) {
         return h(Column, {
           key: col.name,
@@ -2274,119 +3384,202 @@
     const colRef = useRef(null);
 
     // Listen for our synthetic touch-drop events from attachTouchDrag().
-    useEffect(function () {
-      if (!colRef.current) return undefined;
-      const el = colRef.current;
-      function onTouchDrop(e) {
-        if (e.detail && e.detail.status === props.column.name) {
-          const taskId = e.detail.taskId;
-          if (props.selectedIds && props.selectedIds.has(taskId) && props.selectedIds.size > 1 && props.onMoveSelected) {
-            props.onMoveSelected(props.column.name);
-          } else {
-            props.onMove(taskId, props.column.name);
+    useEffect(
+      function () {
+        if (!colRef.current) return undefined;
+        const el = colRef.current;
+        function onTouchDrop(e) {
+          if (e.detail && e.detail.status === props.column.name) {
+            const taskId = e.detail.taskId;
+            if (
+              props.selectedIds &&
+              props.selectedIds.has(taskId) &&
+              props.selectedIds.size > 1 &&
+              props.onMoveSelected
+            ) {
+              props.onMoveSelected(props.column.name);
+            } else {
+              props.onMove(taskId, props.column.name);
+            }
           }
         }
-      }
-      el.addEventListener("hades-kanban:drop", onTouchDrop);
-      return function () { el.removeEventListener("hades-kanban:drop", onTouchDrop); };
-    }, [props.column.name, props.onMove, props.selectedIds, props.onMoveSelected]);
+        el.addEventListener("hades-kanban:drop", onTouchDrop);
+        return function () {
+          el.removeEventListener("hades-kanban:drop", onTouchDrop);
+        };
+      },
+      [
+        props.column.name,
+        props.onMove,
+        props.selectedIds,
+        props.onMoveSelected,
+      ],
+    );
 
     const handleDragOver = function (e) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       if (!dragOver) setDragOver(true);
     };
-    const handleDragLeave = function () { setDragOver(false); };
+    const handleDragLeave = function () {
+      setDragOver(false);
+    };
     const handleDrop = function (e) {
       e.preventDefault();
       setDragOver(false);
       const taskId = e.dataTransfer.getData(MIME_TASK);
       if (!taskId) return;
-      if (props.selectedIds && props.selectedIds.has(taskId) && props.selectedIds.size > 1) {
+      if (
+        props.selectedIds &&
+        props.selectedIds.has(taskId) &&
+        props.selectedIds.size > 1
+      ) {
         if (props.onMoveSelected) props.onMoveSelected(props.column.name);
       } else {
         props.onMove(taskId, props.column.name);
       }
     };
 
-    const lanes = useMemo(function () {
-      if (!props.laneByProfile || props.column.name !== "running") return null;
-      const byProfile = {};
-      for (const tk of props.column.tasks) {
-        const key = tk.assignee || "(unassigned)";
-        (byProfile[key] = byProfile[key] || []).push(tk);
-      }
-      return Object.keys(byProfile).sort().map(function (k) {
-        return { assignee: k, tasks: byProfile[k] };
-      });
-    }, [props.column, props.laneByProfile]);
+    const lanes = useMemo(
+      function () {
+        if (!props.laneByProfile || props.column.name !== "running")
+          return null;
+        const byProfile = {};
+        for (const tk of props.column.tasks) {
+          const key = tk.assignee || "(unassigned)";
+          (byProfile[key] = byProfile[key] || []).push(tk);
+        }
+        return Object.keys(byProfile)
+          .sort()
+          .map(function (k) {
+            return { assignee: k, tasks: byProfile[k] };
+          });
+      },
+      [props.column, props.laneByProfile],
+    );
 
     const colHelp = getColumnHelp(t, props.column.name);
     const colLabel = getColumnLabel(t, props.column.name);
 
-    return h("div", {
-      ref: colRef,
-      "data-kanban-column": props.column.name,
-      className: cn(
-        "hades-kanban-column",
-        dragOver ? "hades-kanban-column--drop" : "",
-      ),
-      onDragOver: handleDragOver,
-      onDragLeave: handleDragLeave,
-      onDrop: handleDrop,
-    },
-      h("div", { className: "hades-kanban-column-header",
-                 title: colHelp || "" },
+    return h(
+      "div",
+      {
+        ref: colRef,
+        "data-kanban-column": props.column.name,
+        className: cn(
+          "hades-kanban-column",
+          dragOver ? "hades-kanban-column--drop" : "",
+        ),
+        onDragOver: handleDragOver,
+        onDragLeave: handleDragLeave,
+        onDrop: handleDrop,
+      },
+      h(
+        "div",
+        { className: "hades-kanban-column-header", title: colHelp || "" },
         h(Checkbox, {
           className: "hades-kanban-col-check",
           title: "Select all tasks in this column",
           "aria-label": `Select all tasks in ${colLabel || props.column.name}`,
-          checked: props.column.tasks.length > 0 && props.column.tasks.every(function (t) { return props.selectedIds.has(t.id); }),
+          checked:
+            props.column.tasks.length > 0 &&
+            props.column.tasks.every(function (t) {
+              return props.selectedIds.has(t.id);
+            }),
           onCheckedChange: function () {
-            if (props.selectAllInColumn) props.selectAllInColumn(props.column.name);
+            if (props.selectAllInColumn)
+              props.selectAllInColumn(props.column.name);
           },
-          onClick: function (e) { e.stopPropagation(); },
+          onClick: function (e) {
+            e.stopPropagation();
+          },
         }),
-        h("span", { className: cn("hades-kanban-dot", COLUMN_DOT[props.column.name]) }),
-        h("span", { className: "hades-kanban-column-label" },
-          colLabel || props.column.name),
-        h("span", { className: "hades-kanban-column-count",
-                    title: `${props.column.tasks.length} task${props.column.tasks.length === 1 ? "" : "s"} in this column` },
-          props.column.tasks.length),
-        h("button", {
-          type: "button",
-          className: "hades-kanban-column-add",
-          title: tx(t, "createTask", "Create task in this column"),
-          onClick: function () { setShowCreate(function (v) { return !v; }); },
-        }, showCreate ? "×" : "+"),
+        h("span", {
+          className: cn("hades-kanban-dot", COLUMN_DOT[props.column.name]),
+        }),
+        h(
+          "span",
+          { className: "hades-kanban-column-label" },
+          colLabel || props.column.name,
+        ),
+        h(
+          "span",
+          {
+            className: "hades-kanban-column-count",
+            title: `${props.column.tasks.length} task${props.column.tasks.length === 1 ? "" : "s"} in this column`,
+          },
+          props.column.tasks.length,
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            className: "hades-kanban-column-add",
+            title: tx(t, "createTask", "Create task in this column"),
+            onClick: function () {
+              setShowCreate(function (v) {
+                return !v;
+              });
+            },
+          },
+          showCreate ? "×" : "+",
+        ),
       ),
-      h("div", { className: "hades-kanban-column-sub" },
-        colHelp || ""),
-      showCreate ? h(InlineCreate, {
-        columnName: props.column.name,
-        allTasks: props.allTasks,
-        onSubmit: function (body) {
-          props.onCreate(body).then(function () { setShowCreate(false); });
-        },
-        onCancel: function () { setShowCreate(false); },
-      }) : null,
-      h("div", { className: "hades-kanban-column-body" },
+      h("div", { className: "hades-kanban-column-sub" }, colHelp || ""),
+      showCreate
+        ? h(InlineCreate, {
+            columnName: props.column.name,
+            allTasks: props.allTasks,
+            onSubmit: function (body) {
+              props.onCreate(body).then(function () {
+                setShowCreate(false);
+              });
+            },
+            onCancel: function () {
+              setShowCreate(false);
+            },
+          })
+        : null,
+      h(
+        "div",
+        { className: "hades-kanban-column-body" },
         props.column.tasks.length === 0
-          ? h("div", { className: "hades-kanban-empty" }, tx(t, "noTasks", "— no tasks —"))
+          ? h(
+              "div",
+              { className: "hades-kanban-empty" },
+              tx(t, "noTasks", "— no tasks —"),
+            )
           : lanes
             ? lanes.map(function (lane) {
-                return h("div", { key: lane.assignee, className: "hades-kanban-lane" },
-                  h("div", { className: "hades-kanban-lane-head" },
-                    h("span", { className: "hades-kanban-lane-name" }, lane.assignee),
-                    h("span", { className: "hades-kanban-lane-count" }, lane.tasks.length),
+                return h(
+                  "div",
+                  { key: lane.assignee, className: "hades-kanban-lane" },
+                  h(
+                    "div",
+                    { className: "hades-kanban-lane-head" },
+                    h(
+                      "span",
+                      { className: "hades-kanban-lane-name" },
+                      lane.assignee,
+                    ),
+                    h(
+                      "span",
+                      { className: "hades-kanban-lane-count" },
+                      lane.tasks.length,
+                    ),
                   ),
                   lane.tasks.map(function (tk) {
                     return h(TaskCard, {
-                      key: tk.id, task: tk,
+                      key: tk.id,
+                      task: tk,
                       selected: props.selectedIds.has(tk.id),
                       failed: props.failedIds && props.failedIds.has(tk.id),
                       draggingTaskId: props.draggingTaskId,
-                      draggingSource: props.draggingTaskId && props.selectedIds.has(props.draggingTaskId) && props.selectedIds.size > 1 && props.selectedIds.has(tk.id),
+                      draggingSource:
+                        props.draggingTaskId &&
+                        props.selectedIds.has(props.draggingTaskId) &&
+                        props.selectedIds.size > 1 &&
+                        props.selectedIds.has(tk.id),
                       toggleSelected: props.toggleSelected,
                       toggleRange: props.toggleRange,
                       onOpen: props.onOpen,
@@ -2396,11 +3589,16 @@
               })
             : props.column.tasks.map(function (tk) {
                 return h(TaskCard, {
-                  key: tk.id, task: tk,
+                  key: tk.id,
+                  task: tk,
                   selected: props.selectedIds.has(tk.id),
                   failed: props.failedIds && props.failedIds.has(tk.id),
                   draggingTaskId: props.draggingTaskId,
-                  draggingSource: props.draggingTaskId && props.selectedIds.has(props.draggingTaskId) && props.selectedIds.size > 1 && props.selectedIds.has(tk.id),
+                  draggingSource:
+                    props.draggingTaskId &&
+                    props.selectedIds.has(props.draggingTaskId) &&
+                    props.selectedIds.size > 1 &&
+                    props.selectedIds.has(tk.id),
                   toggleSelected: props.toggleSelected,
                   toggleRange: props.toggleRange,
                   onOpen: props.onOpen,
@@ -2417,20 +3615,21 @@
   // Staleness tiers — amber after a grace window, red when clearly stuck.
   // Values below are seconds.
   const STALENESS = {
-    ready:   { amber: 1 * 60 * 60,   red: 24 * 60 * 60 },
-    running: { amber: 10 * 60,       red: 60 * 60 },
-    blocked: { amber: 1 * 60 * 60,   red: 24 * 60 * 60 },
-    todo:    { amber: 7 * 24 * 60 * 60, red: 30 * 24 * 60 * 60 },
+    ready: { amber: 1 * 60 * 60, red: 24 * 60 * 60 },
+    running: { amber: 10 * 60, red: 60 * 60 },
+    blocked: { amber: 1 * 60 * 60, red: 24 * 60 * 60 },
+    todo: { amber: 7 * 24 * 60 * 60, red: 30 * 24 * 60 * 60 },
   };
 
   function stalenessClass(task) {
     if (!task || !task.age) return "";
-    const age = task.status === "running"
-      ? task.age.started_age_seconds
-      : task.age.created_age_seconds;
+    const age =
+      task.status === "running"
+        ? task.age.started_age_seconds
+        : task.age.created_age_seconds;
     const tier = STALENESS[task.status];
     if (!tier || age == null) return "";
-    if (age >= tier.red)   return "hades-kanban-card--stale-red";
+    if (age >= tier.red) return "hades-kanban-card--stale-red";
     if (age >= tier.amber) return "hades-kanban-card--stale-amber";
     return "";
   }
@@ -2440,14 +3639,19 @@
     const t = props.task;
     const cardRef = useRef(null);
 
-    useEffect(function () {
-      return attachTouchDrag(cardRef.current, t.id);
-    }, [t.id]);
+    useEffect(
+      function () {
+        return attachTouchDrag(cardRef.current, t.id);
+      },
+      [t.id],
+    );
 
     const handleDragStart = function (e) {
       e.dataTransfer.setData(MIME_TASK, t.id);
       e.dataTransfer.effectAllowed = "move";
-      const selectedCards = document.querySelectorAll(".hades-kanban-card--selected");
+      const selectedCards = document.querySelectorAll(
+        ".hades-kanban-card--selected",
+      );
       if (selectedCards.length > 1 && props.selected) {
         const ghost = document.createElement("div");
         ghost.className = "hades-kanban-drag-ghost";
@@ -2490,105 +3694,198 @@
     const progress = t.progress;
     const needsAssignee = t.status === "ready" && !t.assignee;
 
-    return h("div", {
-      ref: cardRef,
-      "data-task-id": t.id,
-      className: cn(
-        "hades-kanban-card",
-        props.selected ? "hades-kanban-card--selected" : "",
-        props.failed ? "hades-kanban-card--failed" : "",
-        props.draggingSource ? "hades-kanban-card--dragging-source" : "",
-        stalenessClass(t),
-      ),
-      draggable: true,
-      tabIndex: 0,
-      role: "button",
-      "aria-label": `${t.title || "untitled"} — ${t.id} — ${t.status}`,
-      onDragStart: handleDragStart,
-      onClick: handleClick,
-      onKeyDown: handleKeyDown,
-    },
-      h(Card, null,
-        h(CardContent, { className: "hades-kanban-card-content" },
-          h("div", { className: "hades-kanban-card-row" },
-            h("label", {
-              className: "hades-kanban-card-check-wrap",
-              title: tx(i18n, "selectForBulk", "Select for bulk actions"),
-              onClick: function (e) { e.stopPropagation(); },
-            },
+    return h(
+      "div",
+      {
+        ref: cardRef,
+        "data-task-id": t.id,
+        className: cn(
+          "hades-kanban-card",
+          props.selected ? "hades-kanban-card--selected" : "",
+          props.failed ? "hades-kanban-card--failed" : "",
+          props.draggingSource ? "hades-kanban-card--dragging-source" : "",
+          stalenessClass(t),
+        ),
+        draggable: true,
+        tabIndex: 0,
+        role: "button",
+        "aria-label": `${t.title || "untitled"} — ${t.id} — ${t.status}`,
+        onDragStart: handleDragStart,
+        onClick: handleClick,
+        onKeyDown: handleKeyDown,
+      },
+      h(
+        Card,
+        null,
+        h(
+          CardContent,
+          { className: "hades-kanban-card-content" },
+          h(
+            "div",
+            { className: "hades-kanban-card-row" },
+            h(
+              "label",
+              {
+                className: "hades-kanban-card-check-wrap",
+                title: tx(i18n, "selectForBulk", "Select for bulk actions"),
+                onClick: function (e) {
+                  e.stopPropagation();
+                },
+              },
               h(Checkbox, {
                 className: "hades-kanban-card-check",
                 checked: props.selected,
                 onCheckedChange: handleCheckedChange,
-                onClick: function (e) { e.stopPropagation(); },
+                onClick: function (e) {
+                  e.stopPropagation();
+                },
                 "aria-label": `Select task ${t.id}`,
               }),
             ),
-            h("span", { className: "hades-kanban-card-id",
-                        title: `Task id: ${t.id}. Use this id with kanban_show, /kanban show, or hades kanban show.` }, t.id),
+            h(
+              "span",
+              {
+                className: "hades-kanban-card-id",
+                title: `Task id: ${t.id}. Use this id with kanban_show, /kanban show, or hades kanban show.`,
+              },
+              t.id,
+            ),
             t.warnings && t.warnings.count > 0
-              ? h("span", {
-                  className: cn(
-                    "hades-kanban-warning-badge",
-                    "hades-kanban-warning-badge--" + (t.warnings.highest_severity || "warning"),
-                  ),
-                  title: (
-                    `${t.warnings.count} active diagnostic` +
-                    (t.warnings.count === 1 ? "" : "s") +
-                    ` (severity: ${t.warnings.highest_severity || "warning"}). ` +
-                    `Click to open for details.`
-                  ),
-                }, t.warnings.highest_severity === "critical" ? "!!!" :
-                   t.warnings.highest_severity === "error" ? "!!" : "⚠")
+              ? h(
+                  "span",
+                  {
+                    className: cn(
+                      "hades-kanban-warning-badge",
+                      "hades-kanban-warning-badge--" +
+                        (t.warnings.highest_severity || "warning"),
+                    ),
+                    title:
+                      `${t.warnings.count} active diagnostic` +
+                      (t.warnings.count === 1 ? "" : "s") +
+                      ` (severity: ${t.warnings.highest_severity || "warning"}). ` +
+                      `Click to open for details.`,
+                  },
+                  t.warnings.highest_severity === "critical"
+                    ? "!!!"
+                    : t.warnings.highest_severity === "error"
+                      ? "!!"
+                      : "⚠",
+                )
               : null,
             t.priority > 0
-              ? h(Badge, { className: "hades-kanban-priority",
-                           title: `Priority ${t.priority}. Higher-priority tasks are claimed first by the dispatcher.` }, `P${t.priority}`)
+              ? h(
+                  Badge,
+                  {
+                    className: "hades-kanban-priority",
+                    title: `Priority ${t.priority}. Higher-priority tasks are claimed first by the dispatcher.`,
+                  },
+                  `P${t.priority}`,
+                )
               : null,
             t.tenant
-              ? h(Badge, { variant: "outline", className: "hades-kanban-tag",
-                           title: `Tenant: ${t.tenant}. Free-form tag for grouping tasks (customer, project, team).` }, t.tenant)
+              ? h(
+                  Badge,
+                  {
+                    variant: "outline",
+                    className: "hades-kanban-tag",
+                    title: `Tenant: ${t.tenant}. Free-form tag for grouping tasks (customer, project, team).`,
+                  },
+                  t.tenant,
+                )
               : null,
             progress
-              ? h("span", {
-                  className: cn(
-                    "hades-kanban-progress",
-                    progress.done === progress.total ? "hades-kanban-progress--full" : "",
-                  ),
-                  title: `${progress.done} of ${progress.total} child tasks done`,
-                }, `${progress.done}/${progress.total}`)
+              ? h(
+                  "span",
+                  {
+                    className: cn(
+                      "hades-kanban-progress",
+                      progress.done === progress.total
+                        ? "hades-kanban-progress--full"
+                        : "",
+                    ),
+                    title: `${progress.done} of ${progress.total} child tasks done`,
+                  },
+                  `${progress.done}/${progress.total}`,
+                )
               : null,
             needsAssignee
-              ? h(Badge, {
-                  variant: "outline",
-                  className: "hades-kanban-needs-assignee",
-                  title: tx(i18n, "needsAssigneeHint", "Dependencies are satisfied, but the dispatcher skips this task until you assign a profile."),
-                }, tx(i18n, "needsAssignee", "Needs assignee"))
+              ? h(
+                  Badge,
+                  {
+                    variant: "outline",
+                    className: "hades-kanban-needs-assignee",
+                    title: tx(
+                      i18n,
+                      "needsAssigneeHint",
+                      "Dependencies are satisfied, but the dispatcher skips this task until you assign a profile.",
+                    ),
+                  },
+                  tx(i18n, "needsAssignee", "Needs assignee"),
+                )
               : null,
           ),
-          h("div", { className: "hades-kanban-card-title" },
-            t.title || tx(i18n, "untitled", "(untitled)")),
-          h("div", { className: "hades-kanban-card-row hades-kanban-card-meta" },
+          h(
+            "div",
+            { className: "hades-kanban-card-title" },
+            t.title || tx(i18n, "untitled", "(untitled)"),
+          ),
+          h(
+            "div",
+            { className: "hades-kanban-card-row hades-kanban-card-meta" },
             t.assignee
-              ? h("span", { className: "hades-kanban-assignee",
-                            title: `Assigned to Hades profile @${t.assignee}` }, "@", t.assignee)
-              : h("span", { className: "hades-kanban-unassigned",
-                            title: needsAssignee
-                              ? tx(i18n, "needsAssigneeHint", "Dependencies are satisfied, but the dispatcher skips this task until you assign a profile.")
-                              : "No profile assigned." },
-                  tx(i18n, "unassigned", "unassigned")),
+              ? h(
+                  "span",
+                  {
+                    className: "hades-kanban-assignee",
+                    title: `Assigned to Hades profile @${t.assignee}`,
+                  },
+                  "@",
+                  t.assignee,
+                )
+              : h(
+                  "span",
+                  {
+                    className: "hades-kanban-unassigned",
+                    title: needsAssignee
+                      ? tx(
+                          i18n,
+                          "needsAssigneeHint",
+                          "Dependencies are satisfied, but the dispatcher skips this task until you assign a profile.",
+                        )
+                      : "No profile assigned.",
+                  },
+                  tx(i18n, "unassigned", "unassigned"),
+                ),
             t.comment_count > 0
-              ? h("span", { className: "hades-kanban-count",
-                            title: `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"} on this task` }, "💬 ", t.comment_count)
+              ? h(
+                  "span",
+                  {
+                    className: "hades-kanban-count",
+                    title: `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"} on this task`,
+                  },
+                  "💬 ",
+                  t.comment_count,
+                )
               : null,
-            t.link_counts && (t.link_counts.parents + t.link_counts.children) > 0
-              ? h("span", { className: "hades-kanban-count",
-                            title: `${t.link_counts.parents} parent${t.link_counts.parents === 1 ? "" : "s"}, ${t.link_counts.children} child${t.link_counts.children === 1 ? "" : "ren"}. Children stay blocked until their parent is done.` },
-                  "↔ ", t.link_counts.parents + t.link_counts.children)
+            t.link_counts && t.link_counts.parents + t.link_counts.children > 0
+              ? h(
+                  "span",
+                  {
+                    className: "hades-kanban-count",
+                    title: `${t.link_counts.parents} parent${t.link_counts.parents === 1 ? "" : "s"}, ${t.link_counts.children} child${t.link_counts.children === 1 ? "" : "ren"}. Children stay blocked until their parent is done.`,
+                  },
+                  "↔ ",
+                  t.link_counts.parents + t.link_counts.children,
+                )
               : null,
-            h("span", { className: "hades-kanban-ago",
-                        title: t.created_at ? `Created ${t.created_at}` : "" },
-              timeAgo ? timeAgo(t.created_at) : ""),
+            h(
+              "span",
+              {
+                className: "hades-kanban-ago",
+                title: t.created_at ? `Created ${t.created_at}` : "",
+              },
+              timeAgo ? timeAgo(t.created_at) : "",
+            ),
           ),
         ),
       ),
@@ -2635,8 +3932,12 @@
       // always auto-loads kanban-worker; these are extras on top.
       const skillList = skills
         .split(",")
-        .map(function (s) { return s.trim(); })
-        .filter(function (s) { return s.length > 0; });
+        .map(function (s) {
+          return s.trim();
+        })
+        .filter(function (s) {
+          return s.length > 0;
+        });
       if (skillList.length > 0) body.skills = skillList;
       // Only send workspace_kind when it's non-default. Keeps the request
       // shape small and interoperable with older dispatcher versions.
@@ -2653,43 +3954,72 @@
         if (Number.isFinite(gmt) && gmt > 0) body.goal_max_turns = gmt;
       }
       props.onSubmit(body);
-      setTitle(""); setAssignee(""); setPriority(0); setParent(""); setSkills("");
-      setWorkspaceKind("scratch"); setWorkspacePath("");
-      setGoalMode(false); setGoalMaxTurns("");
+      setTitle("");
+      setAssignee("");
+      setPriority(0);
+      setParent("");
+      setSkills("");
+      setWorkspaceKind("scratch");
+      setWorkspacePath("");
+      setGoalMode(false);
+      setGoalMaxTurns("");
     };
 
     const showPathInput = workspaceKind !== "scratch";
-    const pathPlaceholder = workspaceKind === "dir"
-      ? tx(t, "workspacePathDir", "workspace path (required, e.g. ~/projects/my-app)")
-      : tx(t, "workspacePathOptional",
-          "workspace path (optional, derived from assignee if blank)");
+    const pathPlaceholder =
+      workspaceKind === "dir"
+        ? tx(
+            t,
+            "workspacePathDir",
+            "workspace path (required, e.g. ~/projects/my-app)",
+          )
+        : tx(
+            t,
+            "workspacePathOptional",
+            "workspace path (optional, derived from assignee if blank)",
+          );
 
-    return h("div", { className: "hades-kanban-inline-create" },
+    return h(
+      "div",
+      { className: "hades-kanban-inline-create" },
       h("textarea", {
         value: title,
-        onChange: function (e) { setTitle(e.target.value); },
+        onChange: function (e) {
+          setTitle(e.target.value);
+        },
         onKeyDown: function (e) {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submit();
+          }
           if (e.key === "Escape") props.onCancel();
         },
-        placeholder: props.columnName === "triage"
-          ? tx(t, "triagePlaceholder", "Rough idea — AI will spec it…")
-          : tx(t, "taskTitlePlaceholder", "New task title…"),
+        placeholder:
+          props.columnName === "triage"
+            ? tx(t, "triagePlaceholder", "Rough idea — AI will spec it…")
+            : tx(t, "taskTitlePlaceholder", "New task title…"),
         autoFocus: true,
-        className: "text-sm min-h-[2rem] max-h-32 resize-y w-full border border-input bg-transparent px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-ring",
+        className:
+          "text-sm min-h-[2rem] max-h-32 resize-y w-full border border-input bg-transparent px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-ring",
         rows: 2,
       }),
-      h("div", { className: "flex gap-2" },
+      h(
+        "div",
+        { className: "flex gap-2" },
         h(Input, {
           value: assignee,
-          onChange: function (e) { setAssignee(e.target.value); },
-          placeholder: props.columnName === "triage"
-            ? tx(t, "specifier", "specifier")
-            : tx(t, "assigneePlaceholder", "assignee"),
+          onChange: function (e) {
+            setAssignee(e.target.value);
+          },
+          placeholder:
+            props.columnName === "triage"
+              ? tx(t, "specifier", "specifier")
+              : tx(t, "assigneePlaceholder", "assignee"),
           className: "h-7 text-xs flex-1",
-          title: props.columnName === "triage"
-            ? "Hades profile that will spec this task (default: the dispatcher's configured specifier). Leave blank to let the dispatcher pick."
-            : "Hades profile to assign. Leave blank and the dispatcher will pick from available profiles when the task is Ready.",
+          title:
+            props.columnName === "triage"
+              ? "Hades profile that will spec this task (default: the dispatcher's configured specifier). Leave blank to let the dispatcher pick."
+              : "Hades profile to assign. Leave blank and the dispatcher will pick from available profiles when the task is Ready.",
           style: { textTransform: "none" },
           autoCapitalize: "none",
           autoCorrect: "off",
@@ -2698,80 +4028,133 @@
         h(Input, {
           type: "number",
           value: priority,
-          onChange: function (e) { setPriority(e.target.value); },
+          onChange: function (e) {
+            setPriority(e.target.value);
+          },
           placeholder: "pri",
           className: "h-7 text-xs w-16",
-          title: "Priority. Higher-priority tasks are claimed first by the dispatcher. 0 = default.",
+          title:
+            "Priority. Higher-priority tasks are claimed first by the dispatcher. 0 = default.",
         }),
       ),
       h(Input, {
         value: skills,
-        onChange: function (e) { setSkills(e.target.value); },
-        placeholder: tx(t, "skillsPlaceholder",
-          "skills (optional, comma-separated): translation, github-code-review"),
-        title: "Force-load these skills into the worker (in addition to the built-in kanban-worker).",
+        onChange: function (e) {
+          setSkills(e.target.value);
+        },
+        placeholder: tx(
+          t,
+          "skillsPlaceholder",
+          "skills (optional, comma-separated): translation, github-code-review",
+        ),
+        title:
+          "Force-load these skills into the worker (in addition to the built-in kanban-worker).",
         className: "h-7 text-xs",
       }),
-      h("div", { className: "flex gap-2 items-center" },
-        h("label", {
-          className: "flex items-center gap-1.5 text-xs cursor-pointer select-none",
-          title: "Goal mode: the worker keeps going in the same session until a judge agrees the card is done (or the turn budget runs out, which blocks it for review). Best for open-ended cards one shot rarely finishes.",
-        },
+      h(
+        "div",
+        { className: "flex gap-2 items-center" },
+        h(
+          "label",
+          {
+            className:
+              "flex items-center gap-1.5 text-xs cursor-pointer select-none",
+            title:
+              "Goal mode: the worker keeps going in the same session until a judge agrees the card is done (or the turn budget runs out, which blocks it for review). Best for open-ended cards one shot rarely finishes.",
+          },
           h("input", {
             type: "checkbox",
             checked: goalMode,
-            onChange: function (e) { setGoalMode(!!e.target.checked); },
+            onChange: function (e) {
+              setGoalMode(!!e.target.checked);
+            },
             className: "h-3.5 w-3.5 accent-current",
           }),
           tx(t, "goalMode", "goal mode"),
         ),
-        goalMode ? h(Input, {
-          type: "number",
-          value: goalMaxTurns,
-          onChange: function (e) { setGoalMaxTurns(e.target.value); },
-          placeholder: tx(t, "goalMaxTurns", "max turns (default 20)"),
-          className: "h-7 text-xs w-40",
-          title: "Turn budget for the goal loop. Blank = backend default (20).",
-          min: 1,
-        }) : null,
+        goalMode
+          ? h(Input, {
+              type: "number",
+              value: goalMaxTurns,
+              onChange: function (e) {
+                setGoalMaxTurns(e.target.value);
+              },
+              placeholder: tx(t, "goalMaxTurns", "max turns (default 20)"),
+              className: "h-7 text-xs w-40",
+              title:
+                "Turn budget for the goal loop. Blank = backend default (20).",
+              min: 1,
+            })
+          : null,
       ),
-      h("div", { className: "flex gap-2" },
-        h(Select, Object.assign({
-          value: workspaceKind,
-          title: "scratch: isolated temp dir (default). worktree: git worktree on the assignee profile. dir: exact path (required below).",
-          className: "h-7 text-xs w-28",
-        }, selectChangeHandler(setWorkspaceKind)),
+      h(
+        "div",
+        { className: "flex gap-2" },
+        h(
+          Select,
+          Object.assign(
+            {
+              value: workspaceKind,
+              title:
+                "scratch: isolated temp dir (default). worktree: git worktree on the assignee profile. dir: exact path (required below).",
+              className: "h-7 text-xs w-28",
+            },
+            selectChangeHandler(setWorkspaceKind),
+          ),
           h(SelectOption, { value: "scratch" }, "scratch"),
           h(SelectOption, { value: "worktree" }, "worktree"),
           h(SelectOption, { value: "dir" }, "dir"),
         ),
-        showPathInput ? h(Input, {
-          value: workspacePath,
-          onChange: function (e) { setWorkspacePath(e.target.value); },
-          placeholder: pathPlaceholder,
-          className: "h-7 text-xs flex-1",
-        }) : null,
+        showPathInput
+          ? h(Input, {
+              value: workspacePath,
+              onChange: function (e) {
+                setWorkspacePath(e.target.value);
+              },
+              placeholder: pathPlaceholder,
+              className: "h-7 text-xs flex-1",
+            })
+          : null,
       ),
-      h(Select, Object.assign({
-        value: parent,
-        className: "h-7 text-xs",
-        title: "Optional parent task. A child stays blocked in its current column until the parent is marked done.",
-      }, selectChangeHandler(setParent)),
+      h(
+        Select,
+        Object.assign(
+          {
+            value: parent,
+            className: "h-7 text-xs",
+            title:
+              "Optional parent task. A child stays blocked in its current column until the parent is marked done.",
+          },
+          selectChangeHandler(setParent),
+        ),
         h(SelectOption, { value: "" }, tx(t, "noParent", "— no parent —")),
         (props.allTasks || []).map(function (task) {
-          return h(SelectOption, { key: task.id, value: task.id },
-            `${task.id} — ${(task.title || "").slice(0, 50)}`);
+          return h(
+            SelectOption,
+            { key: task.id, value: task.id },
+            `${task.id} — ${(task.title || "").slice(0, 50)}`,
+          );
         }),
       ),
-      h("div", { className: "flex gap-2" },
-        h(Button, {
-          onClick: submit,
-          size: "sm",
-        }, "Create"),
-        h(Button, {
-          onClick: props.onCancel,
-          size: "sm",
-        }, tx(t, "cancel", "Cancel")),
+      h(
+        "div",
+        { className: "flex gap-2" },
+        h(
+          Button,
+          {
+            onClick: submit,
+            size: "sm",
+          },
+          "Create",
+        ),
+        h(
+          Button,
+          {
+            onClick: props.onCancel,
+            size: "sm",
+          },
+          tx(t, "cancel", "Cancel"),
+        ),
       ),
     );
   }
@@ -2801,44 +4184,94 @@
     const [homeBusy, setHomeBusy] = useState({});
     const boardSlug = props.boardSlug;
 
-    const load = useCallback(function () {
-      return SDK.fetchJSON(withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}`, boardSlug))
-        .then(function (d) { setData(d); setErr(null); setPatchErr(null); })
-        .catch(function (e) { setErr(String(e.message || e)); })
-        .finally(function () { setLoading(false); });
-    }, [props.taskId, boardSlug]);
+    const load = useCallback(
+      function () {
+        return SDK.fetchJSON(
+          withBoard(
+            `${API}/tasks/${encodeURIComponent(props.taskId)}`,
+            boardSlug,
+          ),
+        )
+          .then(function (d) {
+            setData(d);
+            setErr(null);
+            setPatchErr(null);
+          })
+          .catch(function (e) {
+            setErr(String(e.message || e));
+          })
+          .finally(function () {
+            setLoading(false);
+          });
+      },
+      [props.taskId, boardSlug],
+    );
 
-    const loadHomeChannels = useCallback(function () {
-      const qs = new URLSearchParams({ task_id: props.taskId });
-      const url = withBoard(`${API}/home-channels?${qs}`, boardSlug);
-      return SDK.fetchJSON(url)
-        .then(function (d) { setHomeChannels(d.home_channels || []); })
-        .catch(function () { /* silent — endpoint optional on older gateways */ });
-    }, [props.taskId, boardSlug]);
+    const loadHomeChannels = useCallback(
+      function () {
+        const qs = new URLSearchParams({ task_id: props.taskId });
+        const url = withBoard(`${API}/home-channels?${qs}`, boardSlug);
+        return SDK.fetchJSON(url)
+          .then(function (d) {
+            setHomeChannels(d.home_channels || []);
+          })
+          .catch(function () {
+            /* silent — endpoint optional on older gateways */
+          });
+      },
+      [props.taskId, boardSlug],
+    );
 
     // Reload when the WS stream reports new events for this task id
     // (completion, block, crash, etc. — anything that'd make the drawer
     // show stale data if we only loaded on mount).
-    useEffect(function () { load(); }, [load, props.eventTick]);
-    useEffect(function () { loadHomeChannels(); }, [loadHomeChannels]);
-    useEffect(function () {
-      function onKey(e) { if (e.key === "Escape" && !editing) props.onClose(); }
-      window.addEventListener("keydown", onKey);
-      return function () { window.removeEventListener("keydown", onKey); };
-    }, [props.onClose, editing]);
+    useEffect(
+      function () {
+        load();
+      },
+      [load, props.eventTick],
+    );
+    useEffect(
+      function () {
+        loadHomeChannels();
+      },
+      [loadHomeChannels],
+    );
+    useEffect(
+      function () {
+        function onKey(e) {
+          if (e.key === "Escape" && !editing) props.onClose();
+        }
+        window.addEventListener("keydown", onKey);
+        return function () {
+          window.removeEventListener("keydown", onKey);
+        };
+      },
+      [props.onClose, editing],
+    );
 
     const handleComment = function () {
       const body = newComment.trim();
       if (!body) return;
-      SDK.fetchJSON(withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}/comments`, boardSlug), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body }),
-      }).then(function () {
-        setNewComment("");
-        load();
-        props.onRefresh();
-      }).catch(function (e) { setErr(String(e.message || e)); });
+      SDK.fetchJSON(
+        withBoard(
+          `${API}/tasks/${encodeURIComponent(props.taskId)}/comments`,
+          boardSlug,
+        ),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body }),
+        },
+      )
+        .then(function () {
+          setNewComment("");
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setErr(String(e.message || e));
+        });
     };
 
     // File upload uses raw fetch (not SDK.fetchJSON, which JSON-encodes)
@@ -2849,7 +4282,10 @@
       if (!files.length) return;
       setUploadBusy(true);
       setUploadErr(null);
-      const url = withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}/attachments`, boardSlug);
+      const url = withBoard(
+        `${API}/tasks/${encodeURIComponent(props.taskId)}/attachments`,
+        boardSlug,
+      );
       // Upload sequentially so a partial failure leaves a clear state.
       let chain = Promise.resolve();
       files.forEach(function (f) {
@@ -2860,30 +4296,44 @@
           // gated cookie) and applies the dashboard base-path prefix. The old
           // hand-rolled Authorization:Bearer + credentials:'same-origin' sent
           // an empty token and 401'd in gated mode.
-          return SDK.authedFetch(url, { method: "POST", body: fd })
-            .then(function (resp) {
+          return SDK.authedFetch(url, { method: "POST", body: fd }).then(
+            function (resp) {
               if (!resp.ok) {
                 return resp.text().then(function (txt) {
-                  throw new Error(parseApiErrorMessage(new Error(resp.status + ": " + txt)));
+                  throw new Error(
+                    parseApiErrorMessage(new Error(resp.status + ": " + txt)),
+                  );
                 });
               }
-            });
+            },
+          );
         });
       });
-      chain.then(function () {
-        load();
-        props.onRefresh();
-      }).catch(function (e) {
-        setUploadErr(String(e.message || e));
-      }).finally(function () {
-        setUploadBusy(false);
-      });
+      chain
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setUploadErr(String(e.message || e));
+        })
+        .finally(function () {
+          setUploadBusy(false);
+        });
     };
 
     const handleDeleteAttachment = function (attachmentId) {
-      return SDK.fetchJSON(withBoard(`${API}/attachments/${attachmentId}`, boardSlug), { method: "DELETE" })
-        .then(function () { load(); props.onRefresh(); })
-        .catch(function (e) { setUploadErr(String(e.message || e)); });
+      return SDK.fetchJSON(
+        withBoard(`${API}/attachments/${attachmentId}`, boardSlug),
+        { method: "DELETE" },
+      )
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setUploadErr(String(e.message || e));
+        });
     };
 
     const doPatch = function (patch, opts) {
@@ -2893,12 +4343,24 @@
       const finalPatch = withCompletionSummary(patch, 1);
       if (!finalPatch) return Promise.resolve();
       setPatchErr(null);
-      return SDK.fetchJSON(withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}`, boardSlug), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalPatch),
-      }).then(function () { load(); props.onRefresh(); })
-        .catch(function (e) { setPatchErr(parseApiErrorMessage(e)); });
+      return SDK.fetchJSON(
+        withBoard(
+          `${API}/tasks/${encodeURIComponent(props.taskId)}`,
+          boardSlug,
+        ),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(finalPatch),
+        },
+      )
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setPatchErr(parseApiErrorMessage(e));
+        });
     };
 
     // Triage specifier — calls the auxiliary LLM to flesh out a rough
@@ -2911,12 +4373,15 @@
     // surfaces inline without treating it as an HTTP error).
     const doSpecify = function () {
       return SDK.fetchJSON(
-        withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}/specify`, boardSlug),
+        withBoard(
+          `${API}/tasks/${encodeURIComponent(props.taskId)}/specify`,
+          boardSlug,
+        ),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
-        }
+        },
       ).then(function (res) {
         load();
         props.onRefresh();
@@ -2930,12 +4395,15 @@
     // todo) and the board (so the new children appear in the columns).
     const doDecompose = function () {
       return SDK.fetchJSON(
-        withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}/decompose`, boardSlug),
+        withBoard(
+          `${API}/tasks/${encodeURIComponent(props.taskId)}/decompose`,
+          boardSlug,
+        ),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
-        }
+        },
       ).then(function (res) {
         load();
         props.onRefresh();
@@ -2948,33 +4416,67 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parent_id: parentId, child_id: props.taskId }),
-      }).then(function () { load(); props.onRefresh(); })
-        .catch(function (e) { setErr(String(e.message || e)); });
+      })
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setErr(String(e.message || e));
+        });
     };
     const removeLink = function (parentId) {
-      const qs = new URLSearchParams({ parent_id: parentId, child_id: props.taskId });
-      return SDK.fetchJSON(withBoard(`${API}/links?${qs}`, boardSlug), { method: "DELETE" })
-        .then(function () { load(); props.onRefresh(); })
-        .catch(function (e) { setErr(String(e.message || e)); });
+      const qs = new URLSearchParams({
+        parent_id: parentId,
+        child_id: props.taskId,
+      });
+      return SDK.fetchJSON(withBoard(`${API}/links?${qs}`, boardSlug), {
+        method: "DELETE",
+      })
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setErr(String(e.message || e));
+        });
     };
     const addChild = function (childId) {
       return SDK.fetchJSON(withBoard(`${API}/links`, boardSlug), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parent_id: props.taskId, child_id: childId }),
-      }).then(function () { load(); props.onRefresh(); })
-        .catch(function (e) { setErr(String(e.message || e)); });
+      })
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setErr(String(e.message || e));
+        });
     };
     const removeChild = function (childId) {
-      const qs = new URLSearchParams({ parent_id: props.taskId, child_id: childId });
-      return SDK.fetchJSON(withBoard(`${API}/links?${qs}`, boardSlug), { method: "DELETE" })
-        .then(function () { load(); props.onRefresh(); })
-        .catch(function (e) { setErr(String(e.message || e)); });
+      const qs = new URLSearchParams({
+        parent_id: props.taskId,
+        child_id: childId,
+      });
+      return SDK.fetchJSON(withBoard(`${API}/links?${qs}`, boardSlug), {
+        method: "DELETE",
+      })
+        .then(function () {
+          load();
+          props.onRefresh();
+        })
+        .catch(function (e) {
+          setErr(String(e.message || e));
+        });
     };
 
     const toggleHomeSubscription = function (platform, currentlySubscribed) {
       // Optimistic flip + busy flag to keep double-clicks idempotent.
-      setHomeBusy(function (b) { return Object.assign({}, b, { [platform]: true }); });
+      setHomeBusy(function (b) {
+        return Object.assign({}, b, { [platform]: true });
+      });
       setHomeChannels(function (list) {
         return list.map(function (h) {
           return h.platform === platform
@@ -2988,7 +4490,9 @@
         boardSlug,
       );
       return SDK.fetchJSON(url, { method: method })
-        .then(function () { return loadHomeChannels(); })
+        .then(function () {
+          return loadHomeChannels();
+        })
         .catch(function (e) {
           // Revert optimistic flip on failure.
           setHomeChannels(function (list) {
@@ -3009,62 +4513,102 @@
         });
     };
 
-    return h("div", { className: "hades-kanban-drawer-shade", onClick: props.onClose },
-      h("div", {
-        className: "hades-kanban-drawer",
-        onClick: function (e) { e.stopPropagation(); },
-      },
-        h("div", { className: "hades-kanban-drawer-head" },
-          h("span", { className: "text-xs text-muted-foreground" }, props.taskId),
-          h("button", {
-            type: "button",
-            onClick: props.onClose,
-            className: "hades-kanban-drawer-close",
-            title: tx(t, "close", "Close (Esc)"),
-          }, "×"),
-        ),
-        loading ? h("div", { className: "p-4 text-sm text-muted-foreground" },
-          tx(t, "loadingDetail", "Loading…")) :
-        err ? h("div", { className: "p-4 text-sm text-destructive" }, err) :
-        data ? h(TaskDetail, {
-          data, editing, setEditing,
-          renderMarkdown: props.renderMarkdown,
-          allTasks: props.allTasks,
-          assignees: props.assignees || [],
-          boardSlug: boardSlug,
-          onPatch: doPatch,
-          onSpecify: doSpecify,
-          onDecompose: doDecompose,
-          onAddParent: addLink,
-          onRemoveParent: removeLink,
-          onAddChild: addChild,
-          onRemoveChild: removeChild,
-          homeChannels: homeChannels,
-          homeBusy: homeBusy,
-          onToggleHomeSub: toggleHomeSubscription,
-          onRefresh: props.onRefresh,
-          onUpload: handleUpload,
-          onDeleteAttachment: handleDeleteAttachment,
-          uploadBusy: uploadBusy,
-          uploadErr: uploadErr,
-        }) : null,
-        data ? h("div", { className: "hades-kanban-drawer-comment-row" },
-          h(Input, {
-            value: newComment,
-            onChange: function (e) { setNewComment(e.target.value); },
-            onKeyDown: function (e) {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault(); handleComment();
-              }
+    return h(
+      "div",
+      { className: "hades-kanban-drawer-shade", onClick: props.onClose },
+      h(
+        "div",
+        {
+          className: "hades-kanban-drawer",
+          onClick: function (e) {
+            e.stopPropagation();
+          },
+        },
+        h(
+          "div",
+          { className: "hades-kanban-drawer-head" },
+          h(
+            "span",
+            { className: "text-xs text-muted-foreground" },
+            props.taskId,
+          ),
+          h(
+            "button",
+            {
+              type: "button",
+              onClick: props.onClose,
+              className: "hades-kanban-drawer-close",
+              title: tx(t, "close", "Close (Esc)"),
             },
-            placeholder: tx(t, "addComment", "Add a comment… (Enter to submit)"),
-            className: "h-8 text-sm flex-1",
-          }),
-          h(Button, {
-            onClick: handleComment,
-            size: "sm",
-          }, tx(t, "comment", "Comment")),
-        ) : null,
+            "×",
+          ),
+        ),
+        loading
+          ? h(
+              "div",
+              { className: "p-4 text-sm text-muted-foreground" },
+              tx(t, "loadingDetail", "Loading…"),
+            )
+          : err
+            ? h("div", { className: "p-4 text-sm text-destructive" }, err)
+            : data
+              ? h(TaskDetail, {
+                  data,
+                  editing,
+                  setEditing,
+                  renderMarkdown: props.renderMarkdown,
+                  allTasks: props.allTasks,
+                  assignees: props.assignees || [],
+                  boardSlug: boardSlug,
+                  onPatch: doPatch,
+                  onSpecify: doSpecify,
+                  onDecompose: doDecompose,
+                  onAddParent: addLink,
+                  onRemoveParent: removeLink,
+                  onAddChild: addChild,
+                  onRemoveChild: removeChild,
+                  homeChannels: homeChannels,
+                  homeBusy: homeBusy,
+                  onToggleHomeSub: toggleHomeSubscription,
+                  onRefresh: props.onRefresh,
+                  onUpload: handleUpload,
+                  onDeleteAttachment: handleDeleteAttachment,
+                  uploadBusy: uploadBusy,
+                  uploadErr: uploadErr,
+                })
+              : null,
+        data
+          ? h(
+              "div",
+              { className: "hades-kanban-drawer-comment-row" },
+              h(Input, {
+                value: newComment,
+                onChange: function (e) {
+                  setNewComment(e.target.value);
+                },
+                onKeyDown: function (e) {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleComment();
+                  }
+                },
+                placeholder: tx(
+                  t,
+                  "addComment",
+                  "Add a comment… (Enter to submit)",
+                ),
+                className: "h-8 text-sm flex-1",
+              }),
+              h(
+                Button,
+                {
+                  onClick: handleComment,
+                  size: "sm",
+                },
+                tx(t, "comment", "Comment"),
+              ),
+            )
+          : null,
       ),
     );
   }
@@ -3100,7 +4644,9 @@
         .then(function (resp) {
           if (!resp.ok) {
             return resp.text().then(function (txt) {
-              throw new Error(parseApiErrorMessage(new Error(resp.status + ": " + txt)));
+              throw new Error(
+                parseApiErrorMessage(new Error(resp.status + ": " + txt)),
+              );
             });
           }
           return resp.blob();
@@ -3113,13 +4659,22 @@
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          setTimeout(function () { URL.revokeObjectURL(objUrl); }, 10000);
+          setTimeout(function () {
+            URL.revokeObjectURL(objUrl);
+          }, 10000);
         })
-        .catch(function (e) { setDlErr(String(e.message || e)); });
+        .catch(function (e) {
+          setDlErr(String(e.message || e));
+        });
     }
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head" },
-        `${tx(i18n, "attachments", "Attachments")} (${atts.length})`),
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head" },
+        `${tx(i18n, "attachments", "Attachments")} (${atts.length})`,
+      ),
       h("input", {
         ref: fileRef,
         type: "file",
@@ -3128,49 +4683,93 @@
         onChange: function (e) {
           if (props.onUpload) props.onUpload(e.target.files);
           // Reset so selecting the same file again re-triggers onChange.
-          try { e.target.value = ""; } catch (_e) { /* ignore */ }
+          try {
+            e.target.value = "";
+          } catch (_e) {
+            /* ignore */
+          }
         },
       }),
-      h("div", { className: "flex items-center gap-2 mb-2" },
-        h(Button, {
-          size: "sm",
-          variant: "outline",
-          disabled: !!props.uploadBusy,
-          onClick: function () { if (fileRef.current) fileRef.current.click(); },
-        }, props.uploadBusy
+      h(
+        "div",
+        { className: "flex items-center gap-2 mb-2" },
+        h(
+          Button,
+          {
+            size: "sm",
+            variant: "outline",
+            disabled: !!props.uploadBusy,
+            onClick: function () {
+              if (fileRef.current) fileRef.current.click();
+            },
+          },
+          props.uploadBusy
             ? tx(i18n, "uploading", "Uploading…")
-            : tx(i18n, "uploadFile", "Upload file")),
+            : tx(i18n, "uploadFile", "Upload file"),
+        ),
       ),
-      (props.uploadErr || dlErr)
-        ? h("div", { className: "text-xs text-destructive mb-2" }, props.uploadErr || dlErr)
+      props.uploadErr || dlErr
+        ? h(
+            "div",
+            { className: "text-xs text-destructive mb-2" },
+            props.uploadErr || dlErr,
+          )
         : null,
       atts.length === 0
-        ? h("div", { className: "text-xs text-muted-foreground" },
-            tx(i18n, "noAttachments", "— no attachments —"))
+        ? h(
+            "div",
+            { className: "text-xs text-muted-foreground" },
+            tx(i18n, "noAttachments", "— no attachments —"),
+          )
         : atts.map(function (a) {
-            return h("div", {
-              key: a.id,
-              className: "flex items-center justify-between gap-2 py-1 text-sm",
-            },
-              h("button", {
-                type: "button",
-                className: "hades-kanban-attachment-link truncate",
-                title: a.filename,
-                onClick: function () { downloadAttachment(a); },
-              }, a.filename),
-              h("span", { className: "text-xs text-muted-foreground whitespace-nowrap" },
-                _fmtBytes(a.size)),
-              h("button", {
-                type: "button",
-                className: "hades-kanban-drawer-close",
-                title: tx(i18n, "removeAttachment", "Remove attachment"),
-                onClick: function () {
-                  if (window.confirm(tx(i18n, "confirmRemoveAttachment",
-                      "Remove this attachment?"))) {
-                    if (props.onDelete) props.onDelete(a.id);
-                  }
+            return h(
+              "div",
+              {
+                key: a.id,
+                className:
+                  "flex items-center justify-between gap-2 py-1 text-sm",
+              },
+              h(
+                "button",
+                {
+                  type: "button",
+                  className: "hades-kanban-attachment-link truncate",
+                  title: a.filename,
+                  onClick: function () {
+                    downloadAttachment(a);
+                  },
                 },
-              }, "×"),
+                a.filename,
+              ),
+              h(
+                "span",
+                {
+                  className: "text-xs text-muted-foreground whitespace-nowrap",
+                },
+                _fmtBytes(a.size),
+              ),
+              h(
+                "button",
+                {
+                  type: "button",
+                  className: "hades-kanban-drawer-close",
+                  title: tx(i18n, "removeAttachment", "Remove attachment"),
+                  onClick: function () {
+                    if (
+                      window.confirm(
+                        tx(
+                          i18n,
+                          "confirmRemoveAttachment",
+                          "Remove this attachment?",
+                        ),
+                      )
+                    ) {
+                      if (props.onDelete) props.onDelete(a.id);
+                    }
+                  },
+                },
+                "×",
+              ),
             );
           }),
     );
@@ -3184,43 +4783,70 @@
     const attachments = props.data.attachments || [];
     const links = props.data.links || { parents: [], children: [] };
 
-    return h("div", { className: "hades-kanban-drawer-body" },
-      h("div", { className: "hades-kanban-drawer-title" },
+    return h(
+      "div",
+      { className: "hades-kanban-drawer-body" },
+      h(
+        "div",
+        { className: "hades-kanban-drawer-title" },
         h("span", { className: cn("hades-kanban-dot", COLUMN_DOT[t.status]) }),
         props.editing
           ? h(TitleEditor, {
               initial: t.title || "",
               onSave: function (newTitle) {
-                return props.onPatch({ title: newTitle }).then(function () { props.setEditing(false); });
+                return props.onPatch({ title: newTitle }).then(function () {
+                  props.setEditing(false);
+                });
               },
-              onCancel: function () { props.setEditing(false); },
+              onCancel: function () {
+                props.setEditing(false);
+              },
             })
-          : h("span", {
-              className: "hades-kanban-drawer-title-text",
-              title: tx(i18n, "clickToEdit", "Click to edit"),
-              onClick: function () { props.setEditing(true); },
-            }, t.title || tx(i18n, "untitled", "(untitled)")),
+          : h(
+              "span",
+              {
+                className: "hades-kanban-drawer-title-text",
+                title: tx(i18n, "clickToEdit", "Click to edit"),
+                onClick: function () {
+                  props.setEditing(true);
+                },
+              },
+              t.title || tx(i18n, "untitled", "(untitled)"),
+            ),
       ),
-      h("div", { className: "hades-kanban-drawer-meta" },
+      h(
+        "div",
+        { className: "hades-kanban-drawer-meta" },
         h(MetaRow, { label: tx(i18n, "status", "Status"), value: t.status }),
         h(AssigneeEditor, { task: t, onPatch: props.onPatch }),
         h(PriorityEditor, { task: t, onPatch: props.onPatch }),
-        t.tenant ? h(MetaRow, { label: tx(i18n, "tenant", "Tenant"), value: t.tenant }) : null,
+        t.tenant
+          ? h(MetaRow, { label: tx(i18n, "tenant", "Tenant"), value: t.tenant })
+          : null,
         h(MetaRow, {
           label: tx(i18n, "workspace", "Workspace"),
           value: `${t.workspace_kind}${t.workspace_path ? ": " + t.workspace_path : ""}`,
         }),
-        (t.skills && t.skills.length > 0) ? h(MetaRow, {
-          label: tx(i18n, "skills", "Skills"),
-          value: t.skills.join(", "),
-        }) : null,
-        t.goal_mode ? h(MetaRow, {
-          label: tx(i18n, "goalMode", "Goal mode"),
-          value: t.goal_max_turns
-            ? `on (max ${t.goal_max_turns} turns)`
-            : "on",
-        }) : null,
-        t.created_by ? h(MetaRow, { label: tx(i18n, "createdBy", "Created by"), value: t.created_by }) : null,
+        t.skills && t.skills.length > 0
+          ? h(MetaRow, {
+              label: tx(i18n, "skills", "Skills"),
+              value: t.skills.join(", "),
+            })
+          : null,
+        t.goal_mode
+          ? h(MetaRow, {
+              label: tx(i18n, "goalMode", "Goal mode"),
+              value: t.goal_max_turns
+                ? `on (max ${t.goal_max_turns} turns)`
+                : "on",
+            })
+          : null,
+        t.created_by
+          ? h(MetaRow, {
+              label: tx(i18n, "createdBy", "Created by"),
+              value: t.created_by,
+            })
+          : null,
       ),
       h(StatusActions, {
         task: t,
@@ -3247,16 +4873,28 @@
       }),
       h(DependencyEditor, {
         task: t,
-        links, allTasks: props.allTasks,
+        links,
+        allTasks: props.allTasks,
         onAddParent: props.onAddParent,
         onRemoveParent: props.onRemoveParent,
         onAddChild: props.onAddChild,
         onRemoveChild: props.onRemoveChild,
       }),
-      t.result ? h("div", { className: "hades-kanban-section" },
-        h("div", { className: "hades-kanban-section-head" }, tx(i18n, "result", "Result")),
-        h(MarkdownBlock, { source: t.result, enabled: props.renderMarkdown }),
-      ) : null,
+      t.result
+        ? h(
+            "div",
+            { className: "hades-kanban-section" },
+            h(
+              "div",
+              { className: "hades-kanban-section-head" },
+              tx(i18n, "result", "Result"),
+            ),
+            h(MarkdownBlock, {
+              source: t.result,
+              enabled: props.renderMarkdown,
+            }),
+          )
+        : null,
       h(AttachmentsSection, {
         attachments: attachments,
         boardSlug: props.boardSlug,
@@ -3266,67 +4904,129 @@
         uploadErr: props.uploadErr,
         i18n: i18n,
       }),
-      h("div", { className: "hades-kanban-section" },
-        h("div", { className: "hades-kanban-section-head" },
-          `${tx(i18n, "comments", "Comments")} (${comments.length})`),
+      h(
+        "div",
+        { className: "hades-kanban-section" },
+        h(
+          "div",
+          { className: "hades-kanban-section-head" },
+          `${tx(i18n, "comments", "Comments")} (${comments.length})`,
+        ),
         comments.length === 0
-          ? h("div", { className: "text-xs text-muted-foreground" },
-              tx(i18n, "noComments", "— no comments —"))
+          ? h(
+              "div",
+              { className: "text-xs text-muted-foreground" },
+              tx(i18n, "noComments", "— no comments —"),
+            )
           : comments.map(function (c) {
-              return h("div", { key: c.id, className: "hades-kanban-comment" },
-                h("div", { className: "hades-kanban-comment-head" },
-                  h("span", { className: "hades-kanban-comment-author" }, c.author || "anon"),
-                  h("span", { className: "hades-kanban-comment-ago" },
-                    timeAgo ? timeAgo(c.created_at) : ""),
+              return h(
+                "div",
+                { key: c.id, className: "hades-kanban-comment" },
+                h(
+                  "div",
+                  { className: "hades-kanban-comment-head" },
+                  h(
+                    "span",
+                    { className: "hades-kanban-comment-author" },
+                    c.author || "anon",
+                  ),
+                  h(
+                    "span",
+                    { className: "hades-kanban-comment-ago" },
+                    timeAgo ? timeAgo(c.created_at) : "",
+                  ),
                 ),
-                h(MarkdownBlock, { source: c.body, enabled: props.renderMarkdown }),
+                h(MarkdownBlock, {
+                  source: c.body,
+                  enabled: props.renderMarkdown,
+                }),
               );
             }),
       ),
-      h("div", { className: "hades-kanban-section" },
-        h("div", { className: "hades-kanban-section-head" },
-          `${tx(i18n, "events", "Events")} (${events.length})`),
-        events.slice().reverse().slice(0, 20).map(function (e) {
-          const isDiag = isDiagnosticEvent(e.kind);
-          const phantoms = isDiag ? phantomIdsFromEvent(e) : [];
-          return h("div", {
-            key: e.id,
-            className: cn(
-              "hades-kanban-event",
-              isDiag ? "hades-kanban-event--hallucination" : "",
-            ),
-          },
-            isDiag
-              ? h("div", { className: "hades-kanban-event-header" },
-                  h("span", { className: "hades-kanban-event-warning-icon" }, "⚠"),
-                  h("span", { className: "hades-kanban-event-warning-label" },
-                    getDiagnosticEventLabel(i18n, e.kind) || e.kind),
-                  h("span", { className: "hades-kanban-event-ago" },
-                    timeAgo ? timeAgo(e.created_at) : ""),
-                )
-              : h("div", { className: "hades-kanban-event-header-plain" },
-                  h("span", { className: "hades-kanban-event-kind" }, e.kind),
-                  h("span", { className: "hades-kanban-event-ago" },
-                    timeAgo ? timeAgo(e.created_at) : ""),
+      h(
+        "div",
+        { className: "hades-kanban-section" },
+        h(
+          "div",
+          { className: "hades-kanban-section-head" },
+          `${tx(i18n, "events", "Events")} (${events.length})`,
+        ),
+        events
+          .slice()
+          .reverse()
+          .slice(0, 20)
+          .map(function (e) {
+            const isDiag = isDiagnosticEvent(e.kind);
+            const phantoms = isDiag ? phantomIdsFromEvent(e) : [];
+            return h(
+              "div",
+              {
+                key: e.id,
+                className: cn(
+                  "hades-kanban-event",
+                  isDiag ? "hades-kanban-event--hallucination" : "",
                 ),
-            isDiag && phantoms.length > 0
-              ? h("div", { className: "hades-kanban-event-phantom-row" },
-                  h("span", { className: "hades-kanban-event-phantom-label" },
-                    tx(i18n, "phantomIds", "Phantom ids:")),
-                  phantoms.map(function (pid) {
-                    return h("code", {
-                      key: pid,
-                      className: "hades-kanban-event-phantom-chip",
-                    }, pid);
-                  }),
-                )
-              : null,
-            e.payload && !isDiag
-              ? h("code", { className: "hades-kanban-event-payload" },
-                  JSON.stringify(e.payload))
-              : null,
-          );
-        }),
+              },
+              isDiag
+                ? h(
+                    "div",
+                    { className: "hades-kanban-event-header" },
+                    h(
+                      "span",
+                      { className: "hades-kanban-event-warning-icon" },
+                      "⚠",
+                    ),
+                    h(
+                      "span",
+                      { className: "hades-kanban-event-warning-label" },
+                      getDiagnosticEventLabel(i18n, e.kind) || e.kind,
+                    ),
+                    h(
+                      "span",
+                      { className: "hades-kanban-event-ago" },
+                      timeAgo ? timeAgo(e.created_at) : "",
+                    ),
+                  )
+                : h(
+                    "div",
+                    { className: "hades-kanban-event-header-plain" },
+                    h("span", { className: "hades-kanban-event-kind" }, e.kind),
+                    h(
+                      "span",
+                      { className: "hades-kanban-event-ago" },
+                      timeAgo ? timeAgo(e.created_at) : "",
+                    ),
+                  ),
+              isDiag && phantoms.length > 0
+                ? h(
+                    "div",
+                    { className: "hades-kanban-event-phantom-row" },
+                    h(
+                      "span",
+                      { className: "hades-kanban-event-phantom-label" },
+                      tx(i18n, "phantomIds", "Phantom ids:"),
+                    ),
+                    phantoms.map(function (pid) {
+                      return h(
+                        "code",
+                        {
+                          key: pid,
+                          className: "hades-kanban-event-phantom-chip",
+                        },
+                        pid,
+                      );
+                    }),
+                  )
+                : null,
+              e.payload && !isDiag
+                ? h(
+                    "code",
+                    { className: "hades-kanban-event-payload" },
+                    JSON.stringify(e.payload),
+                  )
+                : null,
+            );
+          }),
       ),
       h(WorkerLogSection, { taskId: t.id, boardSlug: props.boardSlug }),
       h(RunHistorySection, { runs: props.data.runs || [] }),
@@ -3353,32 +5053,60 @@
       return `${(secs / 3600).toFixed(1)}h`;
     };
 
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head-row" },
-        h("span", { className: "hades-kanban-section-head" },
-          `${tx(t, "runHistory", "Run history")} (${runs.length})`),
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head-row" },
+        h(
+          "span",
+          { className: "hades-kanban-section-head" },
+          `${tx(t, "runHistory", "Run history")} (${runs.length})`,
+        ),
         !showAll
-          ? h("button", {
-              type: "button",
-              onClick: function () { setExpanded(true); },
-              className: "hades-kanban-edit-link",
-              title: tx(t, "showAllAttempts", "Show all attempts"),
-            }, `+${runs.length - 3} earlier`)
+          ? h(
+              "button",
+              {
+                type: "button",
+                onClick: function () {
+                  setExpanded(true);
+                },
+                className: "hades-kanban-edit-link",
+                title: tx(t, "showAllAttempts", "Show all attempts"),
+              },
+              `+${runs.length - 3} earlier`,
+            )
           : null,
       ),
       visible.map(function (r) {
         const outcomeClass = r.ended_at
           ? `hades-kanban-run--${r.outcome || r.status || "ended"}`
           : "hades-kanban-run--active";
-        return h("div", { key: r.id, className: cn("hades-kanban-run", outcomeClass) },
-          h("div", { className: "hades-kanban-run-head" },
-            h("span", { className: "hades-kanban-run-outcome" },
-              r.ended_at ? (r.outcome || r.status || tx(t, "ended", "ended")) : tx(t, "active", "active")),
-            h("span", { className: "hades-kanban-run-profile" },
-              r.profile ? `@${r.profile}` : tx(t, "noProfile", "(no profile)")),
+        return h(
+          "div",
+          { key: r.id, className: cn("hades-kanban-run", outcomeClass) },
+          h(
+            "div",
+            { className: "hades-kanban-run-head" },
+            h(
+              "span",
+              { className: "hades-kanban-run-outcome" },
+              r.ended_at
+                ? r.outcome || r.status || tx(t, "ended", "ended")
+                : tx(t, "active", "active"),
+            ),
+            h(
+              "span",
+              { className: "hades-kanban-run-profile" },
+              r.profile ? `@${r.profile}` : tx(t, "noProfile", "(no profile)"),
+            ),
             h("span", { className: "hades-kanban-run-elapsed" }, fmtElapsed(r)),
-            h("span", { className: "hades-kanban-run-ago" },
-              timeAgo ? timeAgo(r.started_at) : ""),
+            h(
+              "span",
+              { className: "hades-kanban-run-ago" },
+              timeAgo ? timeAgo(r.started_at) : "",
+            ),
           ),
           r.summary
             ? h("div", { className: "hades-kanban-run-summary" }, r.summary)
@@ -3386,15 +5114,21 @@
           r.error
             ? h("div", { className: "hades-kanban-run-error" }, r.error)
             : null,
-          (r.metadata && Object.keys(r.metadata).length > 0)
+          r.metadata && Object.keys(r.metadata).length > 0
             ? (function () {
                 var json = JSON.stringify(r.metadata, null, 2);
                 var collapsed = json.length > 300;
-                return h("details", {
+                return h(
+                  "details",
+                  {
                     className: "hades-kanban-run-meta-block",
                     open: !collapsed,
                   },
-                  h("summary", { className: "hades-kanban-run-meta-label" }, "Metadata"),
+                  h(
+                    "summary",
+                    { className: "hades-kanban-run-meta-label" },
+                    "Metadata",
+                  ),
                   h("code", { className: "hades-kanban-run-meta" }, json),
                 );
               })()
@@ -3407,57 +5141,111 @@
   // Worker log: loads lazily (one GET on mount), refresh button, tail cap.
   function WorkerLogSection(props) {
     const { t } = useI18n();
-    const [state, setState] = useState({ loading: false, data: null, err: null });
-    const load = useCallback(function () {
-      setState({ loading: true, data: null, err: null });
-      SDK.fetchJSON(withBoard(`${API}/tasks/${encodeURIComponent(props.taskId)}/log?tail=100000`, props.boardSlug))
-        .then(function (d) { setState({ loading: false, data: d, err: null }); })
-        .catch(function (e) { setState({ loading: false, data: null, err: String(e.message || e) }); });
-    }, [props.taskId, props.boardSlug]);
+    const [state, setState] = useState({
+      loading: false,
+      data: null,
+      err: null,
+    });
+    const load = useCallback(
+      function () {
+        setState({ loading: true, data: null, err: null });
+        SDK.fetchJSON(
+          withBoard(
+            `${API}/tasks/${encodeURIComponent(props.taskId)}/log?tail=100000`,
+            props.boardSlug,
+          ),
+        )
+          .then(function (d) {
+            setState({ loading: false, data: d, err: null });
+          })
+          .catch(function (e) {
+            setState({
+              loading: false,
+              data: null,
+              err: String(e.message || e),
+            });
+          });
+      },
+      [props.taskId, props.boardSlug],
+    );
 
     // Auto-load when the section mounts; the user opened the drawer so the
     // cost is one small HTTP round-trip.
-    useEffect(function () { load(); }, [load]);
+    useEffect(
+      function () {
+        load();
+      },
+      [load],
+    );
 
     const data = state.data;
     let body;
     if (state.loading) {
-      body = h("div", { className: "text-xs text-muted-foreground" },
-        tx(t, "loadingLog", "Loading log…"));
+      body = h(
+        "div",
+        { className: "text-xs text-muted-foreground" },
+        tx(t, "loadingLog", "Loading log…"),
+      );
     } else if (state.err) {
       body = h("div", { className: "text-xs text-destructive" }, state.err);
     } else if (!data || !data.exists) {
-      body = h("div", { className: "text-xs text-muted-foreground italic" },
-        tx(t, "noWorkerLog",
-          "— no worker log yet (task hasn't spawned or log was rotated away) —"));
+      body = h(
+        "div",
+        { className: "text-xs text-muted-foreground italic" },
+        tx(
+          t,
+          "noWorkerLog",
+          "— no worker log yet (task hasn't spawned or log was rotated away) —",
+        ),
+      );
     } else {
-      body = h("pre", { className: "hades-kanban-pre hades-kanban-log" },
-        data.content || "(empty)");
+      body = h(
+        "pre",
+        { className: "hades-kanban-pre hades-kanban-log" },
+        data.content || "(empty)",
+      );
     }
 
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head-row" },
-        h("span", { className: "hades-kanban-section-head" },
-          tx(t, "workerLog", "Worker log") + (data && data.size_bytes ? ` (${data.size_bytes} B)` : "")),
-        h("button", {
-          type: "button",
-          onClick: load,
-          className: "hades-kanban-edit-link",
-          title: "Refresh log",
-        }, "refresh"),
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head-row" },
+        h(
+          "span",
+          { className: "hades-kanban-section-head" },
+          tx(t, "workerLog", "Worker log") +
+            (data && data.size_bytes ? ` (${data.size_bytes} B)` : ""),
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            onClick: load,
+            className: "hades-kanban-edit-link",
+            title: "Refresh log",
+          },
+          "refresh",
+        ),
       ),
       body,
       data && data.truncated
-        ? h("div", { className: "text-xs text-muted-foreground" },
+        ? h(
+            "div",
+            { className: "text-xs text-muted-foreground" },
             tx(t, "logTruncated", "(showing last 100 KB — full log at "),
             data.path,
-            tx(t, "logAt", ")"))
+            tx(t, "logAt", ")"),
+          )
         : null,
     );
   }
 
   function MetaRow(props) {
-    return h("div", { className: "hades-kanban-meta-row" },
+    return h(
+      "div",
+      { className: "hades-kanban-meta-row" },
       h("span", { className: "hades-kanban-meta-label" }, props.label),
       h("span", { className: "hades-kanban-meta-value" }, props.value),
     );
@@ -3471,22 +5259,30 @@
       if (!trimmed) return;
       props.onSave(trimmed);
     };
-    return h("div", { className: "hades-kanban-edit-row" },
+    return h(
+      "div",
+      { className: "hades-kanban-edit-row" },
       h(Input, {
-        value: v, autoFocus: true,
-        onChange: function (e) { setV(e.target.value); },
+        value: v,
+        autoFocus: true,
+        onChange: function (e) {
+          setV(e.target.value);
+        },
         onKeyDown: function (e) {
-          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          }
           if (e.key === "Escape") props.onCancel();
         },
         className: "h-8 text-sm flex-1",
       }),
-      h(Button, { onClick: save,
-        size: "sm",
-      }, tx(t, "save", "Save")),
-      h(Button, { onClick: props.onCancel,
-        size: "sm",
-      }, tx(t, "cancel", "Cancel")),
+      h(Button, { onClick: save, size: "sm" }, tx(t, "save", "Save")),
+      h(
+        Button,
+        { onClick: props.onCancel, size: "sm" },
+        tx(t, "cancel", "Cancel"),
+      ),
     );
   }
 
@@ -3494,27 +5290,58 @@
     const { t } = useI18n();
     const [editing, setEditing] = useState(false);
     const [v, setV] = useState(props.task.assignee || "");
-    useEffect(function () { setV(props.task.assignee || ""); }, [props.task.assignee]);
+    useEffect(
+      function () {
+        setV(props.task.assignee || "");
+      },
+      [props.task.assignee],
+    );
     if (!editing) {
-      return h("div", { className: "hades-kanban-meta-row" },
-        h("span", { className: "hades-kanban-meta-label" }, tx(t, "assignee", "Assignee")),
-        h("span", {
-          className: "hades-kanban-meta-value hades-kanban-editable",
-          onClick: function () { setEditing(true); },
-          title: tx(t, "clickToEditAssignee", "Click to edit assignee"),
-        }, props.task.assignee || tx(t, "unassigned", "unassigned")),
+      return h(
+        "div",
+        { className: "hades-kanban-meta-row" },
+        h(
+          "span",
+          { className: "hades-kanban-meta-label" },
+          tx(t, "assignee", "Assignee"),
+        ),
+        h(
+          "span",
+          {
+            className: "hades-kanban-meta-value hades-kanban-editable",
+            onClick: function () {
+              setEditing(true);
+            },
+            title: tx(t, "clickToEditAssignee", "Click to edit assignee"),
+          },
+          props.task.assignee || tx(t, "unassigned", "unassigned"),
+        ),
       );
     }
     const save = function () {
-      props.onPatch({ assignee: v.trim() || "" }).then(function () { setEditing(false); });
+      props.onPatch({ assignee: v.trim() || "" }).then(function () {
+        setEditing(false);
+      });
     };
-    return h("div", { className: "hades-kanban-meta-row" },
-      h("span", { className: "hades-kanban-meta-label" }, tx(t, "assignee", "Assignee")),
+    return h(
+      "div",
+      { className: "hades-kanban-meta-row" },
+      h(
+        "span",
+        { className: "hades-kanban-meta-label" },
+        tx(t, "assignee", "Assignee"),
+      ),
       h(Input, {
-        value: v, autoFocus: true,
-        onChange: function (e) { setV(e.target.value); },
+        value: v,
+        autoFocus: true,
+        onChange: function (e) {
+          setV(e.target.value);
+        },
         onKeyDown: function (e) {
-          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          }
           if (e.key === "Escape") setEditing(false);
         },
         placeholder: tx(t, "emptyAssignee", "(empty = unassign)"),
@@ -3531,27 +5358,59 @@
     const { t } = useI18n();
     const [editing, setEditing] = useState(false);
     const [v, setV] = useState(String(props.task.priority || 0));
-    useEffect(function () { setV(String(props.task.priority || 0)); }, [props.task.priority]);
+    useEffect(
+      function () {
+        setV(String(props.task.priority || 0));
+      },
+      [props.task.priority],
+    );
     if (!editing) {
-      return h("div", { className: "hades-kanban-meta-row" },
-        h("span", { className: "hades-kanban-meta-label" }, tx(t, "priority", "Priority")),
-        h("span", {
-          className: "hades-kanban-meta-value hades-kanban-editable",
-          onClick: function () { setEditing(true); },
-          title: tx(t, "clickToEdit", "Click to edit"),
-        }, String(props.task.priority)),
+      return h(
+        "div",
+        { className: "hades-kanban-meta-row" },
+        h(
+          "span",
+          { className: "hades-kanban-meta-label" },
+          tx(t, "priority", "Priority"),
+        ),
+        h(
+          "span",
+          {
+            className: "hades-kanban-meta-value hades-kanban-editable",
+            onClick: function () {
+              setEditing(true);
+            },
+            title: tx(t, "clickToEdit", "Click to edit"),
+          },
+          String(props.task.priority),
+        ),
       );
     }
     const save = function () {
-      props.onPatch({ priority: Number(v) || 0 }).then(function () { setEditing(false); });
+      props.onPatch({ priority: Number(v) || 0 }).then(function () {
+        setEditing(false);
+      });
     };
-    return h("div", { className: "hades-kanban-meta-row" },
-      h("span", { className: "hades-kanban-meta-label" }, tx(t, "priority", "Priority")),
+    return h(
+      "div",
+      { className: "hades-kanban-meta-row" },
+      h(
+        "span",
+        { className: "hades-kanban-meta-label" },
+        tx(t, "priority", "Priority"),
+      ),
       h(Input, {
-        type: "number", value: v, autoFocus: true,
-        onChange: function (e) { setV(e.target.value); },
+        type: "number",
+        value: v,
+        autoFocus: true,
+        onChange: function (e) {
+          setV(e.target.value);
+        },
         onKeyDown: function (e) {
-          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          }
           if (e.key === "Escape") setEditing(false);
         },
         className: "h-7 text-xs w-20",
@@ -3563,40 +5422,77 @@
     const { t } = useI18n();
     const [editing, setEditing] = useState(false);
     const [v, setV] = useState(props.task.body || "");
-    useEffect(function () { setV(props.task.body || ""); }, [props.task.body]);
+    useEffect(
+      function () {
+        setV(props.task.body || "");
+      },
+      [props.task.body],
+    );
     const save = function () {
-      props.onPatch({ body: v }).then(function () { setEditing(false); });
+      props.onPatch({ body: v }).then(function () {
+        setEditing(false);
+      });
     };
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head-row" },
-        h("span", { className: "hades-kanban-section-head" }, tx(t, "description", "Description")),
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head-row" },
+        h(
+          "span",
+          { className: "hades-kanban-section-head" },
+          tx(t, "description", "Description"),
+        ),
         editing
-          ? h("div", { className: "flex gap-1" },
-              h(Button, { onClick: save,
-                size: "sm",
-              }, tx(t, "save", "Save")),
-              h(Button, { onClick: function () { setEditing(false); setV(props.task.body || ""); },
-                size: "sm",
-              }, tx(t, "cancel", "Cancel")),
+          ? h(
+              "div",
+              { className: "flex gap-1" },
+              h(Button, { onClick: save, size: "sm" }, tx(t, "save", "Save")),
+              h(
+                Button,
+                {
+                  onClick: function () {
+                    setEditing(false);
+                    setV(props.task.body || "");
+                  },
+                  size: "sm",
+                },
+                tx(t, "cancel", "Cancel"),
+              ),
             )
-          : h("button", {
-              type: "button",
-              onClick: function () { setEditing(true); },
-              className: "hades-kanban-edit-link",
-              title: "Edit description",
-            }, tx(t, "edit", "edit")),
+          : h(
+              "button",
+              {
+                type: "button",
+                onClick: function () {
+                  setEditing(true);
+                },
+                className: "hades-kanban-edit-link",
+                title: "Edit description",
+              },
+              tx(t, "edit", "edit"),
+            ),
       ),
       editing
         ? h("textarea", {
             className: "hades-kanban-textarea",
             value: v,
             rows: 8,
-            onChange: function (e) { setV(e.target.value); },
+            onChange: function (e) {
+              setV(e.target.value);
+            },
           })
         : props.task.body
-          ? h(MarkdownBlock, { source: props.task.body, enabled: props.renderMarkdown })
-          : h("div", { className: "text-xs text-muted-foreground italic" },
-              tx(t, "noDescription", "— no description —")),
+          ? h(MarkdownBlock, {
+              source: props.task.body,
+              enabled: props.renderMarkdown,
+            })
+          : h(
+              "div",
+              { className: "text-xs text-muted-foreground italic" },
+              tx(t, "noDescription", "— no description —"),
+            ),
     );
   }
 
@@ -3612,85 +5508,163 @@
       });
     };
     const parentExclude = new Set([task.id, ...(links.parents || [])]);
-    const childExclude  = new Set([task.id, ...(links.children || [])]);
+    const childExclude = new Set([task.id, ...(links.children || [])]);
 
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head" }, tx(t, "dependencies", "Dependencies")),
-      h("div", { className: "hades-kanban-deps-row" },
-        h("span", { className: "hades-kanban-deps-label" }, tx(t, "parents", "Parents:")),
-        h("div", { className: "hades-kanban-deps-chips" },
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head" },
+        tx(t, "dependencies", "Dependencies"),
+      ),
+      h(
+        "div",
+        { className: "hades-kanban-deps-row" },
+        h(
+          "span",
+          { className: "hades-kanban-deps-label" },
+          tx(t, "parents", "Parents:"),
+        ),
+        h(
+          "div",
+          { className: "hades-kanban-deps-chips" },
           (links.parents || []).length === 0
-            ? h("span", { className: "hades-kanban-deps-empty" }, tx(t, "none", "none"))
+            ? h(
+                "span",
+                { className: "hades-kanban-deps-empty" },
+                tx(t, "none", "none"),
+              )
             : (links.parents || []).map(function (id) {
-                return h("span", { key: id, className: "hades-kanban-dep-chip" },
+                return h(
+                  "span",
+                  { key: id, className: "hades-kanban-dep-chip" },
                   id,
-                  h("button", {
-                    type: "button",
-                    className: "hades-kanban-dep-chip-x",
-                    onClick: function () { props.onRemoveParent(id); },
-                    title: tx(t, "removeDependency", "Remove dependency"),
-                  }, "×"),
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      className: "hades-kanban-dep-chip-x",
+                      onClick: function () {
+                        props.onRemoveParent(id);
+                      },
+                      title: tx(t, "removeDependency", "Remove dependency"),
+                    },
+                    "×",
+                  ),
                 );
               }),
         ),
       ),
-      h("div", { className: "hades-kanban-deps-row" },
-        h(Select, Object.assign({
-          value: newParent,
-          className: "h-7 text-xs flex-1",
-        }, selectChangeHandler(setNewParent)),
+      h(
+        "div",
+        { className: "hades-kanban-deps-row" },
+        h(
+          Select,
+          Object.assign(
+            {
+              value: newParent,
+              className: "h-7 text-xs flex-1",
+            },
+            selectChangeHandler(setNewParent),
+          ),
           h(SelectOption, { value: "" }, tx(t, "addParent", "— add parent —")),
           candidatesFor(parentExclude).map(function (tk) {
-            return h(SelectOption, { key: tk.id, value: tk.id },
-              `${tk.id} — ${(tk.title || "").slice(0, 50)}`);
+            return h(
+              SelectOption,
+              { key: tk.id, value: tk.id },
+              `${tk.id} — ${(tk.title || "").slice(0, 50)}`,
+            );
           }),
         ),
-        h(Button, {
-          onClick: function () {
-            if (!newParent) return;
-            props.onAddParent(newParent).then(function () { setNewParent(""); });
+        h(
+          Button,
+          {
+            onClick: function () {
+              if (!newParent) return;
+              props.onAddParent(newParent).then(function () {
+                setNewParent("");
+              });
+            },
+            disabled: !newParent,
+            size: "sm",
           },
-          disabled: !newParent,
-          size: "sm",
-        }, "+ parent"),
+          "+ parent",
+        ),
       ),
-      h("div", { className: "hades-kanban-deps-row" },
-        h("span", { className: "hades-kanban-deps-label" }, tx(t, "children", "Children:")),
-        h("div", { className: "hades-kanban-deps-chips" },
+      h(
+        "div",
+        { className: "hades-kanban-deps-row" },
+        h(
+          "span",
+          { className: "hades-kanban-deps-label" },
+          tx(t, "children", "Children:"),
+        ),
+        h(
+          "div",
+          { className: "hades-kanban-deps-chips" },
           (links.children || []).length === 0
-            ? h("span", { className: "hades-kanban-deps-empty" }, tx(t, "none", "none"))
+            ? h(
+                "span",
+                { className: "hades-kanban-deps-empty" },
+                tx(t, "none", "none"),
+              )
             : (links.children || []).map(function (id) {
-                return h("span", { key: id, className: "hades-kanban-dep-chip" },
+                return h(
+                  "span",
+                  { key: id, className: "hades-kanban-dep-chip" },
                   id,
-                  h("button", {
-                    type: "button",
-                    className: "hades-kanban-dep-chip-x",
-                    onClick: function () { props.onRemoveChild(id); },
-                    title: tx(t, "removeDependency", "Remove dependency"),
-                  }, "×"),
+                  h(
+                    "button",
+                    {
+                      type: "button",
+                      className: "hades-kanban-dep-chip-x",
+                      onClick: function () {
+                        props.onRemoveChild(id);
+                      },
+                      title: tx(t, "removeDependency", "Remove dependency"),
+                    },
+                    "×",
+                  ),
                 );
               }),
         ),
       ),
-      h("div", { className: "hades-kanban-deps-row" },
-        h(Select, Object.assign({
-          value: newChild,
-          className: "h-7 text-xs flex-1",
-        }, selectChangeHandler(setNewChild)),
+      h(
+        "div",
+        { className: "hades-kanban-deps-row" },
+        h(
+          Select,
+          Object.assign(
+            {
+              value: newChild,
+              className: "h-7 text-xs flex-1",
+            },
+            selectChangeHandler(setNewChild),
+          ),
           h(SelectOption, { value: "" }, tx(t, "addChild", "— add child —")),
           candidatesFor(childExclude).map(function (tk) {
-            return h(SelectOption, { key: tk.id, value: tk.id },
-              `${tk.id} — ${(tk.title || "").slice(0, 50)}`);
+            return h(
+              SelectOption,
+              { key: tk.id, value: tk.id },
+              `${tk.id} — ${(tk.title || "").slice(0, 50)}`,
+            );
           }),
         ),
-        h(Button, {
-          onClick: function () {
-            if (!newChild) return;
-            props.onAddChild(newChild).then(function () { setNewChild(""); });
+        h(
+          Button,
+          {
+            onClick: function () {
+              if (!newChild) return;
+              props.onAddChild(newChild).then(function () {
+                setNewChild("");
+              });
+            },
+            disabled: !newChild,
+            size: "sm",
           },
-          disabled: !newChild,
-          size: "sm",
-        }, "+ child"),
+          "+ child",
+        ),
       ),
     );
   }
@@ -3703,129 +5677,189 @@
     const [decomposeBusy, setDecomposeBusy] = useState(false);
     const [decomposeMsg, setDecomposeMsg] = useState(null);
     const b = function (label, patch, enabled, confirmMsg) {
-      return h(Button, {
-        onClick: function () { if (enabled !== false) props.onPatch(patch, { confirm: confirmMsg }); },
-        disabled: enabled === false,
-        size: "sm",
-      }, label);
+      return h(
+        Button,
+        {
+          onClick: function () {
+            if (enabled !== false)
+              props.onPatch(patch, { confirm: confirmMsg });
+          },
+          disabled: enabled === false,
+          size: "sm",
+        },
+        label,
+      );
     };
 
     // "Specify" appears only when the task is in the Triage column — the
     // one column where an auxiliary LLM pass is meaningful. Elsewhere
     // the backend would return ok:false with "not in triage" anyway,
     // so hiding the button keeps the action row uncluttered.
-    const specifyButton = (task.status === "triage" && props.onSpecify)
-      ? h(Button, {
-          onClick: function () {
-            if (specifyBusy) return;
-            setSpecifyBusy(true);
-            setSpecifyMsg(null);
-            props.onSpecify().then(function (res) {
-              if (res && res.ok) {
-                const suffix = res.new_title
-                  ? ` — retitled: ${res.new_title}`
-                  : "";
-                setSpecifyMsg({ ok: true, text: `Specified${suffix}` });
-              } else {
-                setSpecifyMsg({
-                  ok: false,
-                  text: "Specify failed: " + ((res && res.reason) || "unknown error"),
-                });
-              }
-            }).catch(function (err) {
-              setSpecifyMsg({
-                ok: false,
-                text: "Specify failed: " + (err.message || String(err)),
-              });
-            }).then(function () {
-              setSpecifyBusy(false);
-            });
-          },
-          disabled: specifyBusy,
-          size: "sm",
-        }, specifyBusy ? "Specifying…" : "✨ Specify")
-      : null;
+    const specifyButton =
+      task.status === "triage" && props.onSpecify
+        ? h(
+            Button,
+            {
+              onClick: function () {
+                if (specifyBusy) return;
+                setSpecifyBusy(true);
+                setSpecifyMsg(null);
+                props
+                  .onSpecify()
+                  .then(function (res) {
+                    if (res && res.ok) {
+                      const suffix = res.new_title
+                        ? ` — retitled: ${res.new_title}`
+                        : "";
+                      setSpecifyMsg({ ok: true, text: `Specified${suffix}` });
+                    } else {
+                      setSpecifyMsg({
+                        ok: false,
+                        text:
+                          "Specify failed: " +
+                          ((res && res.reason) || "unknown error"),
+                      });
+                    }
+                  })
+                  .catch(function (err) {
+                    setSpecifyMsg({
+                      ok: false,
+                      text: "Specify failed: " + (err.message || String(err)),
+                    });
+                  })
+                  .then(function () {
+                    setSpecifyBusy(false);
+                  });
+              },
+              disabled: specifyBusy,
+              size: "sm",
+            },
+            specifyBusy ? "Specifying…" : "✨ Specify",
+          )
+        : null;
 
     // "Decompose" is the built-in decomposer fan-out. Like Specify, only
     // makes sense on triage-column tasks — elsewhere the backend short-
     // circuits with ok:false. When the decomposer returns fanout:false
     // we render the same single-task message as Specify; when it fans
     // out we report the child count for quick at-a-glance verification.
-    const decomposeButton = (task.status === "triage" && props.onDecompose)
-      ? h(Button, {
-          onClick: function () {
-            if (decomposeBusy) return;
-            setDecomposeBusy(true);
-            setDecomposeMsg(null);
-            props.onDecompose().then(function (res) {
-              if (res && res.ok) {
-                if (res.fanout && res.child_ids && res.child_ids.length) {
-                  setDecomposeMsg({
-                    ok: true,
-                    text: `Decomposed into ${res.child_ids.length} children: ${res.child_ids.join(", ")}`,
+    const decomposeButton =
+      task.status === "triage" && props.onDecompose
+        ? h(
+            Button,
+            {
+              onClick: function () {
+                if (decomposeBusy) return;
+                setDecomposeBusy(true);
+                setDecomposeMsg(null);
+                props
+                  .onDecompose()
+                  .then(function (res) {
+                    if (res && res.ok) {
+                      if (res.fanout && res.child_ids && res.child_ids.length) {
+                        setDecomposeMsg({
+                          ok: true,
+                          text: `Decomposed into ${res.child_ids.length} children: ${res.child_ids.join(", ")}`,
+                        });
+                      } else {
+                        const suffix = res.new_title
+                          ? ` — retitled: ${res.new_title}`
+                          : "";
+                        setDecomposeMsg({
+                          ok: true,
+                          text: `Single task (no fanout)${suffix}`,
+                        });
+                      }
+                    } else {
+                      setDecomposeMsg({
+                        ok: false,
+                        text:
+                          "Decompose failed: " +
+                          ((res && res.reason) || "unknown error"),
+                      });
+                    }
+                  })
+                  .catch(function (err) {
+                    setDecomposeMsg({
+                      ok: false,
+                      text: "Decompose failed: " + (err.message || String(err)),
+                    });
+                  })
+                  .then(function () {
+                    setDecomposeBusy(false);
                   });
-                } else {
-                  const suffix = res.new_title
-                    ? ` — retitled: ${res.new_title}`
-                    : "";
-                  setDecomposeMsg({
-                    ok: true,
-                    text: `Single task (no fanout)${suffix}`,
-                  });
-                }
-              } else {
-                setDecomposeMsg({
-                  ok: false,
-                  text: "Decompose failed: " + ((res && res.reason) || "unknown error"),
-                });
-              }
-            }).catch(function (err) {
-              setDecomposeMsg({
-                ok: false,
-                text: "Decompose failed: " + (err.message || String(err)),
-              });
-            }).then(function () {
-              setDecomposeBusy(false);
-            });
-          },
-          disabled: decomposeBusy,
-          size: "sm",
-        }, decomposeBusy ? "Decomposing…" : "⚗ Decompose")
-      : null;
+              },
+              disabled: decomposeBusy,
+              size: "sm",
+            },
+            decomposeBusy ? "Decomposing…" : "⚗ Decompose",
+          )
+        : null;
 
-    return h("div", null,
-      h("div", { className: "hades-kanban-actions" },
+    return h(
+      "div",
+      null,
+      h(
+        "div",
+        { className: "hades-kanban-actions" },
         specifyButton,
         decomposeButton,
-        b("→ triage",  { status: "triage" },   task.status !== "triage"),
-        b("→ ready",   { status: "ready" },    task.status !== "ready"),
+        b("→ triage", { status: "triage" }, task.status !== "triage"),
+        b("→ ready", { status: "ready" }, task.status !== "ready"),
         // No direct → running button: /tasks/:id PATCH rejects status=running
         // with 400 (issue #19535). Tasks enter running only through the
         // dispatcher's claim_task path, which atomically creates the run row,
         // claim lock, and worker process metadata.
-        b(tx(t, "block", "Block"),     { status: "blocked" },
+        b(
+          tx(t, "block", "Block"),
+          { status: "blocked" },
           task.status === "running" || task.status === "ready",
-          getDestructiveConfirm(t, "blocked")),
-        b(tx(t, "unblock", "Unblock"),   { status: "ready" },    task.status === "blocked"),
-        b(tx(t, "complete", "Complete"),  { status: "done" },
-          task.status === "running" || task.status === "ready" || task.status === "blocked",
-          getDestructiveConfirm(t, "done")),
-        b(tx(t, "archive", "Archive"),   { status: "archived" }, task.status !== "archived",
-          getDestructiveConfirm(t, "archived")),
+          getDestructiveConfirm(t, "blocked"),
+        ),
+        b(
+          tx(t, "unblock", "Unblock"),
+          { status: "ready" },
+          task.status === "blocked",
+        ),
+        b(
+          tx(t, "complete", "Complete"),
+          { status: "done" },
+          task.status === "running" ||
+            task.status === "ready" ||
+            task.status === "blocked",
+          getDestructiveConfirm(t, "done"),
+        ),
+        b(
+          tx(t, "archive", "Archive"),
+          { status: "archived" },
+          task.status !== "archived",
+          getDestructiveConfirm(t, "archived"),
+        ),
       ),
-      specifyMsg ? h("div", {
-        className: specifyMsg.ok
-          ? "hades-kanban-msg-ok"
-          : "hades-kanban-msg-err",
-      }, specifyMsg.text) : null,
-      decomposeMsg ? h("div", {
-        className: decomposeMsg.ok
-          ? "hades-kanban-msg-ok"
-          : "hades-kanban-msg-err",
-      }, decomposeMsg.text) : null,
+      specifyMsg
+        ? h(
+            "div",
+            {
+              className: specifyMsg.ok
+                ? "hades-kanban-msg-ok"
+                : "hades-kanban-msg-err",
+            },
+            specifyMsg.text,
+          )
+        : null,
+      decomposeMsg
+        ? h(
+            "div",
+            {
+              className: decomposeMsg.ok
+                ? "hades-kanban-msg-ok"
+                : "hades-kanban-msg-err",
+            },
+            decomposeMsg.text,
+          )
+        : null,
     );
   }
-
 
   // One toggle per gateway platform the user has a home channel set on
   // (telegram, discord, slack, etc.). Toggling on creates a kanban_notify_subs
@@ -3837,10 +5871,17 @@
     const channels = props.homeChannels || [];
     if (channels.length === 0) return null;
     const busy = props.homeBusy || {};
-    return h("div", { className: "hades-kanban-section" },
-      h("div", { className: "hades-kanban-section-head" },
-        tx(t, "notifyHomeChannels", "Notify home channels")),
-      h("div", { className: "hades-kanban-home-subs" },
+    return h(
+      "div",
+      { className: "hades-kanban-section" },
+      h(
+        "div",
+        { className: "hades-kanban-section-head" },
+        tx(t, "notifyHomeChannels", "Notify home channels"),
+      ),
+      h(
+        "div",
+        { className: "hades-kanban-home-subs" },
         channels.map(function (hc) {
           const isBusy = !!busy[hc.platform];
           const label = hc.subscribed ? "✓ " + hc.platform : hc.platform;
@@ -3848,20 +5889,24 @@
           const title = hc.subscribed
             ? `${tx(t, "sendingUpdates", "Sending updates to")} ${target}. Click to stop.`
             : `${tx(t, "sendNotifications", "Send completed / blocked / gave_up notifications to")} ${target}.`;
-          return h(Button, {
-            key: hc.platform,
-            size: "sm",
-            title: title,
-            disabled: isBusy || !props.onToggle,
-            onClick: function () {
-              if (props.onToggle) props.onToggle(hc.platform, hc.subscribed);
+          return h(
+            Button,
+            {
+              key: hc.platform,
+              size: "sm",
+              title: title,
+              disabled: isBusy || !props.onToggle,
+              onClick: function () {
+                if (props.onToggle) props.onToggle(hc.platform, hc.subscribed);
+              },
+              className: hc.subscribed
+                ? "hades-kanban-home-sub hades-kanban-home-sub--on"
+                : "hades-kanban-home-sub",
             },
-            className: hc.subscribed
-              ? "hades-kanban-home-sub hades-kanban-home-sub--on"
-              : "hades-kanban-home-sub",
-          }, label);
-        })
-      )
+            label,
+          );
+        }),
+      ),
     );
   }
 
@@ -3869,7 +5914,10 @@
   // Register
   // -------------------------------------------------------------------------
 
-  if (window.__HADES_PLUGINS__ && typeof window.__HADES_PLUGINS__.register === "function") {
+  if (
+    window.__HADES_PLUGINS__ &&
+    typeof window.__HADES_PLUGINS__.register === "function"
+  ) {
     window.__HADES_PLUGINS__.register("kanban", KanbanPage);
   }
 })();

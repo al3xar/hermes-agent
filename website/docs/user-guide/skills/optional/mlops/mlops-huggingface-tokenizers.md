@@ -75,7 +75,7 @@ tokenizer = Tokenizer.from_pretrained("bert-base-uncased")
 # Encode text
 output = tokenizer.encode("Hello, how are you?")
 print(output.tokens)  # ['hello', ',', 'how', 'are', 'you', '?']
-print(output.ids)     # [7592, 1010, 2129, 2024, 2017, 1029]
+print(output.ids)  # [7592, 1010, 2129, 2024, 2017, 1029]
 
 # Decode back
 text = tokenizer.decode(output.ids)
@@ -98,7 +98,7 @@ tokenizer.pre_tokenizer = Whitespace()
 trainer = BpeTrainer(
     vocab_size=30000,
     special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
-    min_frequency=2
+    min_frequency=2,
 )
 
 # Train on files
@@ -149,9 +149,7 @@ tokenizer = Tokenizer(BPE(unk_token="<|endoftext|>"))
 tokenizer.pre_tokenizer = ByteLevel()
 
 trainer = BpeTrainer(
-    vocab_size=50257,
-    special_tokens=["<|endoftext|>"],
-    min_frequency=2
+    vocab_size=50257, special_tokens=["<|endoftext|>"], min_frequency=2
 )
 
 tokenizer.train(files=["data.txt"], trainer=trainer)
@@ -190,7 +188,7 @@ tokenizer.pre_tokenizer = Whitespace()
 trainer = WordPieceTrainer(
     vocab_size=30522,
     special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
-    continuing_subword_prefix="##"
+    continuing_subword_prefix="##",
 )
 
 tokenizer.train(files=["corpus.txt"], trainer=trainer)
@@ -222,9 +220,7 @@ from tokenizers.trainers import UnigramTrainer
 tokenizer = Tokenizer(Unigram())
 
 trainer = UnigramTrainer(
-    vocab_size=8000,
-    special_tokens=["<unk>", "<s>", "</s>"],
-    unk_token="<unk>"
+    vocab_size=8000, special_tokens=["<unk>", "<s>", "</s>"], unk_token="<unk>"
 )
 
 tokenizer.train(files=["data.txt"], trainer=trainer)
@@ -251,9 +247,9 @@ Clean and standardize text:
 from tokenizers.normalizers import NFD, StripAccents, Lowercase, Sequence
 
 tokenizer.normalizer = Sequence([
-    NFD(),           # Unicode normalization (decompose)
-    Lowercase(),     # Convert to lowercase
-    StripAccents()   # Remove accents
+    NFD(),  # Unicode normalization (decompose)
+    Lowercase(),  # Convert to lowercase
+    StripAccents(),  # Remove accents
 ])
 
 # Input: "Héllo WORLD"
@@ -275,10 +271,7 @@ Split text into word-like units:
 from tokenizers.pre_tokenizers import Whitespace, Punctuation, Sequence, ByteLevel
 
 # Split on whitespace and punctuation
-tokenizer.pre_tokenizer = Sequence([
-    Whitespace(),
-    Punctuation()
-])
+tokenizer.pre_tokenizer = Sequence([Whitespace(), Punctuation()])
 
 # Input: "Hello, world!"
 # After pre-tokenization: ["Hello", ",", "world", "!"]
@@ -312,16 +305,13 @@ tokenizer.post_processor = TemplateProcessing(
 **Common patterns**:
 ```python
 # GPT-2: sentence <|endoftext|>
-TemplateProcessing(
-    single="$A <|endoftext|>",
-    special_tokens=[("<|endoftext|>", 50256)]
-)
+TemplateProcessing(single="$A <|endoftext|>", special_tokens=[("<|endoftext|>", 50256)])
 
 # RoBERTa: <s> sentence </s>
 TemplateProcessing(
     single="<s> $A </s>",
     pair="<s> $A </s> </s> $B </s>",
-    special_tokens=[("<s>", 0), ("</s>", 2)]
+    special_tokens=[("<s>", 0), ("</s>", 2)],
 )
 ```
 
@@ -385,16 +375,12 @@ transformers_tokenizer = PreTrainedTokenizerFast(
     pad_token="[PAD]",
     cls_token="[CLS]",
     sep_token="[SEP]",
-    mask_token="[MASK]"
+    mask_token="[MASK]",
 )
 
 # Use like any transformers tokenizer
 outputs = transformers_tokenizer(
-    "Hello world",
-    padding=True,
-    truncation=True,
-    max_length=512,
-    return_tensors="pt"
+    "Hello world", padding=True, truncation=True, max_length=512, return_tensors="pt"
 )
 ```
 
@@ -408,16 +394,18 @@ from datasets import load_dataset
 # Load dataset
 dataset = load_dataset("wikitext", "wikitext-103-raw-v1", split="train")
 
+
 # Create batch iterator
 def batch_iterator(batch_size=1000):
     for i in range(0, len(dataset), batch_size):
-        yield dataset[i:i + batch_size]["text"]
+        yield dataset[i : i + batch_size]["text"]
+
 
 # Train tokenizer
 tokenizer.train_from_iterator(
     batch_iterator(),
     trainer=trainer,
-    length=len(dataset)  # For progress bar
+    length=len(dataset),  # For progress bar
 )
 ```
 
@@ -433,7 +421,7 @@ tokenizer.enable_truncation(max_length=512)
 tokenizer.enable_padding(
     pad_id=tokenizer.token_to_id("[PAD]"),
     pad_token="[PAD]",
-    length=512  # Fixed length, or None for batch max
+    length=512,  # Fixed length, or None for batch max
 )
 
 # Encode with both
@@ -450,14 +438,16 @@ from multiprocessing import Pool
 # Load tokenizer
 tokenizer = Tokenizer.from_file("tokenizer.json")
 
+
 def encode_batch(texts):
     return tokenizer.encode_batch(texts)
+
 
 # Process large corpus in parallel
 with Pool(8) as pool:
     # Split corpus into chunks
     chunk_size = 1000
-    chunks = [corpus[i:i+chunk_size] for i in range(0, len(corpus), chunk_size)]
+    chunks = [corpus[i : i + chunk_size] for i in range(0, len(corpus), chunk_size)]
 
     # Encode in parallel
     results = pool.map(encode_batch, chunks)
@@ -521,10 +511,10 @@ Browse all: https://huggingface.co/models?library=tokenizers
 
 ## References
 
-- **[Training Guide](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/training.md)** - Train custom tokenizers, configure trainers, handle large datasets
-- **[Algorithms Deep Dive](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/algorithms.md)** - BPE, WordPiece, Unigram explained in detail
-- **[Pipeline Components](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/pipeline.md)** - Normalizers, pre-tokenizers, post-processors, decoders
-- **[Transformers Integration](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/integration.md)** - AutoTokenizer, PreTrainedTokenizerFast, special tokens
+- **[Training Guide](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/training.md)** - Train custom tokenizers, configure trainers, handle large datasets
+- **[Algorithms Deep Dive](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/algorithms.md)** - BPE, WordPiece, Unigram explained in detail
+- **[Pipeline Components](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/pipeline.md)** - Normalizers, pre-tokenizers, post-processors, decoders
+- **[Transformers Integration](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/huggingface-tokenizers/references/integration.md)** - AutoTokenizer, PreTrainedTokenizerFast, special tokens
 
 ## Resources
 

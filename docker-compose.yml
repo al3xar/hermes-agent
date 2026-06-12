@@ -136,6 +136,9 @@ services:
       - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-admin@hades.local}
       - LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME:-Hades Admin}
       - LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_INIT_USER_PASSWORD:-hades-admin-change-me}
+      - LANGFUSE_LLM_CONNECTION_WHITELISTED_HOST=vllm.athena.cibertrs.cloud
+      - LANGFUSE_LLM_CONNECTION_WHITELISTED_IPS=10.200.129.124
+      - LANGFUSE_LLM_CONNECTION_WHITELISTED_IP_SEGMENTS=10.200.0.0/16
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
@@ -172,6 +175,9 @@ services:
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
       - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
       - LANGFUSE_S3_MEDIA_UPLOAD_REGION=us-east-1
+      - LANGFUSE_LLM_CONNECTION_WHITELISTED_HOST=vllm.athena.cibertrs.cloud
+      - LANGFUSE_LLM_CONNECTION_WHITELISTED_IPS=10.200.129.124
+      - LANGFUSE_LLM_CONNECTION_WHITELISTED_IP_SEGMENTS=10.200.0.0/16
 
   langfuse-db:
     image: postgres:17
@@ -213,7 +219,15 @@ services:
       - langfuse-clickhouse-data:/var/lib/clickhouse
       - langfuse-clickhouse-logs:/var/log/clickhouse-server
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8123/ping",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -377,9 +377,14 @@ Ping me on Telegram if RAM is over 85%, every 5 minutes.
 Hades 会通过 `write_file` 将检查脚本写入 `~/.hades/scripts/`，然后调用：
 
 ```python
-cronjob(action="create", schedule="every 5m",
-        script="memory-watchdog.sh", no_agent=True,
-        deliver="telegram", name="memory-watchdog")
+cronjob(
+    action="create",
+    schedule="every 5m",
+    script="memory-watchdog.sh",
+    no_agent=True,
+    deliver="telegram",
+    name="memory-watchdog",
+)
 ```
 
 当消息内容完全由脚本决定时（看门狗、阈值告警、心跳），它会自动选择 `no_agent=True`。同一工具也让 agent 可以暂停、恢复、编辑和删除任务——整个生命周期都通过聊天驱动，无需任何人接触 CLI。
@@ -555,10 +560,11 @@ cronjob(action="create", name="weekly-news-summary",
 ```python
 # 预检脚本
 import json, sys
+
 latest = fetch_latest_issue_count()
 prev = read_state("issue_count")
 if latest == prev:
-    print(json.dumps({"wakeAgent": False}))   # 跳过本次 tick
+    print(json.dumps({"wakeAgent": False}))  # 跳过本次 tick
     sys.exit(0)
 write_state("issue_count", latest)
 print(json.dumps({"wakeAgent": True, "context": {"new_issues": latest - prev}}))
@@ -621,6 +627,7 @@ cronjob(action="create", name="nightly-analysis",
 #!/usr/bin/env python
 # ~/.hades/scripts/new-rows.py
 import json, sqlite3
+
 conn = sqlite3.connect("/home/me/data/app.db")
 n = conn.execute(
     "SELECT COUNT(*) FROM messages WHERE ts > strftime('%s','now','-2 hours')"
@@ -644,7 +651,7 @@ cronjob(action="create", name="summarize-new-msgs",
 Hades 自身的 `~/.hades/state.db` 是内部 schema，会在版本间变更。不要从预运行门控中查询它——指向你自己的数据库或 feed。
 :::
 
-致谢：此方案集由 @iankar8 在 [#2654](https://github.com/NousResearch/hades-agent/pull/2654) 中的探索所启发，该 PR 提议将 sql/file/command 触发器作为并行机制添加。`script` + `wakeAgent` 门控已以零成本覆盖了所有三种情况，因此该工作以文档形式落地。
+致谢：此方案集由 @iankar8 在 [#2654](https://github.com/NousResearch/hermes-agent/pull/2654) 中的探索所启发，该 PR 提议将 sql/file/command 触发器作为并行机制添加。`script` + `wakeAgent` 门控已以零成本覆盖了所有三种情况，因此该工作以文档形式落地。
 
 ### 串联任务：`context_from`
 

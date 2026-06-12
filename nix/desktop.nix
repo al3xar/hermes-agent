@@ -101,7 +101,7 @@ stdenv.mkDerivation {
 
   meta = with lib; {
     description = "Native Electron desktop shell for Hades Agent";
-    homepage = "https://github.com/NousResearch/hades-agent";
+    homepage = "https://github.com/NousResearch/hermes-agent";
     license = licenses.mit;
     platforms = platforms.unix;
     mainProgram = "hades-desktop";

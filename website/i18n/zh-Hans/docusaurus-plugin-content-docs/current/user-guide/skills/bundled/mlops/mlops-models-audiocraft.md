@@ -79,13 +79,13 @@ import torchaudio
 from audiocraft.models import MusicGen
 
 # 加载模型
-model = MusicGen.get_pretrained('facebook/musicgen-small')
+model = MusicGen.get_pretrained("facebook/musicgen-small")
 
 # 设置生成参数
 model.set_generation_params(
     duration=8,  # 秒
     top_k=250,
-    temperature=1.0
+    temperature=1.0,
 )
 
 # 从文本生成
@@ -109,21 +109,18 @@ model.to("cuda")
 
 # 生成音乐
 inputs = processor(
-    text=["80s pop track with bassy drums and synth"],
-    padding=True,
-    return_tensors="pt"
+    text=["80s pop track with bassy drums and synth"], padding=True, return_tensors="pt"
 ).to("cuda")
 
 audio_values = model.generate(
-    **inputs,
-    do_sample=True,
-    guidance_scale=3,
-    max_new_tokens=256
+    **inputs, do_sample=True, guidance_scale=3, max_new_tokens=256
 )
 
 # 保存
 sampling_rate = model.config.audio_encoder.sampling_rate
-scipy.io.wavfile.write("output.wav", rate=sampling_rate, data=audio_values[0, 0].cpu().numpy())
+scipy.io.wavfile.write(
+    "output.wav", rate=sampling_rate, data=audio_values[0, 0].cpu().numpy()
+)
 ```
 
 ### 使用 AudioGen 进行文本转声音
@@ -132,7 +129,7 @@ scipy.io.wavfile.write("output.wav", rate=sampling_rate, data=audio_values[0, 0]
 from audiocraft.models import AudioGen
 
 # 加载 AudioGen
-model = AudioGen.get_pretrained('facebook/audiogen-medium')
+model = AudioGen.get_pretrained("facebook/audiogen-medium")
 
 model.set_generation_params(duration=5)
 
@@ -200,22 +197,22 @@ AudioCraft Architecture:
 from audiocraft.models import MusicGen
 import torchaudio
 
-model = MusicGen.get_pretrained('facebook/musicgen-medium')
+model = MusicGen.get_pretrained("facebook/musicgen-medium")
 
 # 配置生成参数
 model.set_generation_params(
-    duration=30,          # 最长 30 秒
-    top_k=250,            # 采样多样性
-    top_p=0.0,            # 0 = 仅使用 top_k
-    temperature=1.0,      # 创意度（越高越多样）
-    cfg_coef=3.0          # 文本遵循度（越高越严格）
+    duration=30,  # 最长 30 秒
+    top_k=250,  # 采样多样性
+    top_p=0.0,  # 0 = 仅使用 top_k
+    temperature=1.0,  # 创意度（越高越多样）
+    cfg_coef=3.0,  # 文本遵循度（越高越严格）
 )
 
 # 生成多个样本
 descriptions = [
     "epic orchestral soundtrack with strings and brass",
     "chill lo-fi hip hop beat with jazzy piano",
-    "energetic rock song with electric guitar"
+    "energetic rock song with electric guitar",
 ]
 
 # 生成（返回 [batch, channels, samples]）
@@ -233,7 +230,7 @@ from audiocraft.models import MusicGen
 import torchaudio
 
 # 加载旋律模型
-model = MusicGen.get_pretrained('facebook/musicgen-melody')
+model = MusicGen.get_pretrained("facebook/musicgen-melody")
 model.set_generation_params(duration=30)
 
 # 加载旋律音频
@@ -252,7 +249,7 @@ torchaudio.save("melody_conditioned.wav", wav[0].cpu(), sample_rate=32000)
 from audiocraft.models import MusicGen
 
 # 加载立体声模型
-model = MusicGen.get_pretrained('facebook/musicgen-stereo-medium')
+model = MusicGen.get_pretrained("facebook/musicgen-stereo-medium")
 model.set_generation_params(duration=15)
 
 descriptions = ["ambient electronic music with wide stereo panning"]
@@ -273,6 +270,7 @@ model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-medi
 
 # 加载待续写的音频
 import torchaudio
+
 audio, sr = torchaudio.load("intro.wav")
 
 # 同时处理文本和音频
@@ -281,11 +279,13 @@ inputs = processor(
     sampling_rate=sr,
     text=["continue with a epic chorus"],
     padding=True,
-    return_tensors="pt"
+    return_tensors="pt",
 )
 
 # 生成续写内容
-audio_values = model.generate(**inputs, do_sample=True, guidance_scale=3, max_new_tokens=512)
+audio_values = model.generate(
+    **inputs, do_sample=True, guidance_scale=3, max_new_tokens=512
+)
 ```
 
 ## MusicGen-Style 用法
@@ -296,19 +296,19 @@ audio_values = model.generate(**inputs, do_sample=True, guidance_scale=3, max_ne
 from audiocraft.models import MusicGen
 
 # 加载风格模型
-model = MusicGen.get_pretrained('facebook/musicgen-style')
+model = MusicGen.get_pretrained("facebook/musicgen-style")
 
 # 配置带风格的生成参数
 model.set_generation_params(
     duration=30,
     cfg_coef=3.0,
-    cfg_coef_beta=5.0  # 风格影响强度
+    cfg_coef_beta=5.0,  # 风格影响强度
 )
 
 # 配置风格条件器参数
 model.set_style_conditioner_params(
-    eval_q=3,          # RVQ 量化器数量（1-6）
-    excerpt_length=3.0  # 风格片段长度
+    eval_q=3,  # RVQ 量化器数量（1-6）
+    excerpt_length=3.0,  # 风格片段长度
 )
 
 # 加载风格参考音频
@@ -326,7 +326,7 @@ wav = model.generate_with_style(descriptions, style_audio, sr)
 model.set_generation_params(
     duration=30,
     cfg_coef=3.0,
-    cfg_coef_beta=None  # 禁用双 CFG 以支持纯风格模式
+    cfg_coef_beta=None,  # 禁用双 CFG 以支持纯风格模式
 )
 
 wav = model.generate_with_style([None], style_audio, sr)
@@ -340,7 +340,7 @@ wav = model.generate_with_style([None], style_audio, sr)
 from audiocraft.models import AudioGen
 import torchaudio
 
-model = AudioGen.get_pretrained('facebook/audiogen-medium')
+model = AudioGen.get_pretrained("facebook/audiogen-medium")
 model.set_generation_params(duration=10)
 
 # 生成各类声音
@@ -348,7 +348,7 @@ descriptions = [
     "thunderstorm with heavy rain and lightning",
     "busy city traffic with car horns",
     "ocean waves crashing on rocks",
-    "crackling campfire in forest"
+    "crackling campfire in forest",
 ]
 
 wav = model.generate(descriptions)
@@ -367,7 +367,7 @@ import torch
 import torchaudio
 
 # 加载 EnCodec
-model = CompressionModel.get_pretrained('facebook/encodec_32khz')
+model = CompressionModel.get_pretrained("facebook/encodec_32khz")
 
 # 加载音频
 wav, sr = torchaudio.load("audio.wav")
@@ -398,6 +398,7 @@ import torch
 import torchaudio
 from audiocraft.models import MusicGen
 
+
 class MusicGenerator:
     def __init__(self, model_name="facebook/musicgen-medium"):
         self.model = MusicGen.get_pretrained(model_name)
@@ -405,10 +406,7 @@ class MusicGenerator:
 
     def generate(self, prompt, duration=30, temperature=1.0, cfg=3.0):
         self.model.set_generation_params(
-            duration=duration,
-            top_k=250,
-            temperature=temperature,
-            cfg_coef=cfg
+            duration=duration, top_k=250, temperature=temperature, cfg_coef=cfg
         )
 
         with torch.no_grad():
@@ -427,12 +425,11 @@ class MusicGenerator:
     def save(self, audio, path):
         torchaudio.save(path, audio, sample_rate=self.sample_rate)
 
+
 # 使用示例
 generator = MusicGenerator()
 audio = generator.generate(
-    "epic cinematic orchestral music",
-    duration=30,
-    temperature=1.0
+    "epic cinematic orchestral music", duration=30, temperature=1.0
 )
 generator.save(audio, "epic_music.wav")
 ```
@@ -445,6 +442,7 @@ from pathlib import Path
 from audiocraft.models import AudioGen
 import torchaudio
 
+
 def batch_generate_sounds(sound_specs, output_dir):
     """
     根据规格批量生成声音。
@@ -453,7 +451,7 @@ def batch_generate_sounds(sound_specs, output_dir):
         sound_specs: list of {"name": str, "description": str, "duration": float}
         output_dir: output directory path
     """
-    model = AudioGen.get_pretrained('facebook/audiogen-medium')
+    model = AudioGen.get_pretrained("facebook/audiogen-medium")
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
 
@@ -470,16 +468,21 @@ def batch_generate_sounds(sound_specs, output_dir):
         results.append({
             "name": spec["name"],
             "path": str(output_path),
-            "description": spec["description"]
+            "description": spec["description"],
         })
 
     return results
 
+
 # 使用示例
 sounds = [
-    {"name": "explosion", "description": "massive explosion with debris", "duration": 3},
+    {
+        "name": "explosion",
+        "description": "massive explosion with debris",
+        "duration": 3,
+    },
     {"name": "footsteps", "description": "footsteps on wooden floor", "duration": 5},
-    {"name": "door", "description": "wooden door creaking and closing", "duration": 2}
+    {"name": "door", "description": "wooden door creaking and closing", "duration": 2},
 ]
 
 results = batch_generate_sounds(sounds, "sound_effects/")
@@ -493,13 +496,12 @@ import torch
 import torchaudio
 from audiocraft.models import MusicGen
 
-model = MusicGen.get_pretrained('facebook/musicgen-small')
+model = MusicGen.get_pretrained("facebook/musicgen-small")
+
 
 def generate_music(prompt, duration, temperature, cfg_coef):
     model.set_generation_params(
-        duration=duration,
-        temperature=temperature,
-        cfg_coef=cfg_coef
+        duration=duration, temperature=temperature, cfg_coef=cfg_coef
     )
 
     with torch.no_grad():
@@ -510,16 +512,19 @@ def generate_music(prompt, duration, temperature, cfg_coef):
     torchaudio.save(path, wav[0].cpu(), sample_rate=32000)
     return path
 
+
 demo = gr.Interface(
     fn=generate_music,
     inputs=[
-        gr.Textbox(label="Music Description", placeholder="upbeat electronic dance music"),
+        gr.Textbox(
+            label="Music Description", placeholder="upbeat electronic dance music"
+        ),
         gr.Slider(1, 30, value=8, label="Duration (seconds)"),
         gr.Slider(0.5, 2.0, value=1.0, label="Temperature"),
-        gr.Slider(1.0, 10.0, value=3.0, label="CFG Coefficient")
+        gr.Slider(1.0, 10.0, value=3.0, label="CFG Coefficient"),
     ],
     outputs=gr.Audio(label="Generated Music"),
-    title="MusicGen Demo"
+    title="MusicGen Demo",
 )
 
 demo.launch()
@@ -531,7 +536,7 @@ demo.launch()
 
 ```python
 # 使用较小的模型
-model = MusicGen.get_pretrained('facebook/musicgen-small')
+model = MusicGen.get_pretrained("facebook/musicgen-small")
 
 # 每次生成后清理缓存
 torch.cuda.empty_cache()
@@ -575,8 +580,8 @@ for desc in descriptions:
 
 ## 参考资料
 
-- **[高级用法](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/models/audiocraft/references/advanced-usage.md)** - 训练、微调、部署
-- **[故障排查](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/models/audiocraft/references/troubleshooting.md)** - 常见问题与解决方案
+- **[高级用法](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/models/audiocraft/references/advanced-usage.md)** - 训练、微调、部署
+- **[故障排查](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/models/audiocraft/references/troubleshooting.md)** - 常见问题与解决方案
 
 ## 资源
 

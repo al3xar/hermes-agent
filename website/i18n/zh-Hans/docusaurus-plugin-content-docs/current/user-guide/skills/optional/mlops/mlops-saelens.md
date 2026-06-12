@@ -96,9 +96,7 @@ from sae_lens import SAE
 # 1. 加载模型和预训练 SAE
 model = HookedTransformer.from_pretrained("gpt2-small", device="cuda")
 sae, cfg_dict, sparsity = SAE.from_pretrained(
-    release="gpt2-small-res-jb",
-    sae_id="blocks.8.hook_resid_pre",
-    device="cuda"
+    release="gpt2-small-res-jb", sae_id="blocks.8.hook_resid_pre", device="cuda"
 )
 
 # 2. 获取模型激活
@@ -113,7 +111,7 @@ print(f"Active features: {(sae_features > 0).sum()}")
 # 4. 找出每个位置的顶部特征
 for pos in range(tokens.shape[1]):
     top_features = sae_features[0, pos].topk(5)
-    token = model.to_str_tokens(tokens[0, pos:pos+1])[0]
+    token = model.to_str_tokens(tokens[0, pos : pos + 1])[0]
     print(f"Token '{token}': features {top_features.indices.tolist()}")
 
 # 5. 重建激活
@@ -150,27 +148,22 @@ cfg = LanguageModelSAERunnerConfig(
     hook_name="blocks.8.hook_resid_pre",
     hook_layer=8,
     d_in=768,  # 模型维度
-
     # SAE 架构
     architecture="standard",  # 或 "gated"、"topk"
     d_sae=768 * 8,  # 扩展因子为 8
     activation_fn="relu",
-
     # 训练
     lr=4e-4,
     l1_coefficient=8e-5,  # 稀疏性惩罚
     l1_warm_up_steps=1000,
     train_batch_size_tokens=4096,
     training_tokens=100_000_000,
-
     # 数据
     dataset_path="monology/pile-uncopyrighted",
     context_size=128,
-
     # 日志
     log_to_wandb=True,
     wandb_project="sae-training",
-
     # 检查点
     checkpoint_path="checkpoints",
     n_checkpoints=5,
@@ -223,9 +216,7 @@ import torch
 
 model = HookedTransformer.from_pretrained("gpt2-small", device="cuda")
 sae, _, _ = SAE.from_pretrained(
-    release="gpt2-small-res-jb",
-    sae_id="blocks.8.hook_resid_pre",
-    device="cuda"
+    release="gpt2-small-res-jb", sae_id="blocks.8.hook_resid_pre", device="cuda"
 )
 
 # 找出激活特定特征的内容
@@ -264,7 +255,7 @@ def steer_with_feature(model, sae, prompt, feature_idx, strength=5.0):
     output = model.generate(
         tokens,
         max_new_tokens=50,
-        fwd_hooks=[("blocks.8.hook_resid_pre", steering_hook)]
+        fwd_hooks=[("blocks.8.hook_resid_pre", steering_hook)],
     )
     return model.to_string(output[0])
 ```
@@ -282,7 +273,7 @@ features = sae.encode(cache["resid_pre", 8])[0, -1]  # [d_sae]
 # 计算每个特征的 logit 归因
 # 特征贡献 = 特征激活 × 解码器权重 × 反嵌入
 W_dec = sae.W_dec  # [d_sae, d_model]
-W_U = model.W_U    # [d_model, vocab]
+W_U = model.W_U  # [d_model, vocab]
 
 # 对 "Paris" logit 的贡献
 paris_token = model.to_single_token(" Paris")
@@ -308,7 +299,7 @@ cfg = LanguageModelSAERunnerConfig(
 cfg = LanguageModelSAERunnerConfig(
     l1_coefficient=8e-5,
     l1_warm_up_steps=1000,  # 逐步增加
-    use_ghost_grads=True,   # 复活死亡特征
+    use_ghost_grads=True,  # 复活死亡特征
 )
 ```
 
@@ -317,7 +308,7 @@ cfg = LanguageModelSAERunnerConfig(
 # 降低稀疏性惩罚
 cfg = LanguageModelSAERunnerConfig(
     l1_coefficient=5e-5,  # 越低 = 重建越好
-    d_sae=768 * 16,       # 更大容量
+    d_sae=768 * 16,  # 更大容量
 )
 ```
 
@@ -338,8 +329,8 @@ cfg = LanguageModelSAERunnerConfig(
 ```python
 cfg = LanguageModelSAERunnerConfig(
     train_batch_size_tokens=2048,  # 减小批次大小
-    store_batch_size_prompts=4,    # 缓冲区中更少的 prompt
-    n_batches_in_buffer=8,         # 更小的激活缓冲区
+    store_batch_size_prompts=4,  # 缓冲区中更少的 prompt
+    n_batches_in_buffer=8,  # 更小的激活缓冲区
 )
 ```
 
@@ -369,9 +360,9 @@ cfg = LanguageModelSAERunnerConfig(
 
 | 文件 | 内容 |
 |------|----------|
-| [references/README.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/saelens/references/README.md) | 概述与快速入门指南 |
-| [references/api.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/saelens/references/api.md) | SAE、TrainingSAE、配置的完整 API 参考 |
-| [references/tutorials.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/saelens/references/tutorials.md) | 训练、分析、引导的分步教程 |
+| [references/README.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/saelens/references/README.md) | 概述与快速入门指南 |
+| [references/api.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/saelens/references/api.md) | SAE、TrainingSAE、配置的完整 API 参考 |
+| [references/tutorials.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/saelens/references/tutorials.md) | 训练、分析、引导的分步教程 |
 
 ## 外部资源
 

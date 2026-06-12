@@ -60,7 +60,7 @@ trainer = DPOTrainer(
     model=model,
     args=config,
     train_dataset=preference_dataset,  # chosen/rejected pairs
-    processing_class=tokenizer
+    processing_class=tokenizer,
 )
 trainer.train()
 ```
@@ -104,15 +104,12 @@ training_args = SFTConfig(
     num_train_epochs=1,
     learning_rate=2e-5,
     logging_steps=10,
-    save_strategy="epoch"
+    save_strategy="epoch",
 )
 
 # Train
 trainer = SFTTrainer(
-    model=model,
-    args=training_args,
-    train_dataset=dataset,
-    tokenizer=tokenizer
+    model=model, args=training_args, train_dataset=dataset, tokenizer=tokenizer
 )
 trainer.train()
 trainer.save_model()
@@ -129,7 +126,7 @@ from trl import RewardTrainer, RewardConfig
 # Load SFT model as base
 model = AutoModelForSequenceClassification.from_pretrained(
     "Qwen2.5-0.5B-SFT",
-    num_labels=1  # Single reward score
+    num_labels=1,  # Single reward score
 )
 tokenizer = AutoTokenizer.from_pretrained("Qwen2.5-0.5B-SFT")
 
@@ -141,15 +138,12 @@ training_args = RewardConfig(
     output_dir="Qwen2.5-0.5B-Reward",
     per_device_train_batch_size=2,
     num_train_epochs=1,
-    learning_rate=1e-5
+    learning_rate=1e-5,
 )
 
 # Train reward model
 trainer = RewardTrainer(
-    model=model,
-    args=training_args,
-    processing_class=tokenizer,
-    train_dataset=dataset
+    model=model, args=training_args, processing_class=tokenizer, train_dataset=dataset
 )
 trainer.train()
 trainer.save_model()
@@ -231,7 +225,7 @@ config = DPOConfig(
     beta=0.1,  # KL penalty strength
     max_prompt_length=512,
     max_length=1024,
-    logging_steps=10
+    logging_steps=10,
 )
 ```
 
@@ -245,10 +239,7 @@ model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
 
 trainer = DPOTrainer(
-    model=model,
-    args=config,
-    train_dataset=dataset,
-    processing_class=tokenizer
+    model=model, args=config, train_dataset=dataset, processing_class=tokenizer
 )
 
 trainer.train()
@@ -270,7 +261,7 @@ trl dpo \
 
 以最小内存占用进行强化学习训练。
 
-关于深入的 GRPO 指导——奖励函数设计、关键训练洞察（损失行为、模式崩溃、调参）以及高级多阶段模式——请参阅 **[references/grpo-training.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/grpo-training.md)**。生产就绪的训练脚本位于 **[templates/basic_grpo_training.py](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/templates/basic_grpo_training.py)**。
+关于深入的 GRPO 指导——奖励函数设计、关键训练洞察（损失行为、模式崩溃、调参）以及高级多阶段模式——请参阅 **[references/grpo-training.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/grpo-training.md)**。生产就绪的训练脚本位于 **[templates/basic_grpo_training.py](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/templates/basic_grpo_training.py)**。
 
 复制此检查清单：
 
@@ -309,6 +300,7 @@ from transformers import pipeline
 
 reward_model = pipeline("text-classification", model="reward-model-path")
 
+
 def reward_from_model(completions, prompts, **kwargs):
     # Combine prompt + completion
     full_texts = [p + c for p, c in zip(prompts, completions)]
@@ -328,7 +320,7 @@ config = GRPOConfig(
     num_train_epochs=1,
     learning_rate=1e-5,
     num_generations=4,  # Generate 4 completions per prompt
-    max_new_tokens=128
+    max_new_tokens=128,
 )
 ```
 
@@ -345,7 +337,7 @@ trainer = GRPOTrainer(
     model="Qwen/Qwen2-0.5B-Instruct",
     reward_funcs=reward_function,  # Your reward function
     args=config,
-    train_dataset=dataset
+    train_dataset=dataset,
 )
 
 trainer.train()
@@ -391,7 +383,7 @@ trl grpo \
 config = DPOConfig(
     per_device_train_batch_size=1,  # Reduce from 4
     max_length=512,  # Reduce from 1024
-    gradient_accumulation_steps=8  # Maintain effective batch
+    gradient_accumulation_steps=8,  # Maintain effective batch
 )
 ```
 
@@ -417,7 +409,7 @@ config = DPOConfig(beta=0.01)
 ```python
 config = RewardConfig(
     learning_rate=1e-5,  # Try different LR
-    num_train_epochs=3  # Train longer
+    num_train_epochs=3,  # Train longer
 )
 ```
 
@@ -434,21 +426,21 @@ print(dataset[0])
 ```python
 config = PPOConfig(
     kl_coef=0.1,  # Increase from 0.05
-    cliprange=0.1  # Reduce from 0.2
+    cliprange=0.1,  # Reduce from 0.2
 )
 ```
 
 ## 高级主题
 
-**SFT 训练指南**：参阅 [references/sft-training.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/sft-training.md)，了解数据集格式、chat template、packing 策略及多 GPU 训练。
+**SFT 训练指南**：参阅 [references/sft-training.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/sft-training.md)，了解数据集格式、chat template、packing 策略及多 GPU 训练。
 
-**DPO 变体**：参阅 [references/dpo-variants.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/dpo-variants.md)，了解 IPO、cDPO、RPO 及其他 DPO 损失函数与推荐超参数。
+**DPO 变体**：参阅 [references/dpo-variants.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/dpo-variants.md)，了解 IPO、cDPO、RPO 及其他 DPO 损失函数与推荐超参数。
 
-**奖励建模**：参阅 [references/reward-modeling.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/reward-modeling.md)，了解结果奖励与过程奖励、Bradley-Terry 损失及奖励模型评估。
+**奖励建模**：参阅 [references/reward-modeling.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/reward-modeling.md)，了解结果奖励与过程奖励、Bradley-Terry 损失及奖励模型评估。
 
-**在线 RL 方法**：参阅 [references/online-rl.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/online-rl.md)，了解 PPO、GRPO、RLOO 及 OnlineDPO 的详细配置。
+**在线 RL 方法**：参阅 [references/online-rl.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/online-rl.md)，了解 PPO、GRPO、RLOO 及 OnlineDPO 的详细配置。
 
-**GRPO 深度解析**：参阅 [references/grpo-training.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/grpo-training.md)，获取专家级 GRPO 模式——奖励函数设计理念、训练洞察（为何损失上升、模式崩溃检测）、超参数调优、多阶段训练及故障排查。生产就绪模板位于 [templates/basic_grpo_training.py](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/templates/basic_grpo_training.py)。
+**GRPO 深度解析**：参阅 [references/grpo-training.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/references/grpo-training.md)，获取专家级 GRPO 模式——奖励函数设计理念、训练洞察（为何损失上升、模式崩溃检测）、超参数调优、多阶段训练及故障排查。生产就绪模板位于 [templates/basic_grpo_training.py](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/training/trl-fine-tuning/templates/basic_grpo_training.py)。
 
 ## 硬件要求
 

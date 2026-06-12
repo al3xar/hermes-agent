@@ -2,6 +2,7 @@
 
 Provides polite retry + JSON convenience + User-Agent enforcement.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,7 @@ import urllib.request
 
 DEFAULT_UA = (
     "hades-osint-investigation/0.2 "
-    "(+https://github.com/NousResearch/hades-agent; "
+    "(+https://github.com/NousResearch/hermes-agent; "
     "set HADES_OSINT_UA env var to identify yourself per "
     "Wikimedia / SEC fair-use guidance)"
 )
@@ -62,7 +63,11 @@ def get(
                 ) from e
             if e.code in {500, 502, 503, 504} and attempt < max_retries:
                 retry_after = e.headers.get("Retry-After") if e.headers else None
-                wait = float(retry_after) if (retry_after and retry_after.isdigit()) else backoff ** (attempt + 1)
+                wait = (
+                    float(retry_after)
+                    if (retry_after and retry_after.isdigit())
+                    else backoff ** (attempt + 1)
+                )
                 time.sleep(wait)
                 last_err = e
                 continue

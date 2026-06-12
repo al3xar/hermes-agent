@@ -96,9 +96,7 @@ from sae_lens import SAE
 # 1. Load model and pre-trained SAE
 model = HookedTransformer.from_pretrained("gpt2-small", device="cuda")
 sae, cfg_dict, sparsity = SAE.from_pretrained(
-    release="gpt2-small-res-jb",
-    sae_id="blocks.8.hook_resid_pre",
-    device="cuda"
+    release="gpt2-small-res-jb", sae_id="blocks.8.hook_resid_pre", device="cuda"
 )
 
 # 2. Get model activations
@@ -113,7 +111,7 @@ print(f"Active features: {(sae_features > 0).sum()}")
 # 4. Find top features for each position
 for pos in range(tokens.shape[1]):
     top_features = sae_features[0, pos].topk(5)
-    token = model.to_str_tokens(tokens[0, pos:pos+1])[0]
+    token = model.to_str_tokens(tokens[0, pos : pos + 1])[0]
     print(f"Token '{token}': features {top_features.indices.tolist()}")
 
 # 5. Reconstruct activations
@@ -150,27 +148,22 @@ cfg = LanguageModelSAERunnerConfig(
     hook_name="blocks.8.hook_resid_pre",
     hook_layer=8,
     d_in=768,  # Model dimension
-
     # SAE architecture
     architecture="standard",  # or "gated", "topk"
     d_sae=768 * 8,  # Expansion factor of 8
     activation_fn="relu",
-
     # Training
     lr=4e-4,
     l1_coefficient=8e-5,  # Sparsity penalty
     l1_warm_up_steps=1000,
     train_batch_size_tokens=4096,
     training_tokens=100_000_000,
-
     # Data
     dataset_path="monology/pile-uncopyrighted",
     context_size=128,
-
     # Logging
     log_to_wandb=True,
     wandb_project="sae-training",
-
     # Checkpointing
     checkpoint_path="checkpoints",
     n_checkpoints=5,
@@ -223,9 +216,7 @@ import torch
 
 model = HookedTransformer.from_pretrained("gpt2-small", device="cuda")
 sae, _, _ = SAE.from_pretrained(
-    release="gpt2-small-res-jb",
-    sae_id="blocks.8.hook_resid_pre",
-    device="cuda"
+    release="gpt2-small-res-jb", sae_id="blocks.8.hook_resid_pre", device="cuda"
 )
 
 # Find what activates a specific feature
@@ -264,7 +255,7 @@ def steer_with_feature(model, sae, prompt, feature_idx, strength=5.0):
     output = model.generate(
         tokens,
         max_new_tokens=50,
-        fwd_hooks=[("blocks.8.hook_resid_pre", steering_hook)]
+        fwd_hooks=[("blocks.8.hook_resid_pre", steering_hook)],
     )
     return model.to_string(output[0])
 ```
@@ -282,7 +273,7 @@ features = sae.encode(cache["resid_pre", 8])[0, -1]  # [d_sae]
 # Get logit attribution per feature
 # Feature contribution = feature_activation × decoder_weight × unembedding
 W_dec = sae.W_dec  # [d_sae, d_model]
-W_U = model.W_U    # [d_model, vocab]
+W_U = model.W_U  # [d_model, vocab]
 
 # Contribution to "Paris" logit
 paris_token = model.to_single_token(" Paris")
@@ -308,7 +299,7 @@ cfg = LanguageModelSAERunnerConfig(
 cfg = LanguageModelSAERunnerConfig(
     l1_coefficient=8e-5,
     l1_warm_up_steps=1000,  # Gradually increase
-    use_ghost_grads=True,   # Revive dead features
+    use_ghost_grads=True,  # Revive dead features
 )
 ```
 
@@ -317,7 +308,7 @@ cfg = LanguageModelSAERunnerConfig(
 # Reduce sparsity penalty
 cfg = LanguageModelSAERunnerConfig(
     l1_coefficient=5e-5,  # Lower = better reconstruction
-    d_sae=768 * 16,       # More capacity
+    d_sae=768 * 16,  # More capacity
 )
 ```
 
@@ -338,8 +329,8 @@ cfg = LanguageModelSAERunnerConfig(
 ```python
 cfg = LanguageModelSAERunnerConfig(
     train_batch_size_tokens=2048,  # Reduce batch size
-    store_batch_size_prompts=4,    # Fewer prompts in buffer
-    n_batches_in_buffer=8,         # Smaller activation buffer
+    store_batch_size_prompts=4,  # Fewer prompts in buffer
+    n_batches_in_buffer=8,  # Smaller activation buffer
 )
 ```
 
@@ -369,9 +360,9 @@ For detailed API documentation, tutorials, and advanced usage, see the `referenc
 
 | File | Contents |
 |------|----------|
-| [references/README.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/saelens/references/README.md) | Overview and quick start guide |
-| [references/api.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/saelens/references/api.md) | Complete API reference for SAE, TrainingSAE, configurations |
-| [references/tutorials.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/saelens/references/tutorials.md) | Step-by-step tutorials for training, analysis, steering |
+| [references/README.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/saelens/references/README.md) | Overview and quick start guide |
+| [references/api.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/saelens/references/api.md) | Complete API reference for SAE, TrainingSAE, configurations |
+| [references/tutorials.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/saelens/references/tutorials.md) | Step-by-step tutorials for training, analysis, steering |
 
 ## External Resources
 

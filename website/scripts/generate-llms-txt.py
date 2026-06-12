@@ -9,8 +9,8 @@ Outputs:
                                     comments separating files.
 
 Both publish at:
-  https://hades-agent.nousresearch.com/docs/llms.txt
-  https://hades-agent.nousresearch.com/docs/llms-full.txt
+  https://hermes-agent.nousresearch.com/docs/llms.txt
+  https://hermes-agent.nousresearch.com/docs/llms-full.txt
 
 The `/docs/` prefix is not a mistake — Docusaurus serves `website/static/`
 at the `docs/` base path. Clients and IDE plugins that probe the classic
@@ -31,130 +31,176 @@ WEBSITE = SCRIPT_DIR.parent
 DOCS = WEBSITE / "docs"
 STATIC = WEBSITE / "static"
 
-SITE_BASE = "https://hades-agent.nousresearch.com/docs"
+SITE_BASE = "https://hermes-agent.nousresearch.com/docs"
 
 # Curated sections for llms.txt — mirrors the product story, not the filesystem.
 # Each entry: (docs-relative path without .md, display title, optional short desc).
 # `None` desc → pulled from frontmatter `description:` field.
 SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
-    ("Getting Started", [
-        ("getting-started/installation", "Installation", None),
-        ("getting-started/quickstart", "Quickstart", None),
-        ("getting-started/learning-path", "Learning Path", None),
-        ("getting-started/updating", "Updating", None),
-        ("getting-started/termux", "Termux (Android)", None),
-        ("getting-started/nix-setup", "Nix Setup", None),
-    ]),
-    ("Using Hades", [
-        ("user-guide/cli", "CLI", None),
-        ("user-guide/tui", "TUI (Ink terminal UI)", None),
-        ("user-guide/configuration", "Configuration", None),
-        ("user-guide/configuring-models", "Configuring Models", None),
-        ("user-guide/sessions", "Sessions", None),
-        ("user-guide/profiles", "Profiles", None),
-        ("user-guide/git-worktrees", "Git Worktrees", None),
-        ("user-guide/docker", "Docker Backend", None),
-        ("user-guide/security", "Security", None),
-        ("user-guide/checkpoints-and-rollback", "Checkpoints & Rollback", None),
-    ]),
-    ("Core Features", [
-        ("user-guide/features/overview", "Features Overview", None),
-        ("user-guide/features/tools", "Tools", None),
-        ("user-guide/features/skills", "Skills System", None),
-        ("user-guide/features/curator", "Curator", None),
-        ("user-guide/features/memory", "Memory", None),
-        ("user-guide/features/memory-providers", "Memory Providers", None),
-        ("user-guide/features/context-files", "Context Files", None),
-        ("user-guide/features/context-references", "Context References", None),
-        ("user-guide/features/personality", "Personality & SOUL.md", None),
-        ("user-guide/features/plugins", "Plugins", None),
-        ("user-guide/features/built-in-plugins", "Built-in Plugins", None),
-    ]),
-    ("Automation", [
-        ("user-guide/features/cron", "Cron Jobs", None),
-        ("user-guide/features/delegation", "Delegation", None),
-        ("user-guide/features/kanban", "Kanban Multi-Agent", None),
-        ("user-guide/features/kanban-tutorial", "Kanban Tutorial", None),
-        ("user-guide/features/goals", "Persistent Goals", None),
-        ("user-guide/features/code-execution", "Code Execution", None),
-        ("user-guide/features/hooks", "Hooks", None),
-        ("user-guide/features/batch-processing", "Batch Processing", None),
-    ]),
-    ("Media & Web", [
-        ("user-guide/features/voice-mode", "Voice Mode", None),
-        ("user-guide/features/browser", "Browser", None),
-        ("user-guide/features/vision", "Vision", None),
-        ("user-guide/features/image-generation", "Image Generation", None),
-        ("user-guide/features/tts", "Text-to-Speech", None),
-    ]),
-    ("Messaging Platforms", [
-        ("user-guide/messaging/index", "Overview", None),
-        ("user-guide/messaging/telegram", "Telegram", None),
-        ("user-guide/messaging/discord", "Discord", None),
-        ("user-guide/messaging/slack", "Slack", None),
-        ("user-guide/messaging/whatsapp", "WhatsApp", None),
-        ("user-guide/messaging/signal", "Signal", None),
-        ("user-guide/messaging/email", "Email", None),
-        ("user-guide/messaging/sms", "SMS", None),
-        ("user-guide/messaging/matrix", "Matrix", None),
-        ("user-guide/messaging/mattermost", "Mattermost", None),
-        ("user-guide/messaging/homeassistant", "Home Assistant", None),
-        ("user-guide/messaging/webhooks", "Webhooks", None),
-    ]),
-    ("Integrations", [
-        ("integrations/index", "Integrations Overview", None),
-        ("integrations/providers", "Providers", None),
-        ("user-guide/features/mcp", "MCP (Model Context Protocol)", None),
-        ("user-guide/features/acp", "ACP (Agent Context Protocol)", None),
-        ("user-guide/features/api-server", "API Server", None),
-        ("user-guide/features/honcho", "Honcho Memory", None),
-        ("user-guide/features/provider-routing", "Provider Routing", None),
-        ("user-guide/features/fallback-providers", "Fallback Providers", None),
-        ("user-guide/features/credential-pools", "Credential Pools", None),
-    ]),
-    ("Guides & Tutorials", [
-        ("guides/tips", "Tips & Best Practices", None),
-        ("guides/local-llm-on-mac", "Local LLMs on Mac", None),
-        ("guides/daily-briefing-bot", "Daily Briefing Bot", None),
-        ("guides/team-telegram-assistant", "Team Telegram Assistant", None),
-        ("guides/python-library", "Use Hades as a Python Library", None),
-        ("guides/use-mcp-with-hades", "Use MCP with Hades", None),
-        ("guides/use-voice-mode-with-hades", "Use Voice Mode with Hades", None),
-        ("guides/use-soul-with-hades", "Use SOUL.md with Hades", None),
-        ("guides/build-a-hades-plugin", "Build a Hades Plugin", None),
-        ("guides/automate-with-cron", "Automate with Cron", None),
-        ("guides/work-with-skills", "Work with Skills", None),
-        ("guides/delegation-patterns", "Delegation Patterns", None),
-        ("guides/github-pr-review-agent", "GitHub PR Review Agent", None),
-    ]),
-    ("Developer Guide", [
-        ("developer-guide/contributing", "Contributing", None),
-        ("developer-guide/architecture", "Architecture", None),
-        ("developer-guide/agent-loop", "Agent Loop", None),
-        ("developer-guide/prompt-assembly", "Prompt Assembly", None),
-        ("developer-guide/context-compression-and-caching", "Context Compression & Caching", None),
-        ("developer-guide/gateway-internals", "Gateway Internals", None),
-        ("developer-guide/session-storage", "Session Storage", None),
-        ("developer-guide/provider-runtime", "Provider Runtime", None),
-        ("developer-guide/adding-tools", "Adding Tools", None),
-        ("developer-guide/adding-providers", "Adding Providers", None),
-        ("developer-guide/adding-platform-adapters", "Adding Platform Adapters", None),
-        ("developer-guide/creating-skills", "Creating Skills", None),
-        ("developer-guide/extending-the-cli", "Extending the CLI", None),
-    ]),
-    ("Reference", [
-        ("reference/cli-commands", "CLI Commands", None),
-        ("reference/slash-commands", "Slash Commands", None),
-        ("reference/profile-commands", "Profile Commands", None),
-        ("reference/environment-variables", "Environment Variables", None),
-        ("reference/tools-reference", "Tools Reference", None),
-        ("reference/toolsets-reference", "Toolsets Reference", None),
-        ("reference/mcp-config-reference", "MCP Config Reference", None),
-        ("reference/model-catalog", "Model Catalog", None),
-        ("reference/skills-catalog", "Bundled Skills Catalog", "Table of all ~90 skills bundled with Hades"),
-        ("reference/optional-skills-catalog", "Optional Skills Catalog", "Table of ~60 additional installable skills"),
-        ("reference/faq", "FAQ & Troubleshooting", None),
-    ]),
+    (
+        "Getting Started",
+        [
+            ("getting-started/installation", "Installation", None),
+            ("getting-started/quickstart", "Quickstart", None),
+            ("getting-started/learning-path", "Learning Path", None),
+            ("getting-started/updating", "Updating", None),
+            ("getting-started/termux", "Termux (Android)", None),
+            ("getting-started/nix-setup", "Nix Setup", None),
+        ],
+    ),
+    (
+        "Using Hades",
+        [
+            ("user-guide/cli", "CLI", None),
+            ("user-guide/tui", "TUI (Ink terminal UI)", None),
+            ("user-guide/configuration", "Configuration", None),
+            ("user-guide/configuring-models", "Configuring Models", None),
+            ("user-guide/sessions", "Sessions", None),
+            ("user-guide/profiles", "Profiles", None),
+            ("user-guide/git-worktrees", "Git Worktrees", None),
+            ("user-guide/docker", "Docker Backend", None),
+            ("user-guide/security", "Security", None),
+            ("user-guide/checkpoints-and-rollback", "Checkpoints & Rollback", None),
+        ],
+    ),
+    (
+        "Core Features",
+        [
+            ("user-guide/features/overview", "Features Overview", None),
+            ("user-guide/features/tools", "Tools", None),
+            ("user-guide/features/skills", "Skills System", None),
+            ("user-guide/features/curator", "Curator", None),
+            ("user-guide/features/memory", "Memory", None),
+            ("user-guide/features/memory-providers", "Memory Providers", None),
+            ("user-guide/features/context-files", "Context Files", None),
+            ("user-guide/features/context-references", "Context References", None),
+            ("user-guide/features/personality", "Personality & SOUL.md", None),
+            ("user-guide/features/plugins", "Plugins", None),
+            ("user-guide/features/built-in-plugins", "Built-in Plugins", None),
+        ],
+    ),
+    (
+        "Automation",
+        [
+            ("user-guide/features/cron", "Cron Jobs", None),
+            ("user-guide/features/delegation", "Delegation", None),
+            ("user-guide/features/kanban", "Kanban Multi-Agent", None),
+            ("user-guide/features/kanban-tutorial", "Kanban Tutorial", None),
+            ("user-guide/features/goals", "Persistent Goals", None),
+            ("user-guide/features/code-execution", "Code Execution", None),
+            ("user-guide/features/hooks", "Hooks", None),
+            ("user-guide/features/batch-processing", "Batch Processing", None),
+        ],
+    ),
+    (
+        "Media & Web",
+        [
+            ("user-guide/features/voice-mode", "Voice Mode", None),
+            ("user-guide/features/browser", "Browser", None),
+            ("user-guide/features/vision", "Vision", None),
+            ("user-guide/features/image-generation", "Image Generation", None),
+            ("user-guide/features/tts", "Text-to-Speech", None),
+        ],
+    ),
+    (
+        "Messaging Platforms",
+        [
+            ("user-guide/messaging/index", "Overview", None),
+            ("user-guide/messaging/telegram", "Telegram", None),
+            ("user-guide/messaging/discord", "Discord", None),
+            ("user-guide/messaging/slack", "Slack", None),
+            ("user-guide/messaging/whatsapp", "WhatsApp", None),
+            ("user-guide/messaging/signal", "Signal", None),
+            ("user-guide/messaging/email", "Email", None),
+            ("user-guide/messaging/sms", "SMS", None),
+            ("user-guide/messaging/matrix", "Matrix", None),
+            ("user-guide/messaging/mattermost", "Mattermost", None),
+            ("user-guide/messaging/homeassistant", "Home Assistant", None),
+            ("user-guide/messaging/webhooks", "Webhooks", None),
+        ],
+    ),
+    (
+        "Integrations",
+        [
+            ("integrations/index", "Integrations Overview", None),
+            ("integrations/providers", "Providers", None),
+            ("user-guide/features/mcp", "MCP (Model Context Protocol)", None),
+            ("user-guide/features/acp", "ACP (Agent Context Protocol)", None),
+            ("user-guide/features/api-server", "API Server", None),
+            ("user-guide/features/honcho", "Honcho Memory", None),
+            ("user-guide/features/provider-routing", "Provider Routing", None),
+            ("user-guide/features/fallback-providers", "Fallback Providers", None),
+            ("user-guide/features/credential-pools", "Credential Pools", None),
+        ],
+    ),
+    (
+        "Guides & Tutorials",
+        [
+            ("guides/tips", "Tips & Best Practices", None),
+            ("guides/local-llm-on-mac", "Local LLMs on Mac", None),
+            ("guides/daily-briefing-bot", "Daily Briefing Bot", None),
+            ("guides/team-telegram-assistant", "Team Telegram Assistant", None),
+            ("guides/python-library", "Use Hades as a Python Library", None),
+            ("guides/use-mcp-with-hades", "Use MCP with Hades", None),
+            ("guides/use-voice-mode-with-hades", "Use Voice Mode with Hades", None),
+            ("guides/use-soul-with-hades", "Use SOUL.md with Hades", None),
+            ("guides/build-a-hades-plugin", "Build a Hades Plugin", None),
+            ("guides/automate-with-cron", "Automate with Cron", None),
+            ("guides/work-with-skills", "Work with Skills", None),
+            ("guides/delegation-patterns", "Delegation Patterns", None),
+            ("guides/github-pr-review-agent", "GitHub PR Review Agent", None),
+        ],
+    ),
+    (
+        "Developer Guide",
+        [
+            ("developer-guide/contributing", "Contributing", None),
+            ("developer-guide/architecture", "Architecture", None),
+            ("developer-guide/agent-loop", "Agent Loop", None),
+            ("developer-guide/prompt-assembly", "Prompt Assembly", None),
+            (
+                "developer-guide/context-compression-and-caching",
+                "Context Compression & Caching",
+                None,
+            ),
+            ("developer-guide/gateway-internals", "Gateway Internals", None),
+            ("developer-guide/session-storage", "Session Storage", None),
+            ("developer-guide/provider-runtime", "Provider Runtime", None),
+            ("developer-guide/adding-tools", "Adding Tools", None),
+            ("developer-guide/adding-providers", "Adding Providers", None),
+            (
+                "developer-guide/adding-platform-adapters",
+                "Adding Platform Adapters",
+                None,
+            ),
+            ("developer-guide/creating-skills", "Creating Skills", None),
+            ("developer-guide/extending-the-cli", "Extending the CLI", None),
+        ],
+    ),
+    (
+        "Reference",
+        [
+            ("reference/cli-commands", "CLI Commands", None),
+            ("reference/slash-commands", "Slash Commands", None),
+            ("reference/profile-commands", "Profile Commands", None),
+            ("reference/environment-variables", "Environment Variables", None),
+            ("reference/tools-reference", "Tools Reference", None),
+            ("reference/toolsets-reference", "Toolsets Reference", None),
+            ("reference/mcp-config-reference", "MCP Config Reference", None),
+            ("reference/model-catalog", "Model Catalog", None),
+            (
+                "reference/skills-catalog",
+                "Bundled Skills Catalog",
+                "Table of all ~90 skills bundled with Hades",
+            ),
+            (
+                "reference/optional-skills-catalog",
+                "Optional Skills Catalog",
+                "Table of ~60 additional installable skills",
+            ),
+            ("reference/faq", "FAQ & Troubleshooting", None),
+        ],
+    ),
 ]
 
 
@@ -171,7 +217,7 @@ def read_frontmatter(path: Path) -> tuple[dict[str, str], str]:
     body = text
     if m:
         fm = m.group(1)
-        body = text[m.end():]
+        body = text[m.end() :]
         dm = DESC_RE.search(fm)
         if dm:
             meta["description"] = dm.group(1)
@@ -215,7 +261,7 @@ def emit_llms_index() -> str:
         "(Linux, macOS, WSL2, Termux)"
     )
     lines.append("")
-    lines.append("Repo: https://github.com/NousResearch/hades-agent")
+    lines.append("Repo: https://github.com/NousResearch/hermes-agent")
     lines.append("")
 
     for section, items in SECTIONS:
@@ -248,8 +294,8 @@ def emit_llms_full() -> str:
             "Started, Using Hades, Features, Messaging, Integrations, Guides, "
             "Developer Guide, Reference, then everything else.\n"
         ),
-        "Canonical site: https://hades-agent.nousresearch.com/docs\n",
-        "Short index: https://hades-agent.nousresearch.com/docs/llms.txt\n",
+        "Canonical site: https://hermes-agent.nousresearch.com/docs\n",
+        "Short index: https://hermes-agent.nousresearch.com/docs/llms.txt\n",
         "\n---\n\n",
     ]
 
@@ -279,8 +325,12 @@ def emit_llms_full() -> str:
             continue
         rel = path.relative_to(DOCS)
         parts = rel.parts
-        if len(parts) >= 3 and parts[0] == "user-guide" and parts[1] == "skills" \
-                and parts[2] in {"bundled", "optional"}:
+        if (
+            len(parts) >= 3
+            and parts[0] == "user-guide"
+            and parts[1] == "skills"
+            and parts[2] in {"bundled", "optional"}
+        ):
             continue
         seen.add(path)
         meta, body = read_frontmatter(path)

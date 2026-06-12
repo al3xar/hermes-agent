@@ -66,7 +66,7 @@ The `full` variant adds ~700 MB to the closure. If you only need messaging platf
 <summary><strong>Building from a local clone</strong></summary>
 
 ```bash
-git clone https://github.com/NousResearch/hades-agent.git
+git clone https://github.com/NousResearch/hermes-agent.git
 cd hades-agent
 nix build
 ./result/bin/hades setup

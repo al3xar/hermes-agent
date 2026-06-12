@@ -75,18 +75,20 @@ from datasets import load_dataset
 
 # 加载基础模型
 model_name = "meta-llama/Llama-3.1-8B"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+model = AutoModelForCausalLM.from_pretrained(
+    model_name, torch_dtype="auto", device_map="auto"
+)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 tokenizer.pad_token = tokenizer.eos_token
 
 # LoRA 配置
 lora_config = LoraConfig(
     task_type=TaskType.CAUSAL_LM,
-    r=16,                          # 秩（Rank），范围 8-64，越高容量越大
-    lora_alpha=32,                 # 缩放因子（通常为 2*r）
-    lora_dropout=0.05,             # 正则化 dropout
+    r=16,  # 秩（Rank），范围 8-64，越高容量越大
+    lora_alpha=32,  # 缩放因子（通常为 2*r）
+    lora_dropout=0.05,  # 正则化 dropout
     target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],  # 注意力层
-    bias="none"                    # 不训练偏置项
+    bias="none",  # 不训练偏置项
 )
 
 # 应用 LoRA
@@ -97,9 +99,11 @@ model.print_trainable_parameters()
 # 准备数据集
 dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
 
+
 def tokenize(example):
     text = f"### Instruction:\n{example['instruction']}\n\n### Response:\n{example['response']}"
     return tokenizer(text, truncation=True, max_length=512, padding="max_length")
+
 
 tokenized = dataset.map(tokenize, remove_columns=dataset.column_names)
 
@@ -112,16 +116,18 @@ training_args = TrainingArguments(
     learning_rate=2e-4,
     fp16=True,
     logging_steps=10,
-    save_strategy="epoch"
+    save_strategy="epoch",
 )
 
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized,
-    data_collator=lambda data: {"input_ids": torch.stack([f["input_ids"] for f in data]),
-                                 "attention_mask": torch.stack([f["attention_mask"] for f in data]),
-                                 "labels": torch.stack([f["input_ids"] for f in data])}
+    data_collator=lambda data: {
+        "input_ids": torch.stack([f["input_ids"] for f in data]),
+        "attention_mask": torch.stack([f["attention_mask"] for f in data]),
+        "labels": torch.stack([f["input_ids"] for f in data]),
+    },
 )
 
 trainer.train()
@@ -139,16 +145,14 @@ from peft import get_peft_model, LoraConfig, prepare_model_for_kbit_training
 # 4-bit 量化配置
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",           # NormalFloat4（最适合 LLM）
-    bnb_4bit_compute_dtype="bfloat16",   # 以 bf16 计算
-    bnb_4bit_use_double_quant=True       # 嵌套量化
+    bnb_4bit_quant_type="nf4",  # NormalFloat4（最适合 LLM）
+    bnb_4bit_compute_dtype="bfloat16",  # 以 bf16 计算
+    bnb_4bit_use_double_quant=True,  # 嵌套量化
 )
 
 # 加载量化模型
 model = AutoModelForCausalLM.from_pretrained(
-    "meta-llama/Llama-3.1-70B",
-    quantization_config=bnb_config,
-    device_map="auto"
+    "meta-llama/Llama-3.1-70B", quantization_config=bnb_config, device_map="auto"
 )
 
 # 为训练做准备（启用梯度检查点）
@@ -156,12 +160,20 @@ model = prepare_model_for_kbit_training(model)
 
 # QLoRA 的 LoRA 配置
 lora_config = LoraConfig(
-    r=64,                              # 70B 模型使用更高秩
+    r=64,  # 70B 模型使用更高秩
     lora_alpha=128,
     lora_dropout=0.1,
-    target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    target_modules=[
+        "q_proj",
+        "v_proj",
+        "k_proj",
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj",
+    ],
     bias="none",
-    task_type="CAUSAL_LM"
+    task_type="CAUSAL_LM",
 )
 
 model = get_peft_model(model, lora_config)
@@ -193,7 +205,15 @@ LoraConfig(r=16, lora_alpha=64)  # 激进（学习率效果较高）
 
 ```python
 # Llama / Mistral / Qwen
-target_modules = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+target_modules = [
+    "q_proj",
+    "v_proj",
+    "k_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+]
 
 # GPT-2 / GPT-Neo
 target_modules = ["c_attn", "c_proj", "c_fc"]
@@ -222,8 +242,7 @@ model = PeftModel.from_pretrained(base_model, "./lora-llama-adapter")
 
 # 方式二：直接加载（推荐）
 model = AutoPeftModelForCausalLM.from_pretrained(
-    "./lora-llama-adapter",
-    device_map="auto"
+    "./lora-llama-adapter", device_map="auto"
 )
 ```
 
@@ -284,7 +303,7 @@ from peft import IA3Config
 
 ia3_config = IA3Config(
     target_modules=["q_proj", "v_proj", "k_proj", "down_proj"],
-    feedforward_modules=["down_proj"]
+    feedforward_modules=["down_proj"],
 )
 model = get_peft_model(model, ia3_config)
 # 仅训练 0.01% 的参数！
@@ -297,8 +316,8 @@ from peft import PrefixTuningConfig
 
 prefix_config = PrefixTuningConfig(
     task_type="CAUSAL_LM",
-    num_virtual_tokens=20,      # 前置 token 数量
-    prefix_projection=True       # 使用 MLP 投影
+    num_virtual_tokens=20,  # 前置 token 数量
+    prefix_projection=True,  # 使用 MLP 投影
 )
 model = get_peft_model(model, prefix_config)
 ```
@@ -349,8 +368,7 @@ llm = LLM(model="meta-llama/Llama-3.1-8B", enable_lora=True)
 
 # 使用适配器进行推理
 outputs = llm.generate(
-    prompts,
-    lora_request=LoRARequest("adapter1", 1, "./lora-adapter")
+    prompts, lora_request=LoRARequest("adapter1", 1, "./lora-adapter")
 )
 ```
 
@@ -389,13 +407,11 @@ outputs = llm.generate(
 model.gradient_checkpointing_enable()
 
 # 方案二：减小批大小 + 增大梯度累积步数
-TrainingArguments(
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=16
-)
+TrainingArguments(per_device_train_batch_size=1, gradient_accumulation_steps=16)
 
 # 方案三：使用 QLoRA
 from transformers import BitsAndBytesConfig
+
 bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4")
 ```
 
@@ -440,8 +456,8 @@ TrainingArguments(learning_rate=1e-4)
 
 ## 参考资料
 
-- **[高级用法](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/peft/references/advanced-usage.md)** — DoRA、LoftQ、秩稳定化、自定义模块
-- **[故障排查](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/peft/references/troubleshooting.md)** — 常见错误、调试、优化
+- **[高级用法](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/peft/references/advanced-usage.md)** — DoRA、LoftQ、秩稳定化、自定义模块
+- **[故障排查](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/peft/references/troubleshooting.md)** — 常见错误、调试、优化
 
 ## 资源
 

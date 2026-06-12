@@ -1,6 +1,6 @@
 """Tests for get_hades_home() profile-mode fallback warning.
 
-Regression test for https://github.com/NousResearch/hades-agent/issues/18594.
+Regression test for https://github.com/NousResearch/hermes-agent/issues/18594.
 
 When HADES_HOME is unset but an active_profile file indicates a non-default
 profile is active, get_hades_home() should:
@@ -23,6 +23,7 @@ def fresh_constants(monkeypatch, tmp_path):
     """Import hades_constants fresh and reset the one-shot warn flag."""
     import importlib
     import hades_constants
+
     importlib.reload(hades_constants)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.delenv("HADES_HOME", raising=False)
@@ -38,9 +39,7 @@ class TestGetHadesHomeProfileWarning:
         assert result == tmp_path / ".hades"
         assert "HADES_HOME fallback" not in capsys.readouterr().err
 
-    def test_default_active_profile_no_warning(
-        self, fresh_constants, tmp_path, capsys
-    ):
+    def test_default_active_profile_no_warning(self, fresh_constants, tmp_path, capsys):
         """active_profile=default → still no warning, returns ~/.hades."""
         hades_dir = tmp_path / ".hades"
         hades_dir.mkdir()
@@ -102,9 +101,7 @@ class TestGetHadesHomeProfileWarning:
         # Shouldn't crash; shouldn't warn either (can't tell what profile was intended)
         assert "HADES_HOME fallback" not in capsys.readouterr().err
 
-    def test_empty_active_profile_no_warning(
-        self, fresh_constants, tmp_path, capsys
-    ):
+    def test_empty_active_profile_no_warning(self, fresh_constants, tmp_path, capsys):
         """Empty active_profile file → treated as default, no warning."""
         hades_dir = tmp_path / ".hades"
         hades_dir.mkdir()

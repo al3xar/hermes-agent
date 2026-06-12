@@ -46,7 +46,7 @@ That does not stop Hades from working well as a phone-native CLI agent — it ju
 Hades now ships a Termux-aware installer path:
 
 ```bash
-curl -fsSL https://hades-agent.nousresearch.com/install.sh | bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 ```
 
 On Termux, the installer automatically:
@@ -80,7 +80,7 @@ Why these packages?
 ### 2. Clone Hades
 
 ```bash
-git clone https://github.com/NousResearch/hades-agent.git
+git clone https://github.com/NousResearch/hermes-agent.git
 cd hades-agent
 ```
 

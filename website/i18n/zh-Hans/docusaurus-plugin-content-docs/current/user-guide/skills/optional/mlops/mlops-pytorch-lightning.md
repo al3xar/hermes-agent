@@ -48,31 +48,31 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
+
 # Step 1: Define LightningModule (organize your PyTorch code)
 class LitModel(L.LightningModule):
     def __init__(self, hidden_size=128):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(28 * 28, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, 10)
+            nn.Linear(28 * 28, hidden_size), nn.ReLU(), nn.Linear(hidden_size, 10)
         )
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self.model(x)
         loss = nn.functional.cross_entropy(y_hat, y)
-        self.log('train_loss', loss)  # Auto-logged to TensorBoard
+        self.log("train_loss", loss)  # Auto-logged to TensorBoard
         return loss
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)
 
+
 # Step 2: Create data
 train_loader = DataLoader(train_dataset, batch_size=32)
 
 # Step 3: Train with Trainer (handles everything else!)
-trainer = L.Trainer(max_epochs=10, accelerator='gpu', devices=2)
+trainer = L.Trainer(max_epochs=10, accelerator="gpu", devices=2)
 model = LitModel()
 trainer.fit(model, train_loader)
 ```
@@ -94,11 +94,11 @@ trainer.fit(model, train_loader)
 ```python
 model = MyModel()
 optimizer = torch.optim.Adam(model.parameters())
-model.to('cuda')
+model.to("cuda")
 
 for epoch in range(max_epochs):
     for batch in train_loader:
-        batch = batch.to('cuda')
+        batch = batch.to("cuda")
         optimizer.zero_grad()
         loss = model(batch)
         loss.backward()
@@ -119,8 +119,9 @@ class LitModel(L.LightningModule):
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters())
 
+
 # Train
-trainer = L.Trainer(max_epochs=10, accelerator='gpu')
+trainer = L.Trainer(max_epochs=10, accelerator="gpu")
 trainer.fit(LitModel(), train_loader)
 ```
 
@@ -138,7 +139,7 @@ class LitModel(L.LightningModule):
         x, y = batch
         y_hat = self.model(x)
         loss = nn.functional.cross_entropy(y_hat, y)
-        self.log('train_loss', loss)
+        self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -146,17 +147,18 @@ class LitModel(L.LightningModule):
         y_hat = self.model(x)
         val_loss = nn.functional.cross_entropy(y_hat, y)
         acc = (y_hat.argmax(dim=1) == y).float().mean()
-        self.log('val_loss', val_loss)
-        self.log('val_acc', acc)
+        self.log("val_loss", val_loss)
+        self.log("val_acc", acc)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self.model(x)
         test_loss = nn.functional.cross_entropy(y_hat, y)
-        self.log('test_loss', test_loss)
+        self.log("test_loss", test_loss)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)
+
 
 # Train with validation
 trainer = L.Trainer(max_epochs=10)
@@ -179,9 +181,9 @@ model = LitModel()
 
 # 8 GPUs with DDP (automatic!)
 trainer = L.Trainer(
-    accelerator='gpu',
+    accelerator="gpu",
     devices=8,
-    strategy='ddp'  # Or 'fsdp', 'deepspeed'
+    strategy="ddp",  # Or 'fsdp', 'deepspeed'
 )
 
 trainer.fit(model, train_loader)
@@ -201,29 +203,26 @@ python train.py
 ### 工作流 4：用于监控的回调（Callbacks）
 
 ```python
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
+from lightning.pytorch.callbacks import (
+    ModelCheckpoint,
+    EarlyStopping,
+    LearningRateMonitor,
+)
 
 # Create callbacks
 checkpoint = ModelCheckpoint(
-    monitor='val_loss',
-    mode='min',
+    monitor="val_loss",
+    mode="min",
     save_top_k=3,
-    filename='model-{epoch:02d}-{val_loss:.2f}'
+    filename="model-{epoch:02d}-{val_loss:.2f}",
 )
 
-early_stop = EarlyStopping(
-    monitor='val_loss',
-    patience=5,
-    mode='min'
-)
+early_stop = EarlyStopping(monitor="val_loss", patience=5, mode="min")
 
-lr_monitor = LearningRateMonitor(logging_interval='epoch')
+lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
 # Add to Trainer
-trainer = L.Trainer(
-    max_epochs=100,
-    callbacks=[checkpoint, early_stop, lr_monitor]
-)
+trainer = L.Trainer(max_epochs=100, callbacks=[checkpoint, early_stop, lr_monitor])
 
 trainer.fit(model, train_loader, val_loader)
 ```
@@ -244,19 +243,18 @@ class LitModel(L.LightningModule):
 
         # Cosine annealing
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=100,
-            eta_min=1e-5
+            optimizer, T_max=100, eta_min=1e-5
         )
 
         return {
-            'optimizer': optimizer,
-            'lr_scheduler': {
-                'scheduler': scheduler,
-                'interval': 'epoch',  # Update per epoch
-                'frequency': 1
-            }
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",  # Update per epoch
+                "frequency": 1,
+            },
         }
+
 
 # Learning rate auto-logged!
 trainer = L.Trainer(max_epochs=100)
@@ -306,7 +304,7 @@ def training_step(self, batch, batch_idx):
 ```python
 trainer = L.Trainer(
     accumulate_grad_batches=4,  # Effective batch = batch_size × 4
-    precision='bf16'  # Or 'fp16', reduces memory 50%
+    precision="bf16",  # Or 'fp16', reduces memory 50%
 )
 ```
 
@@ -326,19 +324,19 @@ trainer.fit(model, train_loader, val_loader)
 Lightning 会自动检测 GPU。请显式设置 devices：
 ```python
 # Test on CPU first
-trainer = L.Trainer(accelerator='cpu', devices=1)
+trainer = L.Trainer(accelerator="cpu", devices=1)
 
 # Then GPU
-trainer = L.Trainer(accelerator='gpu', devices=1)
+trainer = L.Trainer(accelerator="gpu", devices=1)
 ```
 
 ## 进阶主题
 
-**回调**：参见 [references/callbacks.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/pytorch-lightning/references/callbacks.md)，了解 EarlyStopping、ModelCheckpoint、自定义回调及回调钩子（hook）。
+**回调**：参见 [references/callbacks.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/pytorch-lightning/references/callbacks.md)，了解 EarlyStopping、ModelCheckpoint、自定义回调及回调钩子（hook）。
 
-**分布式策略**：参见 [references/distributed.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/pytorch-lightning/references/distributed.md)，了解 DDP、FSDP、DeepSpeed ZeRO 集成及多节点配置。
+**分布式策略**：参见 [references/distributed.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/pytorch-lightning/references/distributed.md)，了解 DDP、FSDP、DeepSpeed ZeRO 集成及多节点配置。
 
-**超参数调优**：参见 [references/hyperparameter-tuning.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/pytorch-lightning/references/hyperparameter-tuning.md)，了解与 Optuna、Ray Tune 及 WandB sweeps 的集成。
+**超参数调优**：参见 [references/hyperparameter-tuning.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/pytorch-lightning/references/hyperparameter-tuning.md)，了解与 Optuna、Ray Tune 及 WandB sweeps 的集成。
 
 ## 硬件要求
 

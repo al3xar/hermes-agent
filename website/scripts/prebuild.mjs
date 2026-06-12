@@ -34,7 +34,7 @@ const llmsScript = join(scriptDir, "generate-llms-txt.py");
 const outputFile = join(websiteDir, "static", "api", "skills.json");
 const unifiedIndexFile = join(websiteDir, "static", "api", "skills-index.json");
 const UNIFIED_INDEX_URL =
-  "https://hades-agent.nousresearch.com/docs/api/skills-index.json";
+  "https://hermes-agent.nousresearch.com/docs/api/skills-index.json";
 const UNIFIED_INDEX_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 
 function writeEmptyFallback(reason) {
@@ -51,7 +51,10 @@ function runPython(script, label) {
     console.warn(`[prebuild] ${label} skipped (script missing)`);
     return false;
   }
-  const r = spawnSync("python3", [script], { stdio: "inherit", cwd: websiteDir });
+  const r = spawnSync("python3", [script], {
+    stdio: "inherit",
+    cwd: websiteDir,
+  });
   if (r.error && r.error.code === "ENOENT") {
     console.warn(`[prebuild] ${label} skipped (python3 not found)`);
     return false;
@@ -102,7 +105,9 @@ async function ensureUnifiedIndex() {
         return existsSync(unifiedIndexFile);
       }
     } catch (e) {
-      console.warn(`[prebuild] skills-index.json from live site is not valid JSON: ${e}`);
+      console.warn(
+        `[prebuild] skills-index.json from live site is not valid JSON: ${e}`,
+      );
       return existsSync(unifiedIndexFile);
     }
     mkdirSync(dirname(unifiedIndexFile), { recursive: true });

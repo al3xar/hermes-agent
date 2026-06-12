@@ -45,7 +45,9 @@ def _get_platform_default_hades_home() -> Path:
     """Return the platform-native default Hades home path."""
     if sys.platform == "win32":
         local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
-        base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
+        base = (
+            Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
+        )
         return base / "hades"
     return Path.home() / ".hades"
 
@@ -64,7 +66,7 @@ def get_hades_home() -> Path:
     callers that import this at load time.  Subprocess spawners are
     expected to propagate ``HADES_HOME`` explicitly (see the systemd
     template in ``hades_cli/gateway.py`` and the kanban dispatcher in
-    ``hades_cli/kanban_db.py``).  See https://github.com/NousResearch.hades-agent/issues/18594.
+    ``hades_cli/kanban_db.py``).  See https://github.com/NousResearch.hermes-agent/issues/18594.
     """
     override = get_hades_home_override()
     if override:
@@ -270,7 +272,7 @@ def secure_parent_dir(path: Path) -> None:
     prevent catastrophic host bricking when ``HADES_HOME`` or other path
     env vars resolve to an unexpected location.
 
-    See https://github.com/NousResearch.hades-agent/issues/25821.
+    See https://github.com/NousResearch.hermes-agent/issues/25821.
     """
     parent = path.parent.resolve()
     # Refuse root and its direct children (/usr, /home, /var, /tmp, …).
@@ -406,7 +408,6 @@ def get_config_path() -> Path:
 def get_skills_dir() -> Path:
     """Return the path to the skills directory under HADES_HOME."""
     return get_hades_home() / "skills"
-
 
 
 def get_env_path() -> Path:

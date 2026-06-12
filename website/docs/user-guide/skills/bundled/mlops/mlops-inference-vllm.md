@@ -195,14 +195,11 @@ llm = LLM(
     model="meta-llama/Llama-3-8B-Instruct",
     tensor_parallel_size=2,  # Use 2 GPUs
     gpu_memory_utilization=0.9,
-    max_model_len=4096
+    max_model_len=4096,
 )
 
 sampling = SamplingParams(
-    temperature=0.7,
-    top_p=0.95,
-    max_tokens=512,
-    stop=["</s>", "\n\n"]
+    temperature=0.7, top_p=0.95, max_tokens=512, stop=["</s>", "\n\n"]
 )
 ```
 
@@ -229,11 +226,12 @@ for output in outputs:
     results.append({
         "prompt": prompt,
         "generated": generated,
-        "tokens": len(output.outputs[0].token_ids)
+        "tokens": len(output.outputs[0].token_ids),
     })
 
 # Save to file
 import json
+
 with open("results.jsonl", "w") as f:
     for result in results:
         f.write(json.dumps(result) + "\n")
@@ -362,13 +360,13 @@ vllm serve MODEL --speculative-model DRAFT_MODEL
 
 ## Advanced topics
 
-**Server deployment patterns**: See [references/server-deployment.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/server-deployment.md) for Docker, Kubernetes, and load balancing configurations.
+**Server deployment patterns**: See [references/server-deployment.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/server-deployment.md) for Docker, Kubernetes, and load balancing configurations.
 
-**Performance optimization**: See [references/optimization.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/optimization.md) for PagedAttention tuning, continuous batching details, and benchmark results.
+**Performance optimization**: See [references/optimization.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/optimization.md) for PagedAttention tuning, continuous batching details, and benchmark results.
 
-**Quantization guide**: See [references/quantization.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/quantization.md) for AWQ/GPTQ/FP8 setup, model preparation, and accuracy comparisons.
+**Quantization guide**: See [references/quantization.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/quantization.md) for AWQ/GPTQ/FP8 setup, model preparation, and accuracy comparisons.
 
-**Troubleshooting**: See [references/troubleshooting.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/troubleshooting.md) for detailed error messages, debugging steps, and performance diagnostics.
+**Troubleshooting**: See [references/troubleshooting.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/troubleshooting.md) for detailed error messages, debugging steps, and performance diagnostics.
 
 ## Hardware requirements
 

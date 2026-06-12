@@ -1,8 +1,9 @@
 """Regression test: set_runtime_main() must pass base_url/api_key/api_mode
 so that _resolve_auto() can route custom: providers in Step 1.
 
-Fixes https://github.com/NousResearch/hades-agent/issues/34777
+Fixes https://github.com/NousResearch/hermes-agent/issues/34777
 """
+
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -48,7 +49,8 @@ class TestSetRuntimeMainCustomProvider:
         import agent.auxiliary_client as mod
 
         mod.set_runtime_main(
-            "custom:x", "m",
+            "custom:x",
+            "m",
             base_url="https://x.example.com",
             api_key="sk-abc",
             api_mode="chat_completions",
@@ -78,7 +80,10 @@ class TestSetRuntimeMainCustomProvider:
                 mock_resolve.assert_called_once()
                 call_args = mock_resolve.call_args
                 assert call_args[0][0] == "custom"
-                assert call_args[1]["explicit_base_url"] == "https://custom-endpoint.example.com/v1"
+                assert (
+                    call_args[1]["explicit_base_url"]
+                    == "https://custom-endpoint.example.com/v1"
+                )
                 assert call_args[1]["explicit_api_key"] == "sk-test-123"
         finally:
             mod.clear_runtime_main()
@@ -156,8 +161,12 @@ class TestResolveAutoCustomEndToEnd:
         import agent.auxiliary_client as mod
 
         # Hermetic: no aggregator creds, no stale OPENAI_BASE_URL.
-        for var in ("OPENROUTER_API_KEY", "NOUS_API_KEY", "OPENAI_API_KEY",
-                    "OPENAI_BASE_URL"):
+        for var in (
+            "OPENROUTER_API_KEY",
+            "NOUS_API_KEY",
+            "OPENAI_API_KEY",
+            "OPENAI_BASE_URL",
+        ):
             monkeypatch.delenv(var, raising=False)
         hades_home = tmp_path / ".hades"
         hades_home.mkdir()
@@ -195,8 +204,12 @@ class TestResolveAutoCustomEndToEnd:
         broke the named-custom branch and returned None here."""
         import agent.auxiliary_client as mod
 
-        for var in ("OPENROUTER_API_KEY", "NOUS_API_KEY", "OPENAI_API_KEY",
-                    "OPENAI_BASE_URL"):
+        for var in (
+            "OPENROUTER_API_KEY",
+            "NOUS_API_KEY",
+            "OPENAI_API_KEY",
+            "OPENAI_BASE_URL",
+        ):
             monkeypatch.delenv(var, raising=False)
         hades_home = tmp_path / ".hades"
         hades_home.mkdir()

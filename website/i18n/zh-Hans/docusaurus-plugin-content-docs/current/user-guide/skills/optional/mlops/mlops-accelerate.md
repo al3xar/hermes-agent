@@ -75,13 +75,13 @@ accelerate launch train.py
 # train.py
 import torch
 
-model = torch.nn.Linear(10, 2).to('cuda')
+model = torch.nn.Linear(10, 2).to("cuda")
 optimizer = torch.optim.Adam(model.parameters())
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=32)
 
 for epoch in range(10):
     for batch in dataloader:
-        batch = batch.to('cuda')
+        batch = batch.to("cuda")
         optimizer.zero_grad()
         loss = model(batch).mean()
         loss.backward()
@@ -144,13 +144,13 @@ accelerate launch --multi_gpu --num_processes 16 \
 from accelerate import Accelerator
 
 # FP16（带梯度缩放）
-accelerator = Accelerator(mixed_precision='fp16')
+accelerator = Accelerator(mixed_precision="fp16")
 
 # BF16（无缩放，更稳定）
-accelerator = Accelerator(mixed_precision='bf16')
+accelerator = Accelerator(mixed_precision="bf16")
 
 # FP8（H100+）
-accelerator = Accelerator(mixed_precision='fp8')
+accelerator = Accelerator(mixed_precision="fp8")
 
 model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader)
 
@@ -168,12 +168,12 @@ for batch in dataloader:
 from accelerate import Accelerator
 
 accelerator = Accelerator(
-    mixed_precision='bf16',
+    mixed_precision="bf16",
     deepspeed_plugin={
         "zero_stage": 2,  # ZeRO-2
         "offload_optimizer": False,
-        "gradient_accumulation_steps": 4
-    }
+        "gradient_accumulation_steps": 4,
+    },
 )
 
 # 代码与之前完全相同！
@@ -214,13 +214,10 @@ from accelerate import Accelerator, FullyShardedDataParallelPlugin
 fsdp_plugin = FullyShardedDataParallelPlugin(
     sharding_strategy="FULL_SHARD",  # 等价于 ZeRO-3
     auto_wrap_policy="TRANSFORMER_AUTO_WRAP",
-    cpu_offload=False
+    cpu_offload=False,
 )
 
-accelerator = Accelerator(
-    mixed_precision='bf16',
-    fsdp_plugin=fsdp_plugin
-)
+accelerator = Accelerator(mixed_precision="bf16", fsdp_plugin=fsdp_plugin)
 
 model, optimizer, dataloader = accelerator.prepare(model, optimizer, dataloader)
 ```
@@ -280,7 +277,7 @@ for batch in dataloader:
 不要手动移动到设备：
 ```python
 # 错误
-batch = batch.to('cuda')
+batch = batch.to("cuda")
 
 # 正确
 # Accelerate 在 prepare() 之后自动处理
@@ -303,10 +300,10 @@ with accelerator.accumulate(model):
 ```python
 # 仅在主进程保存
 if accelerator.is_main_process:
-    accelerator.save_state('checkpoint/')
+    accelerator.save_state("checkpoint/")
 
 # 在所有进程上加载
-accelerator.load_state('checkpoint/')
+accelerator.load_state("checkpoint/")
 ```
 
 **问题：FSDP 结果不一致**
@@ -314,16 +311,17 @@ accelerator.load_state('checkpoint/')
 确保使用相同的随机种子：
 ```python
 from accelerate.utils import set_seed
+
 set_seed(42)
 ```
 
 ## 高级主题
 
-**Megatron 集成**：张量并行、流水线并行和序列并行的配置，请参阅 [references/megatron-integration.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/accelerate/references/megatron-integration.md)。
+**Megatron 集成**：张量并行、流水线并行和序列并行的配置，请参阅 [references/megatron-integration.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/accelerate/references/megatron-integration.md)。
 
-**自定义插件**：创建自定义分布式插件及高级配置，请参阅 [references/custom-plugins.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/accelerate/references/custom-plugins.md)。
+**自定义插件**：创建自定义分布式插件及高级配置，请参阅 [references/custom-plugins.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/accelerate/references/custom-plugins.md)。
 
-**性能调优**：性能分析、内存优化及最佳实践，请参阅 [references/performance.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/accelerate/references/performance.md)。
+**性能调优**：性能分析、内存优化及最佳实践，请参阅 [references/performance.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/accelerate/references/performance.md)。
 
 ## 硬件要求
 

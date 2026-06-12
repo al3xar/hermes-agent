@@ -1,51 +1,51 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: 'Hades Agent',
-  tagline: 'The self-improving AI agent',
-  favicon: 'img/favicon.ico',
+  title: "Hades Agent",
+  tagline: "The self-improving AI agent",
+  favicon: "img/favicon.ico",
 
-  url: 'https://hades-agent.nousresearch.com',
-  baseUrl: '/docs/',
+  url: "https://hermes-agent.nousresearch.com",
+  baseUrl: "/docs/",
 
-  organizationName: 'NousResearch',
-  projectName: 'hades-agent',
+  organizationName: "NousResearch",
+  projectName: "hades-agent",
 
-  onBrokenLinks: 'warn',
+  onBrokenLinks: "warn",
 
   markdown: {
     mermaid: true,
     hooks: {
-      onBrokenMarkdownLinks: 'warn',
+      onBrokenMarkdownLinks: "warn",
     },
   },
 
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en', 'zh-Hans'],
+    defaultLocale: "en",
+    locales: ["en", "zh-Hans"],
     localeConfigs: {
       en: {
-        label: 'English',
+        label: "English",
       },
-      'zh-Hans': {
-        label: '简体中文',
-        htmlLang: 'zh-Hans',
+      "zh-Hans": {
+        label: "简体中文",
+        htmlLang: "zh-Hans",
       },
     },
   },
 
   themes: [
-    '@docusaurus/theme-mermaid',
+    "@docusaurus/theme-mermaid",
     [
-      require.resolve('@easyops-cn/docusaurus-search-local'),
+      require.resolve("@easyops-cn/docusaurus-search-local"),
       /** @type {import("@easyops-cn/docusaurus-search-local").PluginOptions} */
-      ({
+      {
         hashed: true,
-        language: ['en', 'zh'],
+        language: ["en", "zh"],
         indexBlog: false,
-        docsRouteBasePath: '/',
+        docsRouteBasePath: "/",
         // Disabled: appends ?_highlight=... to URLs (before the #anchor),
         // which makes copy/pasted doc links ugly. Ctrl+F on the page is fine.
         highlightSearchTermsOnTargetPage: false,
@@ -62,31 +62,32 @@ const config: Config = {
           /^user-guide\/skills\/bundled\//,
           /^user-guide\/skills\/optional\//,
         ],
-      }),
+      },
     ],
   ],
 
   presets: [
     [
-      'classic',
+      "classic",
       {
         docs: {
-          routeBasePath: '/',  // Docs at the root of /docs/
-          sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/NousResearch/hades-agent/edit/main/website/',
+          routeBasePath: "/", // Docs at the root of /docs/
+          sidebarPath: "./sidebars.ts",
+          editUrl:
+            "https://github.com/NousResearch/hermes-agent/edit/main/website/",
         },
         blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: "./src/css/custom.css",
         },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
-    image: 'img/hades-agent-banner.png',
+    image: "img/hades-agent-banner.png",
     colorMode: {
-      defaultMode: 'dark',
+      defaultMode: "dark",
       respectPrefersColorScheme: true,
     },
     docs: {
@@ -96,75 +97,84 @@ const config: Config = {
       },
     },
     navbar: {
-      title: 'Hades Agent',
+      title: "Hades Agent",
       logo: {
-        alt: 'Hades Agent',
-        src: 'img/logo.png',
+        alt: "Hades Agent",
+        src: "img/logo.png",
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'docs',
-          position: 'left',
-          label: 'Docs',
+          type: "docSidebar",
+          sidebarId: "docs",
+          position: "left",
+          label: "Docs",
         },
         {
-          to: '/skills',
-          label: 'Skills',
-          position: 'left',
+          to: "/skills",
+          label: "Skills",
+          position: "left",
         },
         {
-          href: 'https://hades-agent.nousresearch.com/desktop',
-          label: 'Download',
-          position: 'left',
+          href: "https://hermes-agent.nousresearch.com/desktop",
+          label: "Download",
+          position: "left",
         },
         {
-          type: 'localeDropdown',
-          position: 'right',
+          type: "localeDropdown",
+          position: "right",
         },
         {
-          href: 'https://hades-agent.nousresearch.com',
-          label: 'Home',
-          position: 'right',
+          href: "https://hermes-agent.nousresearch.com",
+          label: "Home",
+          position: "right",
         },
         {
-          href: 'https://github.com/NousResearch/hades-agent',
-          label: 'GitHub',
-          position: 'right',
+          href: "https://github.com/NousResearch/hermes-agent",
+          label: "GitHub",
+          position: "right",
         },
         {
-          href: 'https://discord.gg/NousResearch',
-          label: 'Discord',
-          position: 'right',
+          href: "https://discord.gg/NousResearch",
+          label: "Discord",
+          position: "right",
         },
       ],
     },
     footer: {
-      style: 'dark',
+      style: "dark",
       links: [
         {
-          title: 'Docs',
+          title: "Docs",
           items: [
-            { label: 'Getting Started', to: '/getting-started/quickstart' },
-            { label: 'User Guide', to: '/user-guide/cli' },
-            { label: 'Developer Guide', to: '/developer-guide/architecture' },
-            { label: 'Reference', to: '/reference/cli-commands' },
+            { label: "Getting Started", to: "/getting-started/quickstart" },
+            { label: "User Guide", to: "/user-guide/cli" },
+            { label: "Developer Guide", to: "/developer-guide/architecture" },
+            { label: "Reference", to: "/reference/cli-commands" },
           ],
         },
         {
-          title: 'Community',
+          title: "Community",
           items: [
-            { label: 'Discord', href: 'https://discord.gg/NousResearch' },
-            { label: 'GitHub Issues', href: 'https://github.com/NousResearch/hades-agent/issues' },
-            { label: 'Skills Hub', href: 'https://agentskills.io' },
+            { label: "Discord", href: "https://discord.gg/NousResearch" },
+            {
+              label: "GitHub Issues",
+              href: "https://github.com/NousResearch/hermes-agent/issues",
+            },
+            { label: "Skills Hub", href: "https://agentskills.io" },
           ],
         },
         {
-          title: 'More',
+          title: "More",
           items: [
-            { label: 'Desktop Download', href: 'https://hades-agent.nousresearch.com/desktop' },
-            { label: 'GitHub', href: 'https://github.com/NousResearch/hades-agent' },
-            { label: 'Nous Research', href: 'https://nousresearch.com' },
+            {
+              label: "Desktop Download",
+              href: "https://hermes-agent.nousresearch.com/desktop",
+            },
+            {
+              label: "GitHub",
+              href: "https://github.com/NousResearch/hermes-agent",
+            },
+            { label: "Nous Research", href: "https://nousresearch.com" },
           ],
         },
       ],
@@ -173,10 +183,10 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
-      additionalLanguages: ['bash', 'yaml', 'json', 'python', 'toml'],
+      additionalLanguages: ["bash", "yaml", "json", "python", "toml"],
     },
     mermaid: {
-      theme: {light: 'neutral', dark: 'dark'},
+      theme: { light: "neutral", dark: "dark" },
     },
   } satisfies Preset.ThemeConfig,
 };

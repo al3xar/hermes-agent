@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 DEFAULT_CATALOG_URL = (
-    "https://hades-agent.nousresearch.com/docs/api/model-catalog.json"
+    "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
 )
 # Fallback fetch chain. The Docusaurus site is served through Vercel, which
 # occasionally returns HTTP 403 + x-vercel-mitigated: challenge for non-
@@ -71,7 +71,7 @@ DEFAULT_CATALOG_URL = (
 # is the same manifest published from the same repo and is not bot-gated,
 # so we fall through to it whenever the primary URL fails.
 DEFAULT_CATALOG_FALLBACK_URLS: tuple[str, ...] = (
-    "https://raw.githubusercontent.com/NousResearch/hades-agent/main/website/static/api/model-catalog.json",
+    "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/static/api/model-catalog.json",
 )
 DEFAULT_TTL_HOURS = 1
 DEFAULT_FETCH_TIMEOUT = 8.0
@@ -95,6 +95,7 @@ def _load_catalog_config() -> dict[str, Any]:
     """Load the ``model_catalog`` config block with defaults filled in."""
     try:
         from hades_cli.config import load_config
+
         cfg = load_config() or {}
     except Exception:
         cfg = {}
@@ -107,13 +108,16 @@ def _load_catalog_config() -> dict[str, Any]:
         "enabled": bool(raw.get("enabled", True)),
         "url": str(raw.get("url") or DEFAULT_CATALOG_URL),
         "ttl_hours": float(raw.get("ttl_hours") or DEFAULT_TTL_HOURS),
-        "providers": raw.get("providers") if isinstance(raw.get("providers"), dict) else {},
+        "providers": raw.get("providers")
+        if isinstance(raw.get("providers"), dict)
+        else {},
     }
 
 
 def _cache_path() -> Path:
     """Return the disk cache path. Import lazily so tests can monkeypatch home."""
     from hades_constants import get_hades_home
+
     return get_hades_home() / "cache" / "model_catalog.json"
 
 
@@ -380,7 +384,9 @@ def seed_cache_from_checkout(project_root: "Path | str") -> bool:
         logger.debug("model catalog seed from checkout skipped (%s): %s", src, exc)
         return False
     if not _validate_manifest(data):
-        logger.debug("model catalog seed from checkout skipped: invalid manifest at %s", src)
+        logger.debug(
+            "model catalog seed from checkout skipped: invalid manifest at %s", src
+        )
         return False
     _write_disk_cache(data)
     reset_cache()  # drop the in-process copy so the next read picks up the seed

@@ -40,9 +40,11 @@ Flash Attention 通过 IO 感知分块（IO-aware tiling）和重计算（recomp
 import torch
 import torch.nn.functional as F
 
-q = torch.randn(2, 8, 512, 64, device='cuda', dtype=torch.float16)  # [batch, heads, seq, dim]
-k = torch.randn(2, 8, 512, 64, device='cuda', dtype=torch.float16)
-v = torch.randn(2, 8, 512, 64, device='cuda', dtype=torch.float16)
+q = torch.randn(
+    2, 8, 512, 64, device="cuda", dtype=torch.float16
+)  # [batch, heads, seq, dim]
+k = torch.randn(2, 8, 512, 64, device="cuda", dtype=torch.float16)
+v = torch.randn(2, 8, 512, 64, device="cuda", dtype=torch.float16)
 
 # 如果可用，自动使用 Flash Attention
 out = F.scaled_dot_product_attention(q, k, v)
@@ -96,15 +98,14 @@ out = attn_weights @ v
 
 # 之后（Flash Attention）
 import torch.nn.functional as F
+
 out = F.scaled_dot_product_attention(q, k, v, attn_mask=mask)
 ```
 
 强制使用 Flash Attention 后端：
 ```python
 with torch.backends.cuda.sdp_kernel(
-    enable_flash=True,
-    enable_math=False,
-    enable_mem_efficient=False
+    enable_flash=True, enable_math=False, enable_mem_efficient=False
 ):
     out = F.scaled_dot_product_attention(q, k, v)
 ```
@@ -114,8 +115,12 @@ with torch.backends.cuda.sdp_kernel(
 ```python
 import torch.utils.benchmark as benchmark
 
+
 def test_attention(use_flash):
-    q, k, v = [torch.randn(2, 8, 2048, 64, device='cuda', dtype=torch.float16) for _ in range(3)]
+    q, k, v = [
+        torch.randn(2, 8, 2048, 64, device="cuda", dtype=torch.float16)
+        for _ in range(3)
+    ]
 
     if use_flash:
         with torch.backends.cuda.sdp_kernel(enable_flash=True):
@@ -124,9 +129,10 @@ def test_attention(use_flash):
         attn = (q @ k.transpose(-2, -1) / 8.0).softmax(dim=-1)
         return attn @ v
 
+
 # 基准测试
-t_flash = benchmark.Timer(stmt='test_attention(True)', globals=globals())
-t_standard = benchmark.Timer(stmt='test_attention(False)', globals=globals())
+t_flash = benchmark.Timer(stmt="test_attention(True)", globals=globals())
+t_standard = benchmark.Timer(stmt="test_attention(False)", globals=globals())
 
 print(f"Flash: {t_flash.timeit(100).mean:.3f}s")
 print(f"Standard: {t_standard.timeit(100).mean:.3f}s")
@@ -138,7 +144,9 @@ print(f"Standard: {t_standard.timeit(100).mean:.3f}s")
 
 ```python
 # 比较输出
-q, k, v = [torch.randn(1, 8, 512, 64, device='cuda', dtype=torch.float16) for _ in range(3)]
+q, k, v = [
+    torch.randn(1, 8, 512, 64, device="cuda", dtype=torch.float16) for _ in range(3)
+]
 
 # Flash Attention
 out_flash = F.scaled_dot_product_attention(q, k, v)
@@ -189,11 +197,13 @@ k = k.transpose(1, 2)
 v = v.transpose(1, 2)
 
 out = flash_attn_func(
-    q, k, v,
+    q,
+    k,
+    v,
     dropout_p=0.1,
     causal=True,  # 用于自回归模型
     window_size=(-1, -1),  # 无滑动窗口
-    softmax_scale=None  # 自动缩放
+    softmax_scale=None,  # 自动缩放
 )
 
 out = out.transpose(1, 2)  # 转回 [batch, heads, seq, dim]
@@ -214,9 +224,11 @@ out = flash_attn_func(q, k, v)  # 自动处理 MQA
 ```python
 # 仅关注前后 256 个 token 的窗口
 out = flash_attn_func(
-    q, k, v,
+    q,
+    k,
+    v,
     window_size=(256, 256),  # (左, 右) 窗口
-    causal=True
+    causal=True,
 )
 ```
 
@@ -227,7 +239,9 @@ import torch
 from flash_attn import flash_attn_func
 import time
 
-q, k, v = [torch.randn(4, 4096, 32, 64, device='cuda', dtype=torch.float16) for _ in range(3)]
+q, k, v = [
+    torch.randn(4, 4096, 32, 64, device="cuda", dtype=torch.float16) for _ in range(3)
+]
 
 # 预热
 for _ in range(10):
@@ -241,8 +255,8 @@ for _ in range(100):
     torch.cuda.synchronize()
 end = time.time()
 
-print(f"Time per iteration: {(end-start)/100*1000:.2f}ms")
-print(f"Memory allocated: {torch.cuda.max_memory_allocated()/1e9:.2f}GB")
+print(f"Time per iteration: {(end - start) / 100 * 1000:.2f}ms")
+print(f"Memory allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f}GB")
 ```
 
 ### 工作流 3：H100 FP8 优化（FlashAttention-3）
@@ -276,9 +290,9 @@ pip install flash-attn --no-build-isolation
 ```python
 import torch
 
-q = torch.randn(2, 4096, 32, 64, device='cuda', dtype=torch.float16)
-k = torch.randn(2, 4096, 32, 64, device='cuda', dtype=torch.float16)
-v = torch.randn(2, 4096, 32, 64, device='cuda', dtype=torch.float16)
+q = torch.randn(2, 4096, 32, 64, device="cuda", dtype=torch.float16)
+k = torch.randn(2, 4096, 32, 64, device="cuda", dtype=torch.float16)
+v = torch.randn(2, 4096, 32, 64, device="cuda", dtype=torch.float16)
 
 # 转换为 float8_e4m3（FP8）
 q_fp8 = q.to(torch.float8_e4m3fn)
@@ -339,6 +353,7 @@ Flash Attention 的收益随序列长度增加而提升：
 验证 GPU 是否支持 Flash Attention：
 ```python
 import torch
+
 print(torch.cuda.get_device_capability())
 # 应为 ≥(7, 5)，即 Turing 及以上
 ```
@@ -359,9 +374,9 @@ Flash Attention 使用 float16/bfloat16 以提升速度，不支持 float32。
 
 ## 高级主题
 
-**与 HuggingFace Transformers 集成**：参见 [references/transformers-integration.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/flash-attention/references/transformers-integration.md)，了解如何在 BERT、GPT、Llama 模型中启用 Flash Attention。
+**与 HuggingFace Transformers 集成**：参见 [references/transformers-integration.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/flash-attention/references/transformers-integration.md)，了解如何在 BERT、GPT、Llama 模型中启用 Flash Attention。
 
-**性能基准测试**：参见 [references/benchmarks.md](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/flash-attention/references/benchmarks.md)，查看跨 GPU 和序列长度的详细速度与内存对比。
+**性能基准测试**：参见 [references/benchmarks.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/flash-attention/references/benchmarks.md)，查看跨 GPU 和序列长度的详细速度与内存对比。
 
 ## 硬件要求
 

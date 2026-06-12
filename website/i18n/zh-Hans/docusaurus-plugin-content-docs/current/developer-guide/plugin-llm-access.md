@@ -33,8 +33,11 @@ return result.text
 ```python
 result = ctx.llm.complete(
     messages=[
-        {"role": "system", "content": "Rewrite errors as one short sentence a non-engineer can act on."},
-        {"role": "user",   "content": traceback_text},
+        {
+            "role": "system",
+            "content": "Rewrite errors as one short sentence a non-engineer can act on.",
+        },
+        {"role": "user", "content": traceback_text},
     ],
     max_tokens=64,
     purpose="hooks.error-rewrite",
@@ -93,8 +96,10 @@ def _tldr(ctx, raw_args: str) -> str:
         return "Usage: /tldr <text to summarise>"
     result = ctx.llm.complete(
         messages=[
-            {"role": "system",
-             "content": "Summarise the user's text in one tight paragraph. No preamble."},
+            {
+                "role": "system",
+                "content": "Summarise the user's text in one tight paragraph. No preamble.",
+            },
             {"role": "user", "content": text},
         ],
         max_tokens=256,
@@ -126,9 +131,9 @@ _TASKS_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "owner":  {"type": "string"},
+                    "owner": {"type": "string"},
                     "action": {"type": "string"},
-                    "due":    {"type": "string", "description": "ISO date or empty"},
+                    "due": {"type": "string", "description": "ISO date or empty"},
                 },
                 "required": ["action"],
             },
@@ -155,7 +160,9 @@ def _paste_to_tasks(ctx, raw_args: str) -> str:
     )
     if result.parsed is None:
         return f"Couldn't parse a response. Raw output:\n{result.text}"
-    lines = [f"- [{t.get('owner') or '?'}] {t['action']}" for t in result.parsed["tasks"]]
+    lines = [
+        f"- [{t.get('owner') or '?'}] {t['action']}" for t in result.parsed["tasks"]
+    ]
     return "\n".join(lines) or "(no tasks found)"
 ```
 
@@ -185,13 +192,13 @@ def _paste_to_tasks(ctx, raw_args: str) -> str:
 ```python
 result = ctx.llm.complete(
     messages=[{"role": "user", "content": "Hi"}],
-    provider=None,         # 可选，受门控——Hades provider id（如 "openrouter"）
-    model=None,            # 可选，受门控——该 provider 期望的任意字符串
+    provider=None,  # 可选，受门控——Hades provider id（如 "openrouter"）
+    model=None,  # 可选，受门控——该 provider 期望的任意字符串
     temperature=None,
     max_tokens=None,
-    timeout=None,          # 秒
-    agent_id=None,         # 可选，受门控
-    profile=None,          # 可选，受门控——显式指定认证 profile 名称
+    timeout=None,  # 秒
+    agent_id=None,  # 可选，受门控
+    profile=None,  # 可选，受门控——显式指定认证 profile 名称
     purpose="optional-audit-string",
 )
 # → PluginLlmCompleteResult(text, provider, model, agent_id, usage, audit)
@@ -207,16 +214,16 @@ result = ctx.llm.complete(
 result = ctx.llm.complete_structured(
     instructions="What you want extracted.",
     input=[
-        {"type": "text",  "text": "..."},
+        {"type": "text", "text": "..."},
         {"type": "image", "data": b"...", "mime_type": "image/png"},
-        {"type": "image", "url":  "https://..."},
+        {"type": "image", "url": "https://..."},
     ],
-    json_schema={...},     # 可选——触发解析结果及验证
-    json_mode=False,       # 设为 True 可在不提供 schema 的情况下请求 JSON
-    schema_name=None,      # 可选的人类可读 schema 名称
+    json_schema={...},  # 可选——触发解析结果及验证
+    json_mode=False,  # 设为 True 可在不提供 schema 的情况下请求 JSON
+    schema_name=None,  # 可选的人类可读 schema 名称
     system_prompt=None,
-    provider=None,         # 可选，受门控
-    model=None,            # 可选，受门控
+    provider=None,  # 可选，受门控
+    model=None,  # 可选，受门控
     temperature=None,
     max_tokens=None,
     timeout=None,
@@ -247,17 +254,18 @@ result = await ctx.llm.acomplete_structured(instructions=..., input=...)
 ```python
 @dataclass
 class PluginLlmCompleteResult:
-    text: str                    # 助手的响应
-    provider: str                # 如 "openrouter"、"anthropic"
-    model: str                   # provider 为本次调用返回的模型标识
-    agent_id: str                # 使用了哪个 agent 的模型/认证
-    usage: PluginLlmUsage        # token 数 + 缓存 + 费用估算
-    audit: Dict[str, Any]        # plugin_id、purpose、profile
+    text: str  # 助手的响应
+    provider: str  # 如 "openrouter"、"anthropic"
+    model: str  # provider 为本次调用返回的模型标识
+    agent_id: str  # 使用了哪个 agent 的模型/认证
+    usage: PluginLlmUsage  # token 数 + 缓存 + 费用估算
+    audit: Dict[str, Any]  # plugin_id、purpose、profile
+
 
 @dataclass
 class PluginLlmStructuredResult(PluginLlmCompleteResult):
-    parsed: Optional[Any]        # content_type == "json" 时的 JSON 对象
-    content_type: str            # "json" 或 "text"
+    parsed: Optional[Any]  # content_type == "json" 时的 JSON 对象
+    content_type: str  # "json" 或 "text"
     # 提供 schema_name 时 audit 中也会携带该字段
 ```
 
@@ -362,8 +370,8 @@ Plugin id 对于扁平 plugin 是 manifest 中的 `name:` 字段，对于嵌套 
 
 ## 参考资料
 
-* 实现：[`agent/plugin_llm.py`](https://github.com/NousResearch/hades-agent/blob/main/agent/plugin_llm.py)
-* 测试：[`tests/agent/test_plugin_llm.py`](https://github.com/NousResearch/hades-agent/blob/main/tests/agent/test_plugin_llm.py)
+* 实现：[`agent/plugin_llm.py`](https://github.com/NousResearch/hermes-agent/blob/main/agent/plugin_llm.py)
+* 测试：[`tests/agent/test_plugin_llm.py`](https://github.com/NousResearch/hermes-agent/blob/main/tests/agent/test_plugin_llm.py)
 * 参考 plugin（配套仓库）：
   * [`plugin-llm-example`](https://github.com/NousResearch/hades-example-plugins/tree/main/plugin-llm-example) — 带图像输入的同步结构化提取
   * [`plugin-llm-async-example`](https://github.com/NousResearch/hades-example-plugins/tree/main/plugin-llm-async-example) — 使用 `asyncio.gather()` 的异步示例

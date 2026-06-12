@@ -195,14 +195,11 @@ llm = LLM(
     model="meta-llama/Llama-3-8B-Instruct",
     tensor_parallel_size=2,  # Use 2 GPUs
     gpu_memory_utilization=0.9,
-    max_model_len=4096
+    max_model_len=4096,
 )
 
 sampling = SamplingParams(
-    temperature=0.7,
-    top_p=0.95,
-    max_tokens=512,
-    stop=["</s>", "\n\n"]
+    temperature=0.7, top_p=0.95, max_tokens=512, stop=["</s>", "\n\n"]
 )
 ```
 
@@ -229,11 +226,12 @@ for output in outputs:
     results.append({
         "prompt": prompt,
         "generated": generated,
-        "tokens": len(output.outputs[0].token_ids)
+        "tokens": len(output.outputs[0].token_ids),
     })
 
 # Save to file
 import json
+
 with open("results.jsonl", "w") as f:
     for result in results:
         f.write(json.dumps(result) + "\n")
@@ -362,13 +360,13 @@ vllm serve MODEL --speculative-model DRAFT_MODEL
 
 ## 高级主题
 
-**服务器部署模式**：参见 [references/server-deployment.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/server-deployment.md)，了解 Docker、Kubernetes 和负载均衡配置。
+**服务器部署模式**：参见 [references/server-deployment.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/server-deployment.md)，了解 Docker、Kubernetes 和负载均衡配置。
 
-**性能优化**：参见 [references/optimization.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/optimization.md)，了解 PagedAttention 调优、continuous batching 详情及基准测试结果。
+**性能优化**：参见 [references/optimization.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/optimization.md)，了解 PagedAttention 调优、continuous batching 详情及基准测试结果。
 
-**量化指南**：参见 [references/quantization.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/quantization.md)，了解 AWQ/GPTQ/FP8 配置、模型准备及精度对比。
+**量化指南**：参见 [references/quantization.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/quantization.md)，了解 AWQ/GPTQ/FP8 配置、模型准备及精度对比。
 
-**故障排查**：参见 [references/troubleshooting.md](https://github.com/NousResearch/hades-agent/blob/main/skills/mlops/inference/vllm/references/troubleshooting.md)，了解详细错误信息、调试步骤及性能诊断。
+**故障排查**：参见 [references/troubleshooting.md](https://github.com/NousResearch/hermes-agent/blob/main/skills/mlops/inference/vllm/references/troubleshooting.md)，了解详细错误信息、调试步骤及性能诊断。
 
 ## 硬件要求
 

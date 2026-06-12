@@ -93,7 +93,7 @@ const API_KEY_OPTIONS: ApiKeyOption[] = [
     id: 'local',
     name: 'Local / custom endpoint',
     envKey: 'OPENAI_BASE_URL',
-    docsUrl: 'https://github.com/NousResearch/hades-agent#bring-your-own-endpoint',
+    docsUrl: 'https://github.com/NousResearch/hermes-agent#bring-your-own-endpoint',
     placeholder: 'http://127.0.0.1:8000/v1'
   }
 ]
@@ -289,9 +289,9 @@ export function DesktopOnboardingOverlay({ enabled, onCompleted, requestGateway 
 
   const reason =
     rawReason &&
-    !isProviderSetupErrorMessage(rawReason) &&
-    rawReason !== DEFAULT_ONBOARDING_REASON &&
-    rawReason !== DEFAULT_MANUAL_ONBOARDING_REASON
+      !isProviderSetupErrorMessage(rawReason) &&
+      rawReason !== DEFAULT_ONBOARDING_REASON &&
+      rawReason !== DEFAULT_MANUAL_ONBOARDING_REASON
       ? rawReason
       : null
 
@@ -1034,7 +1034,7 @@ function useDecoded(text: string): string {
     const chars = [...text]
     const scrambleable = chars.map(() => false)
 
-    for (let i = 0; i < chars.length; ) {
+    for (let i = 0; i < chars.length;) {
       if (!/[a-z0-9]/i.test(chars[i])) {
         i += 1
 

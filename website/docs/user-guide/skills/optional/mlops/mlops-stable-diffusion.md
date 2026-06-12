@@ -74,8 +74,7 @@ import torch
 
 # Load pipeline (auto-detects model type)
 pipe = DiffusionPipeline.from_pretrained(
-    "stable-diffusion-v1-5/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
+    "stable-diffusion-v1-5/stable-diffusion-v1-5", torch_dtype=torch.float16
 )
 pipe.to("cuda")
 
@@ -83,7 +82,7 @@ pipe.to("cuda")
 image = pipe(
     "A serene mountain landscape at sunset, highly detailed",
     num_inference_steps=50,
-    guidance_scale=7.5
+    guidance_scale=7.5,
 ).images[0]
 
 image.save("output.png")
@@ -98,7 +97,7 @@ import torch
 pipe = AutoPipelineForText2Image.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0",
     torch_dtype=torch.float16,
-    variant="fp16"
+    variant="fp16",
 )
 pipe.to("cuda")
 
@@ -109,7 +108,7 @@ image = pipe(
     prompt="A futuristic city with flying cars, cinematic lighting",
     height=1024,
     width=1024,
-    num_inference_steps=30
+    num_inference_steps=30,
 ).images[0]
 ```
 
@@ -176,9 +175,7 @@ Schedulers control the denoising process:
 from diffusers import DPMSolverMultistepScheduler
 
 # Swap for faster generation
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-    pipe.scheduler.config
-)
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
 # Now generate with fewer steps
 image = pipe(prompt, num_inference_steps=20).images[0]
@@ -206,9 +203,7 @@ import torch
 generator = torch.Generator(device="cuda").manual_seed(42)
 
 image = pipe(
-    prompt="A cat wearing a top hat",
-    generator=generator,
-    num_inference_steps=50
+    prompt="A cat wearing a top hat", generator=generator, num_inference_steps=50
 ).images[0]
 ```
 
@@ -218,7 +213,7 @@ image = pipe(
 image = pipe(
     prompt="Professional photo of a dog in a garden",
     negative_prompt="blurry, low quality, distorted, ugly, bad anatomy",
-    guidance_scale=7.5
+    guidance_scale=7.5,
 ).images[0]
 ```
 
@@ -231,8 +226,7 @@ from diffusers import AutoPipelineForImage2Image
 from PIL import Image
 
 pipe = AutoPipelineForImage2Image.from_pretrained(
-    "stable-diffusion-v1-5/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
+    "stable-diffusion-v1-5/stable-diffusion-v1-5", torch_dtype=torch.float16
 ).to("cuda")
 
 init_image = Image.open("input.jpg").resize((512, 512))
@@ -241,7 +235,7 @@ image = pipe(
     prompt="A watercolor painting of the scene",
     image=init_image,
     strength=0.75,  # How much to transform (0-1)
-    num_inference_steps=50
+    num_inference_steps=50,
 ).images[0]
 ```
 
@@ -254,8 +248,7 @@ from diffusers import AutoPipelineForInpainting
 from PIL import Image
 
 pipe = AutoPipelineForInpainting.from_pretrained(
-    "runwayml/stable-diffusion-inpainting",
-    torch_dtype=torch.float16
+    "runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16
 ).to("cuda")
 
 image = Image.open("photo.jpg")
@@ -265,7 +258,7 @@ result = pipe(
     prompt="A red car parked on the street",
     image=image,
     mask_image=mask,
-    num_inference_steps=50
+    num_inference_steps=50,
 ).images[0]
 ```
 
@@ -279,14 +272,13 @@ import torch
 
 # Load ControlNet for edge conditioning
 controlnet = ControlNetModel.from_pretrained(
-    "lllyasviel/control_v11p_sd15_canny",
-    torch_dtype=torch.float16
+    "lllyasviel/control_v11p_sd15_canny", torch_dtype=torch.float16
 )
 
 pipe = StableDiffusionControlNetPipeline.from_pretrained(
     "stable-diffusion-v1-5/stable-diffusion-v1-5",
     controlnet=controlnet,
-    torch_dtype=torch.float16
+    torch_dtype=torch.float16,
 ).to("cuda")
 
 # Use Canny edge image as control
@@ -295,7 +287,7 @@ control_image = get_canny_image(input_image)
 image = pipe(
     prompt="A beautiful house in the style of Van Gogh",
     image=control_image,
-    num_inference_steps=30
+    num_inference_steps=30,
 ).images[0]
 ```
 
@@ -318,8 +310,7 @@ Load fine-tuned style adapters:
 from diffusers import DiffusionPipeline
 
 pipe = DiffusionPipeline.from_pretrained(
-    "stable-diffusion-v1-5/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
+    "stable-diffusion-v1-5/stable-diffusion-v1-5", torch_dtype=torch.float16
 ).to("cuda")
 
 # Load LoRA weights
@@ -392,16 +383,11 @@ pipe.enable_vae_tiling()
 ```python
 # FP16 (recommended for GPU)
 pipe = DiffusionPipeline.from_pretrained(
-    "model-id",
-    torch_dtype=torch.float16,
-    variant="fp16"
+    "model-id", torch_dtype=torch.float16, variant="fp16"
 )
 
 # BF16 (better precision, requires Ampere+ GPU)
-pipe = DiffusionPipeline.from_pretrained(
-    "model-id",
-    torch_dtype=torch.bfloat16
-)
+pipe = DiffusionPipeline.from_pretrained("model-id", torch_dtype=torch.bfloat16)
 ```
 
 ### Loading specific components
@@ -414,9 +400,7 @@ vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse")
 
 # Use with pipeline
 pipe = DiffusionPipeline.from_pretrained(
-    "stable-diffusion-v1-5/stable-diffusion-v1-5",
-    vae=vae,
-    torch_dtype=torch.float16
+    "stable-diffusion-v1-5/stable-diffusion-v1-5", vae=vae, torch_dtype=torch.float16
 )
 ```
 
@@ -426,19 +410,13 @@ Generate multiple images efficiently:
 
 ```python
 # Multiple prompts
-prompts = [
-    "A cat playing piano",
-    "A dog reading a book",
-    "A bird painting a picture"
-]
+prompts = ["A cat playing piano", "A dog reading a book", "A bird painting a picture"]
 
 images = pipe(prompts, num_inference_steps=30).images
 
 # Multiple images per prompt
 images = pipe(
-    "A beautiful sunset",
-    num_images_per_prompt=4,
-    num_inference_steps=30
+    "A beautiful sunset", num_images_per_prompt=4, num_inference_steps=30
 ).images
 ```
 
@@ -454,7 +432,7 @@ import torch
 pipe = StableDiffusionXLPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0",
     torch_dtype=torch.float16,
-    variant="fp16"
+    variant="fp16",
 )
 pipe.to("cuda")
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -467,7 +445,7 @@ image = pipe(
     num_inference_steps=30,
     guidance_scale=7.5,
     height=1024,
-    width=1024
+    width=1024,
 ).images[0]
 ```
 
@@ -479,8 +457,7 @@ import torch
 
 # Use LCM for 4-8 step generation
 pipe = AutoPipelineForText2Image.from_pretrained(
-    "stabilityai/stable-diffusion-xl-base-1.0",
-    torch_dtype=torch.float16
+    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
 ).to("cuda")
 
 # Load LCM LoRA for fast generation
@@ -489,11 +466,9 @@ pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
 pipe.fuse_lora()
 
 # Generate in ~1 second
-image = pipe(
-    "A beautiful landscape",
-    num_inference_steps=4,
-    guidance_scale=1.0
-).images[0]
+image = pipe("A beautiful landscape", num_inference_steps=4, guidance_scale=1.0).images[
+    0
+]
 ```
 
 ## Common issues
@@ -523,6 +498,7 @@ pipe = pipe.to(dtype=torch.float16)
 ```python
 # Use faster scheduler
 from diffusers import DPMSolverMultistepScheduler
+
 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
 # Reduce steps
@@ -531,8 +507,8 @@ image = pipe(prompt, num_inference_steps=20).images[0]
 
 ## References
 
-- **[Advanced Usage](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/stable-diffusion/references/advanced-usage.md)** - Custom pipelines, fine-tuning, deployment
-- **[Troubleshooting](https://github.com/NousResearch/hades-agent/blob/main/optional-skills/mlops/stable-diffusion/references/troubleshooting.md)** - Common issues and solutions
+- **[Advanced Usage](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/stable-diffusion/references/advanced-usage.md)** - Custom pipelines, fine-tuning, deployment
+- **[Troubleshooting](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/mlops/stable-diffusion/references/troubleshooting.md)** - Common issues and solutions
 
 ## Resources
 

@@ -110,7 +110,7 @@ def _strip_yaml_frontmatter(content: str) -> str:
         end = content.find("\n---", 3)
         if end != -1:
             # Skip past the closing --- and any trailing newline
-            body = content[end + 4:].lstrip("\n")
+            body = content[end + 4 :].lstrip("\n")
             return body if body else content
     return content
 
@@ -133,7 +133,7 @@ HADES_AGENT_HELP_GUIDANCE = (
     "You run on Hades Agent (by Nous Research). When the user needs help with "
     "Hades itself — configuring, setting up, using, extending, or troubleshooting "
     "it — or when you need to understand your own features, tools, or capabilities, "
-    "the documentation at https://hades-agent.nousresearch.com/docs is your "
+    "the documentation at https://hermes-agent.nousresearch.com/docs is your "
     "authoritative reference and always holds the latest, most up-to-date "
     "information. Load the `hades-agent` skill with skill_view(name='hades-agent') "
     "for additional guidance and proven workflows, but treat the docs as the source "
@@ -207,7 +207,7 @@ KANBAN_GUIDANCE = (
     "tick), but you lose your current run's progress.\n"
     "4. **Block on genuine ambiguity.** If you need a human decision you cannot "
     "infer (missing credentials, UX choice, paywalled source, peer output you "
-    "need first), call `kanban_block(reason=\"...\")` and stop. Don't guess. "
+    'need first), call `kanban_block(reason="...")` and stop. Don\'t guess. '
     "The user will unblock with context and the dispatcher will respawn you.\n"
     "5. **Complete with structured handoff.** Call `kanban_complete(summary=..., "
     "metadata=...)`. `summary` is 1–3 human-readable sentences naming concrete "
@@ -219,7 +219,7 @@ KANBAN_GUIDANCE = (
     "before counting as merged/done (most coding tasks), drop the "
     "structured metadata (changed_files / tests_run / diff_path) into a "
     "`kanban_comment` first, then end with "
-    "`kanban_block(reason=\"review-required: <one-line summary>\")` so a "
+    '`kanban_block(reason="review-required: <one-line summary>")` so a '
     "reviewer can approve+unblock or request changes. Reviewing-then-"
     "completing is more honest than auto-completing work that still needs "
     "eyes on it.\n"
@@ -271,7 +271,16 @@ TOOL_USE_ENFORCEMENT_GUIDANCE = (
 
 # Model name substrings that trigger tool-use enforcement guidance.
 # Add new patterns here when a model family needs explicit steering.
-TOOL_USE_ENFORCEMENT_MODELS = ("gpt", "codex", "gemini", "gemma", "grok", "glm", "qwen", "deepseek")
+TOOL_USE_ENFORCEMENT_MODELS = (
+    "gpt",
+    "codex",
+    "gemini",
+    "gemma",
+    "grok",
+    "glm",
+    "qwen",
+    "deepseek",
+)
 
 # Universal "finish the job" guidance — applied to ALL models, not gated
 # by model family.  Addresses two cross-model failure modes:
@@ -683,7 +692,11 @@ WSL_ENVIRONMENT_HINT = (
 # runs. For these backends, host info (Windows/Linux/macOS, $HOME, cwd) is
 # misleading — the agent should only see the machine it can actually touch.
 _REMOTE_TERMINAL_BACKENDS = frozenset({
-    "docker", "singularity", "modal", "daytona", "ssh",
+    "docker",
+    "singularity",
+    "modal",
+    "daytona",
+    "ssh",
     "managed_modal",
 })
 
@@ -752,9 +765,9 @@ def _probe_remote_backend(env_type: str) -> str | None:
         # `2>/dev/null` so a missing binary doesn't pollute the output.
         probe_cmd = (
             "printf 'os=%s\\nkernel=%s\\nhome=%s\\ncwd=%s\\nuser=%s\\n' "
-            "\"$(uname -s 2>/dev/null || echo unknown)\" "
-            "\"$(uname -r 2>/dev/null || echo unknown)\" "
-            "\"$HOME\" \"$(pwd)\" \"$(whoami 2>/dev/null || id -un 2>/dev/null || echo unknown)\""
+            '"$(uname -s 2>/dev/null || echo unknown)" '
+            '"$(uname -r 2>/dev/null || echo unknown)" '
+            '"$HOME" "$(pwd)" "$(whoami 2>/dev/null || id -un 2>/dev/null || echo unknown)"'
         )
         result = env.execute(probe_cmd, timeout=4)
         if result.get("returncode") != 0:
@@ -778,7 +791,9 @@ def _probe_remote_backend(env_type: str) -> str | None:
             parsed[k.strip()] = v.strip()
 
     pieces = []
-    os_bits = " ".join(x for x in (parsed.get("os"), parsed.get("kernel")) if x and x != "unknown")
+    os_bits = " ".join(
+        x for x in (parsed.get("os"), parsed.get("kernel")) if x and x != "unknown"
+    )
     if os_bits:
         pieces.append(f"OS: {os_bits}")
     if parsed.get("user") and parsed["user"] != "unknown":
@@ -1025,6 +1040,7 @@ def _build_snapshot_entry(
 # Skills index
 # =========================================================================
 
+
 def _parse_skill_file(skill_file: Path) -> tuple[bool, dict, str]:
     """Read a SKILL.md once and return platform compatibility, frontmatter, and description.
 
@@ -1110,6 +1126,7 @@ def build_skills_system_prompt(
     # Include the resolved platform so per-platform disabled-skill lists
     # produce distinct cache entries (gateway serves multiple platforms).
     from gateway.session_context import get_session_env
+
     _platform_hint = (
         os.environ.get("HADES_PLATFORM")
         or get_session_env("HADES_SESSION_PLATFORM")
@@ -1155,9 +1172,10 @@ def build_skills_system_prompt(
                 available_toolsets,
             ):
                 continue
-            skills_by_category.setdefault(category, []).append(
-                (frontmatter_name, entry.get("description", ""))
-            )
+            skills_by_category.setdefault(category, []).append((
+                frontmatter_name,
+                entry.get("description", ""),
+            ))
         category_descriptions = {
             str(k): str(v)
             for k, v in (snapshot.get("category_descriptions") or {}).items()
@@ -1180,9 +1198,10 @@ def build_skills_system_prompt(
                 available_toolsets,
             ):
                 continue
-            skills_by_category.setdefault(entry["category"], []).append(
-                (entry["frontmatter_name"], entry["description"])
-            )
+            skills_by_category.setdefault(entry["category"], []).append((
+                entry["frontmatter_name"],
+                entry["description"],
+            ))
 
         # Read category-level DESCRIPTION.md files
         for desc_file in iter_skill_index_files(skills_dir, "DESCRIPTION.md"):
@@ -1236,9 +1255,10 @@ def build_skills_system_prompt(
                 ):
                     continue
                 seen_skill_names.add(frontmatter_name)
-                skills_by_category.setdefault(entry["category"], []).append(
-                    (frontmatter_name, entry["description"])
-                )
+                skills_by_category.setdefault(entry["category"], []).append((
+                    frontmatter_name,
+                    entry["description"],
+                ))
             except Exception as e:
                 logger.debug("Error reading external skill %s: %s", skill_file, e)
 
@@ -1252,9 +1272,13 @@ def build_skills_system_prompt(
                     continue
                 rel = desc_file.relative_to(ext_dir)
                 cat = "/".join(rel.parts[:-1]) if len(rel.parts) > 1 else "general"
-                category_descriptions.setdefault(cat, str(cat_desc).strip().strip("'\""))
+                category_descriptions.setdefault(
+                    cat, str(cat_desc).strip().strip("'\"")
+                )
             except Exception as e:
-                logger.debug("Could not read external skill description %s: %s", desc_file, e)
+                logger.debug(
+                    "Could not read external skill description %s: %s", desc_file, e
+                )
 
     if not skills_by_category:
         result = ""
@@ -1299,8 +1323,7 @@ def build_skills_system_prompt(
             "If a skill you loaded was missing steps, had wrong commands, or needed "
             "pitfalls you discovered, update it before finishing.\n"
             "\n"
-            "<available_skills>\n"
-            + "\n".join(index_lines) + "\n"
+            "<available_skills>\n" + "\n".join(index_lines) + "\n"
             "</available_skills>\n"
             "\n"
             "Only proceed without loading a skill if genuinely none are relevant to the task."
@@ -1371,14 +1394,12 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
         "Current capability status:",
     ]
     lines.extend(_status_line(feature) for feature in features.items())
-    lines.extend(
-        [
-            "When a Nous-managed feature is active, do not ask the user for Firecrawl, FAL, OpenAI TTS, or Browser-Use API keys.",
-            "If the user is not subscribed and asks for a capability that Nous subscription would unlock or simplify, suggest Nous subscription as one option alongside direct setup or local alternatives.",
-            "Do not mention subscription unless the user asks about it or it directly solves the current missing capability.",
-            "Useful commands: hades setup, hades setup tools, hades setup terminal, hades status.",
-        ]
-    )
+    lines.extend([
+        "When a Nous-managed feature is active, do not ask the user for Firecrawl, FAL, OpenAI TTS, or Browser-Use API keys.",
+        "If the user is not subscribed and asks for a capability that Nous subscription would unlock or simplify, suggest Nous subscription as one option alongside direct setup or local alternatives.",
+        "Do not mention subscription unless the user asks about it or it directly solves the current missing capability.",
+        "Useful commands: hades setup, hades setup tools, hades setup terminal, hades status.",
+    ])
     return "\n".join(lines)
 
 
@@ -1386,7 +1407,10 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
 # Context files (SOUL.md, AGENTS.md, .cursorrules)
 # =========================================================================
 
-def _truncate_content(content: str, filename: str, max_chars: int = CONTEXT_FILE_MAX_CHARS) -> str:
+
+def _truncate_content(
+    content: str, filename: str, max_chars: int = CONTEXT_FILE_MAX_CHARS
+) -> str:
     """Head/tail truncation with a marker in the middle."""
     if len(content) <= max_chars:
         return content
@@ -1407,6 +1431,7 @@ def load_soul_md() -> Optional[str]:
     """
     try:
         from hades_cli.config import ensure_hades_home
+
         ensure_hades_home()
     except Exception as e:
         logger.debug("Could not ensure HADES_HOME before loading SOUL.md: %s", e)
@@ -1501,8 +1526,12 @@ def _load_cursorrules(cwd_path: Path) -> str:
             try:
                 content = mdc_file.read_text(encoding="utf-8").strip()
                 if content:
-                    content = _scan_context_content(content, f".cursor/rules/{mdc_file.name}")
-                    cursorrules_content += f"## .cursor/rules/{mdc_file.name}\n\n{content}\n\n"
+                    content = _scan_context_content(
+                        content, f".cursor/rules/{mdc_file.name}"
+                    )
+                    cursorrules_content += (
+                        f"## .cursor/rules/{mdc_file.name}\n\n{content}\n\n"
+                    )
             except Exception as e:
                 logger.debug("Could not read %s: %s", mdc_file, e)
 
@@ -1511,7 +1540,9 @@ def _load_cursorrules(cwd_path: Path) -> str:
     return _truncate_content(cursorrules_content, ".cursorrules")
 
 
-def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = False) -> str:
+def build_context_files_prompt(
+    cwd: Optional[str] = None, skip_soul: bool = False
+) -> str:
     """Discover and load context files for the system prompt.
 
     Priority (first found wins — only ONE project context type is loaded):
@@ -1550,4 +1581,7 @@ def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = Fals
 
     if not sections:
         return ""
-    return "# Project Context\n\nThe following project context files have been loaded and should be followed:\n\n" + "\n".join(sections)
+    return (
+        "# Project Context\n\nThe following project context files have been loaded and should be followed:\n\n"
+        + "\n".join(sections)
+    )

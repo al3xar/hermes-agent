@@ -148,7 +148,9 @@ def test_get_platform_tools_homeassistant_platform_keeps_homeassistant_toolset()
     assert "homeassistant" in enabled
 
 
-def test_get_platform_tools_homeassistant_toolset_enabled_for_cron_when_hass_token_set(monkeypatch):
+def test_get_platform_tools_homeassistant_toolset_enabled_for_cron_when_hass_token_set(
+    monkeypatch,
+):
     """HA toolset is runtime-gated by check_fn (requires HASS_TOKEN).
 
     When HASS_TOKEN is set, the user has explicitly opted in — _DEFAULT_OFF_TOOLSETS
@@ -169,7 +171,9 @@ def test_get_platform_tools_homeassistant_toolset_enabled_for_cron_when_hass_tok
     assert "homeassistant" in cli_enabled
 
 
-def test_get_platform_tools_homeassistant_toolset_off_for_cron_when_hass_token_missing(monkeypatch):
+def test_get_platform_tools_homeassistant_toolset_off_for_cron_when_hass_token_missing(
+    monkeypatch,
+):
     """Without HASS_TOKEN, HA stays off by default — preserves #14798's behavior
     for users who never configured HA."""
     monkeypatch.delenv("HASS_TOKEN", raising=False)
@@ -188,9 +192,7 @@ def test_get_platform_tools_x_search_auto_enabled_when_xai_oauth_present(monkeyp
     later go missing.
     """
     monkeypatch.delenv("XAI_API_KEY", raising=False)
-    monkeypatch.setattr(
-        "hades_cli.tools_config._xai_credentials_present", lambda: True
-    )
+    monkeypatch.setattr("hades_cli.tools_config._xai_credentials_present", lambda: True)
 
     for plat in ("cli", "cron", "telegram"):
         enabled = _get_platform_tools({}, plat)
@@ -223,9 +225,7 @@ def test_get_platform_tools_x_search_respects_explicit_config(monkeypatch):
     that list is authoritative — x_search auto-enable does NOT fire even
     when xAI creds exist. The saved list represents deliberate choices."""
     monkeypatch.delenv("XAI_API_KEY", raising=False)
-    monkeypatch.setattr(
-        "hades_cli.tools_config._xai_credentials_present", lambda: True
-    )
+    monkeypatch.setattr("hades_cli.tools_config._xai_credentials_present", lambda: True)
 
     # User explicitly opted into spotify but not x_search via `hades tools`.
     config = {"platform_toolsets": {"cli": ["hades-cli", "spotify"]}}
@@ -244,8 +244,18 @@ def test_get_platform_tools_expands_composite_when_mixed_with_configurable():
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
     # Native tools must reappear.
-    for ts in ("terminal", "file", "web", "browser", "memory", "delegation",
-               "code_execution", "todo", "session_search", "skills"):
+    for ts in (
+        "terminal",
+        "file",
+        "web",
+        "browser",
+        "memory",
+        "delegation",
+        "code_execution",
+        "todo",
+        "session_search",
+        "skills",
+    ):
         assert ts in enabled, f"{ts} should be enabled when hades-cli is listed"
     # User explicitly opted into Spotify — must survive _DEFAULT_OFF_TOOLSETS subtraction.
     assert "spotify" in enabled
@@ -361,7 +371,9 @@ def test_get_platform_tools_includes_enabled_mcp_servers_by_default():
     config = {
         "mcp_servers": {
             "exa": {"url": "https://mcp.exa.ai/mcp"},
-            "web-search-prime": {"url": "https://api.z.ai/api/mcp/web_search_prime/mcp"},
+            "web-search-prime": {
+                "url": "https://api.z.ai/api/mcp/web_search_prime/mcp"
+            },
             "disabled-server": {"url": "https://example.com/mcp", "enabled": False},
         }
     }
@@ -378,7 +390,9 @@ def test_get_platform_tools_keeps_enabled_mcp_servers_with_explicit_builtin_sele
         "platform_toolsets": {"cli": ["web", "memory"]},
         "mcp_servers": {
             "exa": {"url": "https://mcp.exa.ai/mcp"},
-            "web-search-prime": {"url": "https://api.z.ai/api/mcp/web_search_prime/mcp"},
+            "web-search-prime": {
+                "url": "https://api.z.ai/api/mcp/web_search_prime/mcp"
+            },
         },
     }
 
@@ -396,7 +410,9 @@ def test_get_platform_tools_no_mcp_sentinel_excludes_all_mcp_servers():
         "platform_toolsets": {"cli": ["web", "terminal", "no_mcp"]},
         "mcp_servers": {
             "exa": {"url": "https://mcp.exa.ai/mcp"},
-            "web-search-prime": {"url": "https://api.z.ai/api/mcp/web_search_prime/mcp"},
+            "web-search-prime": {
+                "url": "https://api.z.ai/api/mcp/web_search_prime/mcp"
+            },
         },
     }
 
@@ -449,7 +465,7 @@ def test_toolset_has_keys_for_vision_accepts_codex_auth(tmp_path, monkeypatch):
 def test_save_platform_tools_preserves_mcp_server_names():
     """Ensure MCP server names are preserved when saving platform tools.
 
-    Regression test for https://github.com/NousResearch/hades-agent/issues/1247
+    Regression test for https://github.com/NousResearch/hermes-agent/issues/1247
     """
     config = {
         "platform_toolsets": {
@@ -486,11 +502,7 @@ def test_save_platform_tools_handles_empty_existing_config():
 
 def test_save_platform_tools_handles_invalid_existing_config():
     """Saving platform tools works when existing config is not a list."""
-    config = {
-        "platform_toolsets": {
-            "cli": "invalid-string-value"
-        }
-    }
+    config = {"platform_toolsets": {"cli": "invalid-string-value"}}
 
     with patch("hades_cli.tools_config.save_config"):
         _save_platform_tools(config, "cli", {"web"})
@@ -516,19 +528,41 @@ def test_save_platform_tools_does_not_preserve_platform_default_toolsets():
     config = {
         "platform_toolsets": {
             "cli": [
-                "browser", "clarify", "code_execution", "cronjob",
-                "delegation", "file", "hades-cli",  # <-- the culprit
-                "memory", "session_search", "skills", "terminal",
-                "todo", "tts", "vision", "web",
+                "browser",
+                "clarify",
+                "code_execution",
+                "cronjob",
+                "delegation",
+                "file",
+                "hades-cli",  # <-- the culprit
+                "memory",
+                "session_search",
+                "skills",
+                "terminal",
+                "todo",
+                "tts",
+                "vision",
+                "web",
             ]
         }
     }
 
     # User unchecks image_gen, homeassistant, moa — keeps the rest
     new_selection = {
-        "browser", "clarify", "code_execution", "cronjob",
-        "delegation", "file", "memory", "session_search",
-        "skills", "terminal", "todo", "tts", "vision", "web",
+        "browser",
+        "clarify",
+        "code_execution",
+        "cronjob",
+        "delegation",
+        "file",
+        "memory",
+        "session_search",
+        "skills",
+        "terminal",
+        "todo",
+        "tts",
+        "vision",
+        "web",
     }
 
     with patch("hades_cli.tools_config.save_config"):
@@ -555,7 +589,11 @@ def test_save_platform_tools_does_not_preserve_hades_telegram():
     config = {
         "platform_toolsets": {
             "telegram": [
-                "browser", "file", "hades-telegram", "terminal", "web",
+                "browser",
+                "file",
+                "hades-telegram",
+                "terminal",
+                "web",
             ]
         }
     }
@@ -576,7 +614,11 @@ def test_save_platform_tools_still_preserves_mcp_with_platform_default_present()
     config = {
         "platform_toolsets": {
             "cli": [
-                "web", "terminal", "hades-cli", "my-mcp-server", "github-tools",
+                "web",
+                "terminal",
+                "hades-cli",
+                "my-mcp-server",
+                "github-tools",
             ]
         }
     }
@@ -649,7 +691,9 @@ def test_visible_providers_show_nous_subscription_when_logged_out(monkeypatch):
     assert any(p["name"].startswith("Nous Subscription") for p in providers)
 
 
-def test_visible_providers_show_nous_subscription_when_paid_access_is_false(monkeypatch):
+def test_visible_providers_show_nous_subscription_when_paid_access_is_false(
+    monkeypatch,
+):
     """Logged-in-but-unpaid users still see the managed rows.
 
     The paid-access gate moved from visibility to selection time — the row is
@@ -660,11 +704,11 @@ def test_visible_providers_show_nous_subscription_when_paid_access_is_false(monk
     monkeypatch.setattr(
         "hades_cli.nous_subscription.get_nous_portal_account_info",
         lambda: NousPortalAccountInfo(
-                logged_in=True,
-                source="jwt",
-                fresh=False,
-                paid_service_access=False,
-            ),
+            logged_in=True,
+            source="jwt",
+            fresh=False,
+            paid_service_access=False,
+        ),
     )
 
     providers = _visible_providers(TOOL_CATEGORIES["browser"], config)
@@ -672,7 +716,9 @@ def test_visible_providers_show_nous_subscription_when_paid_access_is_false(monk
     assert any(p["name"].startswith("Nous Subscription") for p in providers)
 
 
-def test_visible_providers_force_fresh_shows_nous_subscription_after_upgrade(monkeypatch):
+def test_visible_providers_force_fresh_shows_nous_subscription_after_upgrade(
+    monkeypatch,
+):
     calls = []
 
     def fake_subscription_features(config, *, force_fresh=False):
@@ -773,7 +819,9 @@ def test_reconfigure_lists_enabled_web_without_existing_provider_config(monkeypa
 
 
 def test_first_install_nous_auto_configures_managed_defaults(monkeypatch):
-    monkeypatch.setattr("hades_cli.nous_subscription.managed_nous_tools_enabled", lambda: True)
+    monkeypatch.setattr(
+        "hades_cli.nous_subscription.managed_nous_tools_enabled", lambda: True
+    )
     config = {
         "model": {"provider": "nous"},
         "platform_toolsets": {"cli": []},
@@ -837,7 +885,9 @@ def test_first_install_nous_auto_configures_video_gen(monkeypatch):
     video_gen.use_gateway so the FAL plugin can route through the gateway
     at runtime.  Regression test for the bug where video_gen was marked as
     auto-configured but no config was actually written."""
-    monkeypatch.setattr("hades_cli.nous_subscription.managed_nous_tools_enabled", lambda: True)
+    monkeypatch.setattr(
+        "hades_cli.nous_subscription.managed_nous_tools_enabled", lambda: True
+    )
     config = {
         "model": {"provider": "nous"},
         "platform_toolsets": {"cli": []},
@@ -888,6 +938,7 @@ def test_first_install_nous_auto_configures_video_gen(monkeypatch):
     assert config["video_gen"]["use_gateway"] is True
     # video_gen should NOT appear in the manual configure list — it's auto-configured
     assert "video_gen" not in configured
+
 
 # ── Platform / toolset consistency ────────────────────────────────────────────
 
@@ -945,7 +996,7 @@ def test_numeric_mcp_server_name_does_not_crash_sorted():
     _get_platform_tools must normalise them to str so that sorted()
     on the returned set never raises TypeError on mixed int/str.
 
-    Regression test for https://github.com/NousResearch/hades-agent/issues/6901
+    Regression test for https://github.com/NousResearch/hermes-agent/issues/6901
     """
     config = {
         "platform_toolsets": {"cli": ["web", 12306]},
@@ -969,6 +1020,7 @@ def test_numeric_mcp_server_name_does_not_crash_sorted():
 
 # ─── Imagegen Backend Picker Wiring ────────────────────────────────────────
 
+
 def test_toolset_has_keys_treats_no_key_providers_as_configured():
     config = {}
 
@@ -987,6 +1039,7 @@ def test_computer_use_needs_configuration_when_cua_driver_post_setup_pending():
 
 def test_computer_use_skips_configuration_when_cua_driver_already_installed():
     """Installed post_setup dependencies should keep returning-user toggles no-op."""
+
     def fake_which(name: str):
         return "/usr/local/bin/cua-driver" if name == "cua-driver" else None
 
@@ -996,33 +1049,42 @@ def test_computer_use_skips_configuration_when_cua_driver_already_installed():
 
 def test_computer_use_respects_custom_cua_driver_command():
     """The setup gate should match runtime's HADES_CUA_DRIVER_CMD override."""
+
     def fake_which(name: str):
         return "/opt/bin/custom-cua" if name == "custom-cua" else None
 
-    with patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "custom-cua"}), \
-         patch("shutil.which", side_effect=fake_which):
+    with (
+        patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "custom-cua"}),
+        patch("shutil.which", side_effect=fake_which),
+    ):
         assert _toolset_needs_configuration_prompt("computer_use", {}) is False
 
 
 def test_computer_use_blank_custom_driver_command_falls_back_to_default():
     """Blank overrides should not make the setup gate look for an empty command."""
+
     def fake_which(name: str):
         return "/usr/local/bin/cua-driver" if name == "cua-driver" else None
 
-    with patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "   "}), \
-         patch("shutil.which", side_effect=fake_which):
+    with (
+        patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "   "}),
+        patch("shutil.which", side_effect=fake_which),
+    ):
         assert _toolset_needs_configuration_prompt("computer_use", {}) is False
 
 
 def test_computer_use_post_setup_respects_custom_driver_command_when_installed():
     """post_setup already-installed checks should version-probe the override."""
+
     def fake_which(name: str):
         return "/opt/bin/custom-cua" if name == "custom-cua" else None
 
-    with patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "custom-cua"}), \
-         patch("platform.system", return_value="Darwin"), \
-         patch("shutil.which", side_effect=fake_which), \
-         patch("subprocess.run") as run:
+    with (
+        patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "custom-cua"}),
+        patch("platform.system", return_value="Darwin"),
+        patch("shutil.which", side_effect=fake_which),
+        patch("subprocess.run") as run,
+    ):
         run.return_value.stdout = "custom 1.2.3\n"
 
         _run_post_setup("cua_driver")
@@ -1043,10 +1105,12 @@ def test_computer_use_post_setup_missing_override_does_not_accept_default_binary
             return None
         return None
 
-    with patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "custom-cua"}), \
-         patch("platform.system", return_value="Darwin"), \
-         patch("shutil.which", side_effect=fake_which), \
-         patch("subprocess.run") as run:
+    with (
+        patch.dict("os.environ", {"HADES_CUA_DRIVER_CMD": "custom-cua"}),
+        patch("platform.system", return_value="Darwin"),
+        patch("shutil.which", side_effect=fake_which),
+        patch("subprocess.run") as run,
+    ):
         _run_post_setup("cua_driver")
 
     run.assert_not_called()
@@ -1059,11 +1123,13 @@ class TestImagegenBackendRegistry:
 
     def test_fal_backend_registered(self):
         from hades_cli.tools_config import IMAGEGEN_BACKENDS
+
         assert "fal" in IMAGEGEN_BACKENDS
 
     def test_fal_catalog_loads_lazily(self):
         """catalog_fn should defer import to avoid import cycles."""
         from hades_cli.tools_config import IMAGEGEN_BACKENDS
+
         catalog, default = IMAGEGEN_BACKENDS["fal"]["catalog_fn"]()
         assert default == "fal-ai/flux-2/klein/9b"
         assert "fal-ai/flux-2/klein/9b" in catalog
@@ -1073,6 +1139,7 @@ class TestImagegenBackendRegistry:
         """Both Nous Subscription and FAL.ai providers must carry the
         imagegen_backend tag so _configure_provider fires the picker."""
         from hades_cli.tools_config import TOOL_CATEGORIES
+
         providers = TOOL_CATEGORIES["image_gen"]["providers"]
         for p in providers:
             assert p.get("imagegen_backend") == "fal", (
@@ -1086,6 +1153,7 @@ class TestImagegenModelPicker:
 
     def test_picker_writes_chosen_model_to_config(self):
         from hades_cli.tools_config import _configure_imagegen_model
+
         config = {}
         # Force _prompt_choice to pick index 1 (second-in-ordered-list).
         with patch("hades_cli.tools_config._prompt_choice", return_value=1):
@@ -1101,6 +1169,7 @@ class TestImagegenModelPicker:
             _configure_imagegen_model,
             IMAGEGEN_BACKENDS,
         )
+
         catalog, default_model = IMAGEGEN_BACKENDS["fal"]["catalog_fn"]()
         model_ids = list(catalog.keys())
         ordered = [default_model] + [m for m in model_ids if m != default_model]
@@ -1108,6 +1177,7 @@ class TestImagegenModelPicker:
 
         # Only ONE picker call is expected (for model) — not two (model + quality).
         call_count = {"n": 0}
+
         def fake_prompt(*a, **kw):
             call_count["n"] += 1
             return gpt_idx
@@ -1124,6 +1194,7 @@ class TestImagegenModelPicker:
 
     def test_picker_no_op_for_unknown_backend(self):
         from hades_cli.tools_config import _configure_imagegen_model
+
         config = {}
         _configure_imagegen_model("nonexistent-backend", config)
         assert config == {}  # untouched
@@ -1132,6 +1203,7 @@ class TestImagegenModelPicker:
         """When image_gen is a non-dict (user-edit YAML), the picker should
         replace it with a fresh dict rather than crash."""
         from hades_cli.tools_config import _configure_imagegen_model
+
         config = {"image_gen": "some-garbage-string"}
         with patch("hades_cli.tools_config._prompt_choice", return_value=0):
             _configure_imagegen_model("fal", config)
@@ -1143,11 +1215,7 @@ def test_save_platform_tools_normalizes_numeric_entries():
     """YAML may parse bare numeric toolset names as int. They should be
     normalized to str so they survive the save round-trip.
     """
-    config = {
-        "platform_toolsets": {
-            "cli": ["web", "terminal", 12306, "custom-mcp"]
-        }
-    }
+    config = {"platform_toolsets": {"cli": ["web", "terminal", 12306, "custom-mcp"]}}
 
     with patch("hades_cli.tools_config.save_config"):
         _save_platform_tools(config, "cli", {"web", "browser"})
@@ -1162,11 +1230,7 @@ def test_save_platform_tools_clears_no_mcp_sentinel():
     the sentinel unconditionally — otherwise a user who once set no_mcp by
     hand could never re-enable MCP servers through the UI.
     """
-    config = {
-        "platform_toolsets": {
-            "cli": ["web", "terminal", "no_mcp"]
-        }
-    }
+    config = {"platform_toolsets": {"cli": ["web", "terminal", "no_mcp"]}}
 
     with patch("hades_cli.tools_config.save_config"):
         _save_platform_tools(config, "cli", {"web", "browser"})
@@ -1180,9 +1244,7 @@ def test_save_platform_tools_preserves_mcp_server_names():
     the save — we only clear `no_mcp`, not every non-configurable entry.
     """
     config = {
-        "platform_toolsets": {
-            "cli": ["web", "terminal", "custom-mcp", "another-mcp"]
-        }
+        "platform_toolsets": {"cli": ["web", "terminal", "custom-mcp", "another-mcp"]}
     }
 
     with patch("hades_cli.tools_config.save_config"):
@@ -1209,7 +1271,13 @@ def test_get_platform_tools_recovers_non_configurable_toolsets_from_composite():
     }
     fake_toolsets["hades-_test_platform"] = {
         "description": "test composite",
-        "tools": ["web_search", "web_extract", "terminal", "process", "_test_special_tool"],
+        "tools": [
+            "web_search",
+            "web_extract",
+            "terminal",
+            "process",
+            "_test_special_tool",
+        ],
         "includes": [],
     }
 
@@ -1217,7 +1285,9 @@ def test_get_platform_tools_recovers_non_configurable_toolsets_from_composite():
         "_test_platform": {"label": "Test", "default_toolset": "hades-_test_platform"},
     }
 
-    with mock_patch("hades_cli.tools_config.PLATFORMS", {**PLATFORMS, **test_platforms}):
+    with mock_patch(
+        "hades_cli.tools_config.PLATFORMS", {**PLATFORMS, **test_platforms}
+    ):
         with mock_patch("toolsets.TOOLSETS", fake_toolsets):
             enabled = _get_platform_tools({}, "_test_platform")
 
@@ -1259,6 +1329,7 @@ def test_discord_toolsets_not_available_on_other_platforms():
     """Platform-scoping: discord / discord_admin should not appear on CLI,
     Telegram, etc. — not even as an opt-in."""
     from hades_cli.tools_config import _toolset_allowed_for_platform
+
     for plat in ["cli", "telegram", "slack", "whatsapp", "signal"]:
         assert not _toolset_allowed_for_platform("discord", plat), (
             f"`discord` toolset leaked onto {plat}"
@@ -1282,8 +1353,11 @@ def test_save_platform_tools_strips_restricted_toolsets():
     """Hand-edited or all-platforms checklist with `discord` selected for
     Telegram must be stripped at save time."""
     from hades_cli.tools_config import _save_platform_tools
+
     config = {}
-    _save_platform_tools(config, "telegram", {"web", "terminal", "discord", "discord_admin"})
+    _save_platform_tools(
+        config, "telegram", {"web", "terminal", "discord", "discord_admin"}
+    )
     saved = config["platform_toolsets"]["telegram"]
     assert "discord" not in saved
     assert "discord_admin" not in saved
@@ -1325,17 +1399,53 @@ def test_get_effective_configurable_toolsets_dedupes_bundled_plugins():
     assert spotify_rows[0][1] == "🎵 Spotify"
 
 
-@pytest.mark.parametrize("provider,config_key,expected", [
-    # managed provider → use_gateway True
-    ({"name": "T", "tts_provider": "elevenlabs", "managed_nous_feature": "tts", "env_vars": []}, "tts", True),
-    ({"name": "B", "browser_provider": "browserbase", "managed_nous_feature": "browser", "env_vars": []}, "browser", True),
-    ({"name": "W", "web_backend": "tavily", "managed_nous_feature": "web", "env_vars": []}, "web", True),
-    # self-hosted provider → use_gateway False
-    ({"name": "T", "tts_provider": "elevenlabs", "env_vars": []}, "tts", False),
-    ({"name": "B", "browser_provider": "browserbase", "env_vars": []}, "browser", False),
-    ({"name": "W", "web_backend": "tavily", "env_vars": []}, "web", False),
-])
-def test_reconfigure_provider_syncs_use_gateway(monkeypatch, provider, config_key, expected):
+@pytest.mark.parametrize(
+    "provider,config_key,expected",
+    [
+        # managed provider → use_gateway True
+        (
+            {
+                "name": "T",
+                "tts_provider": "elevenlabs",
+                "managed_nous_feature": "tts",
+                "env_vars": [],
+            },
+            "tts",
+            True,
+        ),
+        (
+            {
+                "name": "B",
+                "browser_provider": "browserbase",
+                "managed_nous_feature": "browser",
+                "env_vars": [],
+            },
+            "browser",
+            True,
+        ),
+        (
+            {
+                "name": "W",
+                "web_backend": "tavily",
+                "managed_nous_feature": "web",
+                "env_vars": [],
+            },
+            "web",
+            True,
+        ),
+        # self-hosted provider → use_gateway False
+        ({"name": "T", "tts_provider": "elevenlabs", "env_vars": []}, "tts", False),
+        (
+            {"name": "B", "browser_provider": "browserbase", "env_vars": []},
+            "browser",
+            False,
+        ),
+        ({"name": "W", "web_backend": "tavily", "env_vars": []}, "web", False),
+    ],
+)
+def test_reconfigure_provider_syncs_use_gateway(
+    monkeypatch, provider, config_key, expected
+):
     # Managed providers run the inline Portal entitlement gate; treat the user
     # as already entitled so the test exercises the use_gateway sync.
     monkeypatch.setattr(
@@ -1350,29 +1460,36 @@ def test_reconfigure_provider_syncs_use_gateway(monkeypatch, provider, config_ke
 def test_reconfigure_browser_provider_overwrites_stale_use_gateway():
     # Switching from managed (use_gateway=True) to self-hosted must clear the stale flag.
     config = {"browser": {"cloud_provider": "managed-browser", "use_gateway": True}}
-    provider = {"name": "Browserbase", "browser_provider": "browserbase", "env_vars": []}
+    provider = {
+        "name": "Browserbase",
+        "browser_provider": "browserbase",
+        "env_vars": [],
+    }
     _reconfigure_provider(provider, config)
     assert config["browser"]["use_gateway"] is False
 
 
-@pytest.mark.parametrize("provider_name,post_setup_key", [
-    ("Camofox", "camofox"),
-])
+@pytest.mark.parametrize(
+    "provider_name,post_setup_key",
+    [
+        ("Camofox", "camofox"),
+    ],
+)
 def test_reconfigure_provider_runs_post_setup_for_env_var_providers(
     monkeypatch, provider_name, post_setup_key
 ):
     """_reconfigure_provider() must call _run_post_setup() for providers that have
     both env_vars and post_setup — parity with _configure_provider() line 2286."""
     called = []
-    monkeypatch.setattr("hades_cli.tools_config._run_post_setup", lambda key: called.append(key))
+    monkeypatch.setattr(
+        "hades_cli.tools_config._run_post_setup", lambda key: called.append(key)
+    )
     monkeypatch.setattr("hades_cli.tools_config.get_env_value", lambda k: None)
     monkeypatch.setattr("hades_cli.tools_config._prompt", lambda *a, **kw: "")
     monkeypatch.setattr("hades_cli.tools_config.save_env_value", lambda k, v: None)
 
     provider = next(
-        p
-        for p in TOOL_CATEGORIES["browser"]["providers"]
-        if p["name"] == provider_name
+        p for p in TOOL_CATEGORIES["browser"]["providers"] if p["name"] == provider_name
     )
     _reconfigure_provider(provider, {})
 
@@ -1432,9 +1549,7 @@ def test_configure_non_managed_provider_skips_portal_gate(monkeypatch):
         called["gate"] = True
         return False
 
-    monkeypatch.setattr(
-        "hades_cli.nous_subscription.ensure_nous_portal_access", _boom
-    )
+    monkeypatch.setattr("hades_cli.nous_subscription.ensure_nous_portal_access", _boom)
     provider = {"name": "Tavily", "web_backend": "tavily", "env_vars": []}
     config = {}
 
@@ -1486,11 +1601,13 @@ def test_apply_provider_selection_does_not_prompt_or_post_setup(monkeypatch):
     from hades_cli import tools_config
 
     monkeypatch.setattr(
-        tools_config, "_run_post_setup",
+        tools_config,
+        "_run_post_setup",
         lambda *a, **k: pytest.fail("post-setup must not run on provider selection"),
     )
     monkeypatch.setattr(
-        tools_config, "_prompt",
+        tools_config,
+        "_prompt",
         lambda *a, **k: pytest.fail("env prompting must not run on provider selection"),
     )
     config = {}
@@ -1550,5 +1667,3 @@ def test_real_configurable_changes_still_reported_in_diff():
     # User adds 'vision' (configurable) — must still report as added.
     new_enabled2 = (current - {"kanban"}) | {"vision"}
     assert ((new_enabled2 - current) & universe) == {"vision"}
-
-
