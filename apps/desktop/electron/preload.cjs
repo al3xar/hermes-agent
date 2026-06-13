@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('hadesDesktop', {
   revalidateConnection: () => ipcRenderer.invoke('hades:connection:revalidate'),
   touchBackend: profile => ipcRenderer.invoke('hades:backend:touch', profile),
   getGatewayWsUrl: profile => ipcRenderer.invoke('hades:gateway:ws-url', profile),
+  openSessionWindow: sessionId => ipcRenderer.invoke('hades:window:openSession', sessionId),
   getBootProgress: () => ipcRenderer.invoke('hades:boot-progress:get'),
   getConnectionConfig: profile => ipcRenderer.invoke('hades:connection-config:get', profile),
   saveConnectionConfig: payload => ipcRenderer.invoke('hades:connection-config:save', payload),
@@ -41,6 +42,7 @@ contextBridge.exposeInMainWorld('hadesDesktop', {
   setPreviewShortcutActive: active => ipcRenderer.send('hades:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hades:openExternal', url),
   fetchLinkTitle: url => ipcRenderer.invoke('hades:fetchLinkTitle', url),
+  sanitizeWorkspaceCwd: cwd => ipcRenderer.invoke('hades:workspace:sanitize', cwd),
   settings: {
     getDefaultProjectDir: () => ipcRenderer.invoke('hades:setting:defaultProjectDir:get'),
     setDefaultProjectDir: dir => ipcRenderer.invoke('hades:setting:defaultProjectDir:set', dir),
@@ -132,5 +134,9 @@ contextBridge.exposeInMainWorld('hadesDesktop', {
       ipcRenderer.on('hades:updates:progress', listener)
       return () => ipcRenderer.removeListener('hades:updates:progress', listener)
     }
+  },
+  themes: {
+    fetchMarketplace: id => ipcRenderer.invoke('hades:vscode-theme:fetch', id),
+    searchMarketplace: query => ipcRenderer.invoke('hades:vscode-theme:search', query)
   }
 })
