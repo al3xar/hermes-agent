@@ -1589,9 +1589,7 @@ def _runtime_model_config(agent, existing: dict | None = None) -> dict:
 
                 provider = find_custom_provider_identity(base_url) or provider
             except Exception:
-                logger.debug(
-                    "custom provider identity lookup failed", exc_info=True
-                )
+                logger.debug("custom provider identity lookup failed", exc_info=True)
         config["provider"] = provider
     if base_url:
         config["base_url"] = base_url
@@ -1970,13 +1968,14 @@ def _apply_model_switch(
     *,
     confirm_expensive_model: bool = False,
     pin_session_override: bool = True,
+    parsed_flags: tuple[str, str, bool, bool] | None = None,
 ) -> dict:
     from hermes_cli.model_switch import parse_model_flags, switch_model
     from hermes_cli.runtime_provider import resolve_runtime_provider
 
-    model_input, explicit_provider, persist_global, _force_refresh = parse_model_flags(
-        raw_input
-    )
+    if parsed_flags is None:
+        parsed_flags = parse_model_flags(raw_input)
+    model_input, explicit_provider, persist_global, _force_refresh = parsed_flags
     if not model_input:
         raise ValueError("model value required")
 
@@ -1987,20 +1986,24 @@ def _apply_model_switch(
         current_base_url = getattr(agent, "base_url", "") or ""
         current_api_key = getattr(agent, "api_key", "") or ""
     else:
-        runtime = resolve_runtime_provider(requested=None)
-        current_provider = str(runtime.get("provider", "") or "")
         current_model = _resolve_model()
-        current_base_url = str(runtime.get("base_url", "") or "")
-        # Preserve a callable api_key (Azure Foundry Entra ID bearer
-        # provider) unchanged — ``str(...)`` would produce
-        # ``"<function ...>"`` and poison downstream switch_model
-        # validation. Match the agent-present branch's behavior at the
-        # top of this block.
-        _runtime_key = runtime.get("api_key", "")
-        if callable(_runtime_key) and not isinstance(_runtime_key, str):
-            current_api_key = _runtime_key
-        else:
-            current_api_key = str(_runtime_key or "")
+        current_provider = explicit_provider.strip()
+        current_base_url = ""
+        current_api_key = ""
+        if not explicit_provider:
+            runtime = resolve_runtime_provider(requested=None)
+            current_provider = str(runtime.get("provider", "") or "")
+            current_base_url = str(runtime.get("base_url", "") or "")
+            # Preserve a callable api_key (Azure Foundry Entra ID bearer
+            # provider) unchanged — ``str(...)`` would produce
+            # ``"<function ...>"`` and poison downstream switch_model
+            # validation. Match the agent-present branch's behavior at the
+            # top of this block.
+            _runtime_key = runtime.get("api_key", "")
+            if callable(_runtime_key) and not isinstance(_runtime_key, str):
+                current_api_key = _runtime_key
+            else:
+                current_api_key = str(_runtime_key or "")
 
     # Load user-defined providers so switch_model can resolve named custom
     # endpoints (e.g. "ollama-launch") and validate against saved model lists.
@@ -2823,7 +2826,9 @@ def _mirror_subagent_to_child(event_type: str, payload: dict) -> None:
         return
     csid = live[0]
     with _child_mirrors_lock:
-        st = _child_mirrors.setdefault(child_key, {"seq": 0, "open_tool": None, "started": False})
+        st = _child_mirrors.setdefault(
+            child_key, {"seq": 0, "open_tool": None, "started": False}
+        )
         if not st["started"]:
             st["started"] = True
             _emit("message.start", csid)
@@ -4218,7 +4223,9 @@ def _(rid, params: dict) -> dict:
                     "last_active": now,
                     "lazy": True,
                     "pending_title": None,
-                    "profile_home": str(profile_home) if profile_home is not None else None,
+                    "profile_home": str(profile_home)
+                    if profile_home is not None
+                    else None,
                     "resume_session_id": target,
                     "running": False,
                     "session_key": target,
@@ -4883,7 +4890,9 @@ def _(rid, params: dict) -> dict:
             {
                 "logged_in": bool(view.logged_in),
                 "balance_lines": [
-                    line for line in view.balance_lines if not line.lstrip().startswith("📈")
+                    line
+                    for line in view.balance_lines
+                    if not line.lstrip().startswith("📈")
                 ],
                 "identity_line": view.identity_line,
                 "topup_url": view.topup_url,
@@ -4892,7 +4901,16 @@ def _(rid, params: dict) -> dict:
         )
     except Exception:
         # Fail-open: TUI treats this as "not logged in" and shows the prompt.
-        return _ok(rid, {"logged_in": False, "balance_lines": [], "identity_line": None, "topup_url": None, "depleted": False})
+        return _ok(
+            rid,
+            {
+                "logged_in": False,
+                "balance_lines": [],
+                "identity_line": None,
+                "topup_url": None,
+                "depleted": False,
+            },
+        )
 
 
 @method("session.status")
@@ -5536,7 +5554,9 @@ def _(rid, params: dict) -> dict:
         # racing the in-flight child on the same stored session (interleaved
         # transcript, stale fork). After the run completes, submitting is fine:
         # the upgrade resumes the child's transcript as a normal conversation.
-        if session.get("lazy") and _child_run_active(str(session.get("session_key") or "")):
+        if session.get("lazy") and _child_run_active(
+            str(session.get("session_key") or "")
+        ):
             return _err(rid, 4009, "subagent still running — wait for it to finish")
         if truncate_user_ordinal is not None:
             try:
@@ -7113,7 +7133,13 @@ def _(rid, params: dict) -> dict:
                         4009,
                         "session busy — /interrupt the current turn before switching models",
                     )
-                if session.get("agent") is None:
+                from hermes_cli.model_switch import parse_model_flags
+
+                parsed_flags = parse_model_flags(value)
+                _model_input, explicit_provider, _persist_global, _force_refresh = (
+                    parsed_flags
+                )
+                if session.get("agent") is None and not explicit_provider.strip():
                     session_id = params.get("session_id", "")
                     _start_agent_build(session_id, session)
                     init_err = _wait_agent(session, rid)
@@ -7128,6 +7154,7 @@ def _(rid, params: dict) -> dict:
                     confirm_expensive_model=bool(
                         params.get("confirm_expensive_model", False)
                     ),
+                    parsed_flags=parsed_flags,
                 )
             else:
                 result = _apply_model_switch(
