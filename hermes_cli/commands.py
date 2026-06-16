@@ -142,22 +142,51 @@ COMMAND_REGISTRY: list[CommandDef] = [
         args_hint="[create|restore <id>|prune]",
     ),
     CommandDef("stop", "Kill all running background processes", "Session"),
-    CommandDef("approve", "Approve a pending dangerous command", "Session",
-               gateway_only=True, args_hint="[session|always]"),
-    CommandDef("deny", "Deny a pending dangerous command", "Session",
-               gateway_only=True),
-    CommandDef("background", "Run a prompt in the background", "Session",
-               aliases=("bg", "btw"), args_hint="<prompt>"),
-    CommandDef("agents", "Show active agents and running tasks", "Session",
-               aliases=("tasks",)),
-    CommandDef("queue", "Queue a prompt for the next turn (doesn't interrupt)", "Session",
-               aliases=("q",), args_hint="<prompt>"),
-    CommandDef("steer", "Inject a message after the next tool call without interrupting", "Session",
-               args_hint="<prompt>"),
-    CommandDef("goal", "Set a standing goal Hermes works on across turns until achieved", "Session",
-               args_hint="[text | pause | resume | clear | status]"),
-    CommandDef("subgoal", "Add or manage extra criteria on the active goal", "Session",
-               args_hint="[text | remove N | clear]"),
+    CommandDef(
+        "approve",
+        "Approve a pending dangerous command",
+        "Session",
+        gateway_only=True,
+        args_hint="[session|always]",
+    ),
+    CommandDef(
+        "deny", "Deny a pending dangerous command", "Session", gateway_only=True
+    ),
+    CommandDef(
+        "background",
+        "Run a prompt in the background",
+        "Session",
+        aliases=("bg", "btw"),
+        args_hint="<prompt>",
+    ),
+    CommandDef(
+        "agents", "Show active agents and running tasks", "Session", aliases=("tasks",)
+    ),
+    CommandDef(
+        "queue",
+        "Queue a prompt for the next turn (doesn't interrupt)",
+        "Session",
+        aliases=("q",),
+        args_hint="<prompt>",
+    ),
+    CommandDef(
+        "steer",
+        "Inject a message after the next tool call without interrupting",
+        "Session",
+        args_hint="<prompt>",
+    ),
+    CommandDef(
+        "goal",
+        "Set a standing goal Hermes works on across turns until achieved",
+        "Session",
+        args_hint="[text | pause | resume | clear | status]",
+    ),
+    CommandDef(
+        "subgoal",
+        "Add or manage extra criteria on the active goal",
+        "Session",
+        args_hint="[text | remove N | clear]",
+    ),
     CommandDef("status", "Show session, model, token, and context info", "Session"),
     CommandDef("whoami", "Show your slash command access (admin / user)", "Info"),
     CommandDef("profile", "Show active profile name and home directory", "Info"),
@@ -285,52 +314,166 @@ COMMAND_REGISTRY: list[CommandDef] = [
         args_hint="[native|deepagents|show]",
     ),
     # Tools & Skills
-    CommandDef("tools", "Manage tools: /tools [list|disable|enable] [name...]", "Tools & Skills",
-               args_hint="[list|disable|enable] [name...]", cli_only=True),
-    CommandDef("toolsets", "List available toolsets", "Tools & Skills",
-               cli_only=True),
-    CommandDef("skills", "Search, install, inspect, or manage skills",
-               "Tools & Skills", cli_only=True,
-               gateway_config_gate="skills.write_approval",
-               subcommands=("search", "browse", "inspect", "install", "audit",
-                            "pending", "approve", "reject", "diff", "approval")),
-    CommandDef("memory", "Review pending memory writes / toggle the approval gate",
-               "Tools & Skills",
-               args_hint="[pending|approve|reject|approval] [id|on|off]",
-               subcommands=("pending", "approve", "reject", "approval")),
-    CommandDef("bundles", "List skill bundles (aliases /<name> for multiple skills)",
-               "Tools & Skills"),
-    CommandDef("cron", "Manage scheduled tasks", "Tools & Skills",
-               cli_only=True, args_hint="[subcommand]",
-               subcommands=("list", "add", "create", "edit", "pause", "resume", "run", "remove")),
-    CommandDef("suggestions", "Review suggested automations (accept/dismiss)",
-               "Tools & Skills", aliases=("suggest",), args_hint="[accept|dismiss N | catalog]",
-               subcommands=("accept", "dismiss", "catalog", "clear")),
-    CommandDef("blueprint", "Set up an automation from a blueprint template",
-               "Tools & Skills", aliases=("bp",), args_hint="[name] [slot=value ...]"),
-    CommandDef("curator", "Background skill maintenance (status, run, pin, archive, list-archived)",
-               "Tools & Skills", args_hint="[subcommand]",
-               subcommands=("status", "run", "pause", "resume", "pin", "unpin", "restore", "list-archived")),
-    CommandDef("kanban", "Multi-profile collaboration board (tasks, links, comments)",
-               "Tools & Skills", args_hint="[subcommand]",
-               subcommands=("init", "boards", "create", "list", "ls", "show", "assign",
-                            "reclaim", "reassign", "diagnostics", "diag", "link", "unlink",
-                            "claim", "comment", "complete", "edit", "block", "unblock",
-                            "archive", "tail", "dispatch", "stats", "notify-subscribe",
-                            "notify-list", "notify-unsubscribe", "log", "runs",
-                            "heartbeat", "assignees", "context", "specify", "gc")),
-    CommandDef("reload", "Reload .env variables into the running session", "Tools & Skills",
-               cli_only=True),
-    CommandDef("reload-mcp", "Reload MCP servers from config", "Tools & Skills",
-               aliases=("reload_mcp",)),
-    CommandDef("reload-skills", "Re-scan ~/.hermes/skills/ for newly installed or removed skills",
-               "Tools & Skills", aliases=("reload_skills",)),
-    CommandDef("browser", "Connect browser tools to your live Chromium-family browser via CDP", "Tools & Skills",
-               cli_only=True, args_hint="[connect|disconnect|status]",
-               subcommands=("connect", "disconnect", "status")),
-    CommandDef("plugins", "List installed plugins and their status",
-               "Tools & Skills", cli_only=True),
-
+    CommandDef(
+        "tools",
+        "Manage tools: /tools [list|disable|enable] [name...]",
+        "Tools & Skills",
+        args_hint="[list|disable|enable] [name...]",
+        cli_only=True,
+    ),
+    CommandDef("toolsets", "List available toolsets", "Tools & Skills", cli_only=True),
+    CommandDef(
+        "skills",
+        "Search, install, inspect, or manage skills",
+        "Tools & Skills",
+        cli_only=True,
+        gateway_config_gate="skills.write_approval",
+        subcommands=(
+            "search",
+            "browse",
+            "inspect",
+            "install",
+            "audit",
+            "pending",
+            "approve",
+            "reject",
+            "diff",
+            "approval",
+        ),
+    ),
+    CommandDef(
+        "memory",
+        "Review pending memory writes / toggle the approval gate",
+        "Tools & Skills",
+        args_hint="[pending|approve|reject|approval] [id|on|off]",
+        subcommands=("pending", "approve", "reject", "approval"),
+    ),
+    CommandDef(
+        "bundles",
+        "List skill bundles (aliases /<name> for multiple skills)",
+        "Tools & Skills",
+    ),
+    CommandDef(
+        "cron",
+        "Manage scheduled tasks",
+        "Tools & Skills",
+        cli_only=True,
+        args_hint="[subcommand]",
+        subcommands=(
+            "list",
+            "add",
+            "create",
+            "edit",
+            "pause",
+            "resume",
+            "run",
+            "remove",
+        ),
+    ),
+    CommandDef(
+        "suggestions",
+        "Review suggested automations (accept/dismiss)",
+        "Tools & Skills",
+        aliases=("suggest",),
+        args_hint="[accept|dismiss N | catalog]",
+        subcommands=("accept", "dismiss", "catalog", "clear"),
+    ),
+    CommandDef(
+        "blueprint",
+        "Set up an automation from a blueprint template",
+        "Tools & Skills",
+        aliases=("bp",),
+        args_hint="[name] [slot=value ...]",
+    ),
+    CommandDef(
+        "curator",
+        "Background skill maintenance (status, run, pin, archive, list-archived)",
+        "Tools & Skills",
+        args_hint="[subcommand]",
+        subcommands=(
+            "status",
+            "run",
+            "pause",
+            "resume",
+            "pin",
+            "unpin",
+            "restore",
+            "list-archived",
+        ),
+    ),
+    CommandDef(
+        "kanban",
+        "Multi-profile collaboration board (tasks, links, comments)",
+        "Tools & Skills",
+        args_hint="[subcommand]",
+        subcommands=(
+            "init",
+            "boards",
+            "create",
+            "list",
+            "ls",
+            "show",
+            "assign",
+            "reclaim",
+            "reassign",
+            "diagnostics",
+            "diag",
+            "link",
+            "unlink",
+            "claim",
+            "comment",
+            "complete",
+            "edit",
+            "block",
+            "unblock",
+            "archive",
+            "tail",
+            "dispatch",
+            "stats",
+            "notify-subscribe",
+            "notify-list",
+            "notify-unsubscribe",
+            "log",
+            "runs",
+            "heartbeat",
+            "assignees",
+            "context",
+            "specify",
+            "gc",
+        ),
+    ),
+    CommandDef(
+        "reload",
+        "Reload .env variables into the running session",
+        "Tools & Skills",
+        cli_only=True,
+    ),
+    CommandDef(
+        "reload-mcp",
+        "Reload MCP servers from config",
+        "Tools & Skills",
+        aliases=("reload_mcp",),
+    ),
+    CommandDef(
+        "reload-skills",
+        "Re-scan ~/.hermes/skills/ for newly installed or removed skills",
+        "Tools & Skills",
+        aliases=("reload_skills",),
+    ),
+    CommandDef(
+        "browser",
+        "Connect browser tools to your live Chromium-family browser via CDP",
+        "Tools & Skills",
+        cli_only=True,
+        args_hint="[connect|disconnect|status]",
+        subcommands=("connect", "disconnect", "status"),
+    ),
+    CommandDef(
+        "plugins",
+        "List installed plugins and their status",
+        "Tools & Skills",
+        cli_only=True,
+    ),
     # Info
     CommandDef(
         "commands",
@@ -340,22 +483,50 @@ COMMAND_REGISTRY: list[CommandDef] = [
         args_hint="[page]",
     ),
     CommandDef("help", "Show available commands", "Info"),
-    CommandDef("restart", "Gracefully restart the gateway after draining active runs", "Session",
-               gateway_only=True),
-    CommandDef("usage", "Show token usage and rate limits for the current session", "Info"),
+    CommandDef(
+        "restart",
+        "Gracefully restart the gateway after draining active runs",
+        "Session",
+        gateway_only=True,
+    ),
+    CommandDef(
+        "usage", "Show token usage and rate limits for the current session", "Info"
+    ),
     CommandDef("credits", "Show Nous credit balance and top up", "Info"),
-    CommandDef("insights", "Show usage insights and analytics", "Info",
-               args_hint="[days]"),
-    CommandDef("platforms", "Show gateway/messaging platform status", "Info",
-               cli_only=True, aliases=("gateway",)),
-    CommandDef("platform", "Pause, resume, or list a failing gateway platform", "Info",
-               gateway_only=True, args_hint="<pause|resume|list> [name]"),
-    CommandDef("copy", "Copy the last assistant response to clipboard", "Info",
-               cli_only=True, args_hint="[number]"),
-    CommandDef("paste", "Attach clipboard image from your clipboard", "Info",
-               cli_only=True),
-    CommandDef("image", "Attach a local image file for your next prompt", "Info",
-               cli_only=True, args_hint="<path>"),
+    CommandDef(
+        "insights", "Show usage insights and analytics", "Info", args_hint="[days]"
+    ),
+    CommandDef(
+        "platforms",
+        "Show gateway/messaging platform status",
+        "Info",
+        cli_only=True,
+        aliases=("gateway",),
+    ),
+    CommandDef(
+        "platform",
+        "Pause, resume, or list a failing gateway platform",
+        "Info",
+        gateway_only=True,
+        args_hint="<pause|resume|list> [name]",
+    ),
+    CommandDef(
+        "copy",
+        "Copy the last assistant response to clipboard",
+        "Info",
+        cli_only=True,
+        args_hint="[number]",
+    ),
+    CommandDef(
+        "paste", "Attach clipboard image from your clipboard", "Info", cli_only=True
+    ),
+    CommandDef(
+        "image",
+        "Attach a local image file for your next prompt",
+        "Info",
+        cli_only=True,
+        args_hint="<path>",
+    ),
     CommandDef("update", "Update Hermes Agent to the latest version", "Info"),
     CommandDef("version", "Show Hermes Agent version", "Info", aliases=("v",)),
     CommandDef(
@@ -1228,12 +1399,8 @@ _SLACK_PRIORITY_ALIASES = ("btw", "bg")
 # the telegram-parity test reads it so an entry here is a deliberate
 # "Slack-via-/hermes" decision, not a silent clamp.
 #   - credits: the billing/top-up surface; reached via /hermes credits on Slack.
-#   - footer: a niche cosmetic toggle (runtime-metadata footer) demoted to free
-#     the last slot for /debug, a higher-value maintenance command. The
-#     deep-agents additions pushed COMMAND_REGISTRY to 51 canonical commands,
-#     one over the 50-slash cap; demoting /footer keeps /debug native on Slack.
-#     Reached via /hermes footer on Slack.
-_SLACK_VIA_HERMES_ONLY = frozenset({"credits", "footer"})
+#   - debug: the log/report upload surface; reached via /hermes debug on Slack.
+_SLACK_VIA_HERMES_ONLY = frozenset({"credits", "debug"})
 
 
 def _sanitize_slack_name(raw: str) -> str:
@@ -1309,7 +1476,9 @@ def slack_native_slashes() -> list[tuple[str, str, str]]:
     for alias in _SLACK_PRIORITY_ALIASES:
         cmd = _alias_to_cmd.get(alias)
         if cmd is not None:
-            _add(alias, f"Alias for /{cmd.name} — {cmd.description}", cmd.args_hint or "")
+            _add(
+                alias, f"Alias for /{cmd.name} — {cmd.description}", cmd.args_hint or ""
+            )
 
     # First pass: canonical names (so they win slots if we hit the cap).
     for cmd in COMMAND_REGISTRY:
@@ -1826,7 +1995,9 @@ class SlashCommandCompleter(Completer):
             )
 
             config = load_config()
-            enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
+            enabled = _get_platform_tools(
+                config, "cli", include_default_mcp_servers=False
+            )
 
             for ts_key, label, _desc in CONFIGURABLE_TOOLSETS:
                 if ts_key in already or not ts_key.startswith(partial_lower):
@@ -1903,7 +2074,11 @@ class SlashCommandCompleter(Completer):
                 home = gw.get_home_channel(platform)
             except Exception:
                 home = None
-            meta = f"→ {home.name}" if home and getattr(home, "name", None) else "send this session here"
+            meta = (
+                f"→ {home.name}"
+                if home and getattr(home, "name", None)
+                else "send this session here"
+            )
             yield Completion(
                 name,
                 start_position=-len(partial),
@@ -1921,7 +2096,9 @@ class SlashCommandCompleter(Completer):
             # used to come back empty even with personalities available.
             from cli import load_cli_config
 
-            personalities = (load_cli_config().get("agent") or {}).get("personalities", {}) or {}
+            personalities = (load_cli_config().get("agent") or {}).get(
+                "personalities", {}
+            ) or {}
             if "none".startswith(sub_lower) and "none" != sub_lower:
                 yield Completion(
                     "none",
