@@ -3,10 +3,85 @@ model:
   default: nvidia/Qwen3.6-35B-A3B-NVFP4
   base_url: https://vllm.athena.cibertrs.cloud/v1
   context_length: 262144
+
 terminal:
   backend: local
+
 gateway:
   deepagents_mode: true
+
+# =============================================================================
+# Hades — perfil OFENSIVO (red-team operator)
+# =============================================================================
+agent:
+  # Cadenas de ataque largas (recon -> web-exploit -> foothold -> post-exploit)
+  max_turns: 120
+  reasoning_effort: "high"
+  personalities:
+    # Persona ofensiva. Actívala con `/personality hades` (o fíjala como
+    # identidad del gateway). Diseño: ver wiki/architecture/diseno-arnes-ofensivo.
+    hades: >
+      You are Hades, an autonomous offensive-security (red-team) operator running
+      inside an AUTHORIZED cyber-range lab. Your mission is to audit the target in
+      scope end-to-end: reconnaissance, web exploitation, gaining a foothold,
+      post-exploitation (privilege escalation, lateral movement, credential reuse,
+      pivoting) and a final evidence-based report. Follow PTES and the OWASP Web
+      Security Testing Guide.
+
+      You drive the NyxStrike MCP server as your toolbox under a PLAN-AND-APPROVE
+      model: NyxStrike's decision engine proposes the next AttackStep (tool +
+      parameters + rationale); you EVALUATE each step (does it advance the goal? is
+      there a better pivot? does the result open a new branch?), approve / adjust /
+      reject it, interpret the result, and persist findings (credentials, hosts,
+      secrets) to memory so you can chain them. Do not improvise raw shell commands
+      when an MCP tool exists for the task.
+
+      Rules: (1) Only ever act against targets inside the declared lab scope; refuse
+      off-scope hosts. (2) No exploit, no report — every finding needs reproducible
+      runtime evidence. (3) Be concise and technical. (4) Stop and summarize when the
+      objective is met (foothold / host compromised / range fully owned).
+
+# =============================================================================
+# Skills ofensivas (web-pentest "No exploit, no report", etc.)
+# =============================================================================
+skills:
+  external_dirs:
+    # Skills de seguridad incluidas en el repo (web-pentest, oss-forensics, ...)
+    - ${HERMES_REPO:-/opt/hermes}/optional-skills/security
+
+# =============================================================================
+# Plugins: observabilidad + memoria (estado de la cadena de ataque entre pasos)
+# =============================================================================
 plugins:
   enabled:
     - observability/langfuse
+    - memory
+
+# =============================================================================
+# Toolset ofensivo del gateway: lo mínimo para operar NyxStrike sin saturar
+# contexto del modelo local (terminal/web/browser/file/delegation/skills + MCP).
+# =============================================================================
+platform_toolsets:
+  cli: [terminal, web, browser, file, skills, todo, delegation]
+  telegram: [terminal, web, browser, file, skills, todo, delegation]
+
+# =============================================================================
+# NyxStrike MCP — la caja de herramientas ofensiva (plan-and-approve)
+# =============================================================================
+# El bridge nyxstrike_mcp.py traduce MCP <-> API HTTP de NyxStrike. En K8s corre
+# como sidecar del pod de Hades (fase K2); en local apunta al server NyxStrike.
+# Variables: NYXSTRIKE_MCP_BRIDGE (ruta a nyxstrike_mcp.py), NYXSTRIKE_URL,
+# NYXSTRIKE_API_TOKEN (auth obligatorio en el server NyxStrike).
+mcp_servers:
+  nyxstrike:
+    command: python3
+    args:
+      - "${NYXSTRIKE_MCP_BRIDGE:-/opt/nyxstrike/nyxstrike_mcp.py}"
+      - "--server"
+      - "${NYXSTRIKE_URL:-http://nyxstrike:8888}"
+      - "--profile"
+      - "full"                       # TODO: cambiar a 'cyber-range' cuando exista en NyxStrike
+      - "--auth-token"
+      - "${NYXSTRIKE_API_TOKEN}"
+    timeout: 300
+    connect_timeout: 60

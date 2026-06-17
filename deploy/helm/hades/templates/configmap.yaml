@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hades.fullname" . }}-config
+  labels: {{- include "hades.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    model:
+      provider: custom
+      default: nvidia/Qwen3.6-35B-A3B-NVFP4
+      base_url: https://{{ .Values.vllm.host }}/v1
+      context_length: 262144
+    terminal:
+      backend: local
+    gateway:
+      deepagents_mode: true
+    agent:
+      max_turns: 120
+      reasoning_effort: "high"
+      personalities:
+        hades: >
+          You are Hades, an autonomous offensive-security (red-team) operator in an
+          AUTHORIZED cyber-range lab. Audit the in-scope target end-to-end (recon,
+          web exploitation, foothold, post-exploitation, report) following PTES/OWASP.
+          Drive NyxStrike under plan-and-approve: it proposes the next AttackStep, you
+          evaluate/approve/adjust it, interpret results and persist findings to memory
+          to chain them. Only act in scope; no exploit, no report; be concise.
+    skills:
+      external_dirs:
+        - /opt/hermes/optional-skills/security
+    plugins:
+      enabled:
+        - observability/langfuse
+        - memory
+    platform_toolsets:
+      cli: [terminal, web, browser, file, skills, todo, delegation]
+      telegram: [terminal, web, browser, file, skills, todo, delegation]
+    mcp_servers:
+      nyxstrike:
+        # El bridge corre como sidecar (HTTP) en este mismo pod.
+        url: "http://127.0.0.1:{{ .Values.nyxstrike.mcpPort }}/mcp"
+        timeout: 300

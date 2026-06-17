@@ -1,0 +1,82 @@
+# Hades (Hermes fork) — despliegue K8s con Gateway y Dashboard en pods separados.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: al3xar/hermes-agent
+  tag: "latest"            # build local; subir a Harbor cuando haga falta
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# UID/GID que el s6-overlay remapea (deben poder escribir HERMES_HOME).
+hermesUid: 501
+hermesGid: 20
+hermesHome: /opt/data
+
+# vLLM (Qwen local de Athena): alias host->IP, igual que el docker-compose.
+vllm:
+  host: vllm.athena.cibertrs.cloud
+  ip: "10.200.129.124"
+
+# Gateway (core/API del agente)
+gateway:
+  replicaCount: 1
+  port: 8080
+  bootstrapState: running
+  allowAllUsers: true
+
+# Dashboard (web UI)
+dashboard:
+  replicaCount: 1
+  port: 9119
+  # El dashboard se NIEGA a bindear en 0.0.0.0 sin un DashboardAuthProvider
+  # (gate OAuth). En K8s el Service es ClusterIP (no expuesto directo) y el
+  # acceso desde el navegador pasa por el Ingress, que ya lleva basic-auth + TLS
+  # (ver ingress.basicAuth). Por eso aquí va inseguro (= HERMES_DASHBOARD_INSECURE=1,
+  # como el docker-compose); la auth real está en el borde (Ingress).
+  insecure: true
+
+# Secrets (provee via existingSecret o estos valores). Claves:
+#   ATHENA_VLLM_KEY, API_SERVER_KEY, NYXSTRIKE_API_TOKEN,
+#   HERMES_LANGFUSE_PUBLIC_KEY, HERMES_LANGFUSE_SECRET_KEY
+secrets:
+  existingSecret: ""
+  athenaVllmKey: ""
+  apiServerKey: "dev-key-change-me"
+  nyxstrikeApiToken: ""
+  langfusePublicKey: "pk-lf-dev"
+  langfuseSecretKey: "sk-lf-dev"
+langfuseBaseUrl: "http://langfuse-web:3000"
+
+# NyxStrike MCP. El bridge nyxstrike_mcp.py corre como SIDECAR del pod Gateway
+# (imagen NyxStrike, transporte HTTP) y Hades conecta por http://127.0.0.1:<mcpPort>/mcp.
+nyxstrike:
+  url: "http://nyxstrike.nyx.svc:8888"   # Service del server NyxStrike (DMZ)
+  mcpPort: 9000
+  profile: "full"                         # TODO: 'cyber-range' cuando exista
+  sidecar:
+    enabled: true
+    image: "nyxstrike/nyxstrike:1.5.0"
+    # python que ejecuta el bridge dentro de la imagen NyxStrike
+    pythonBin: "/opt/nyxstrike/nyxstrike-env/bin/python3"
+    bridgePath: "/opt/nyxstrike/nyxstrike_mcp.py"
+
+# Ingress (nginx-ingress) que expone el Dashboard en el dominio de Hermes.
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "hermes.cibertrs.cloud"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  tls:
+    enabled: true
+    secretName: ""        # default <fullname>-dashboard-tls
+  # basic-auth en el nginx-ingress (capa extra ante exposición al navegador,
+  # además de la auth propia del dashboard). El htpasswd se genera del user/pass.
+  basicAuth:
+    enabled: true
+    username: "hades"
+    password: "change-me"   # CÁMBIALO, o usa existingSecret
+    existingSecret: ""      # Secret nginx basic-auth (clave 'auth', htpasswd)
+
+resources: {}

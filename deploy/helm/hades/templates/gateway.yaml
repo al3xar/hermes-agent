@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-gateway
+  labels:
+    {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: gateway
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      hostAliases:
+        - ip: {{ .Values.vllm.ip | quote }}
+          hostnames: [{{ .Values.vllm.host | quote }}]
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Mantiene vivo el contenedor (el gateway corre como servicio s6 en
+          # background); espejo del docker-compose `command: [sleep, infinity]`.
+          # Sin esto el wrapper ejecuta el `hermes` interactivo, que sale sin TTY.
+          args: ["sleep", "infinity"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.port }}
+          env:
+            - name: HERMES_HOME
+              value: {{ .Values.hermesHome | quote }}
+            - name: HERMES_UID
+              value: {{ .Values.hermesUid | quote }}
+            - name: HERMES_GID
+              value: {{ .Values.hermesGid | quote }}
+            - name: API_SERVER_HOST
+              value: "0.0.0.0"
+            - name: API_SERVER_PORT
+              value: {{ .Values.gateway.port | quote }}
+            - name: HERMES_GATEWAY_BOOTSTRAP_STATE
+              value: {{ .Values.gateway.bootstrapState | quote }}
+            - name: GATEWAY_ALLOW_ALL_USERS
+              value: {{ .Values.gateway.allowAllUsers | quote }}
+            - name: NYXSTRIKE_URL
+              value: {{ .Values.nyxstrike.url | quote }}
+            - name: HERMES_LANGFUSE_BASE_URL
+              value: {{ .Values.langfuseBaseUrl | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ include "hades.secretName" . }}
+          volumeMounts:
+            - name: config
+              mountPath: {{ .Values.hermesHome }}/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.nyxstrike.sidecar.enabled }}
+        # Sidecar: bridge MCP de NyxStrike en HTTP. Hades lo consume por
+        # http://127.0.0.1:{{ .Values.nyxstrike.mcpPort }}/mcp (mismo pod).
+        - name: nyxstrike-mcp
+          image: {{ .Values.nyxstrike.sidecar.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - {{ .Values.nyxstrike.sidecar.pythonBin | quote }}
+            - {{ .Values.nyxstrike.sidecar.bridgePath | quote }}
+            - "--server"
+            - {{ .Values.nyxstrike.url | quote }}
+            - "--transport"
+            - "http"
+            - "--mcp-host"
+            - "127.0.0.1"
+            - "--mcp-port"
+            - {{ .Values.nyxstrike.mcpPort | quote }}
+            - "--profile"
+            - {{ .Values.nyxstrike.profile | quote }}
+            - "--auth-token"
+            - "$(NYXSTRIKE_API_TOKEN)"
+          env:
+            - name: NYXSTRIKE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hades.secretName" . }}
+                  key: NYXSTRIKE_API_TOKEN
+          ports:
+            - name: mcp
+              containerPort: {{ .Values.nyxstrike.mcpPort }}
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "hades.fullname" . }}-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hades.fullname" . }}-gateway
+  labels:
+    {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.gateway.port }}
+      targetPort: http
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gateway
