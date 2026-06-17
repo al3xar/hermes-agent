@@ -164,7 +164,7 @@ class SkinConfig:
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
     "default": {
         "name": "default",
-        "description": "Classic Hermes — gold and kawaii",
+        "description": "Classic Hades — gold and kawaii",
         "colors": {
             "banner_border": "#CD7F32",
             "banner_title": "#FFD700",
@@ -187,10 +187,10 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             # Empty = use hardcoded defaults in display.py
         },
         "branding": {
-            "agent_name": "Hermes Agent",
-            "welcome": "Welcome to Hermes Agent! Type your message or /help for commands.",
+            "agent_name": "Hades Agent",
+            "welcome": "Welcome to Hades Agent! Type your message or /help for commands.",
             "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Hermes ",
+            "response_label": " ⚕ Hades ",
             "prompt_symbol": "❯",
             "help_header": "(^_^)? Available Commands",
         },
@@ -298,10 +298,10 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
         },
         "spinner": {},
         "branding": {
-            "agent_name": "Hermes Agent",
-            "welcome": "Welcome to Hermes Agent! Type your message or /help for commands.",
+            "agent_name": "Hades Agent",
+            "welcome": "Welcome to Hades Agent! Type your message or /help for commands.",
             "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Hermes ",
+            "response_label": " ⚕ Hades ",
             "prompt_symbol": "❯",
             "help_header": "[?] Available Commands",
         },
@@ -337,10 +337,10 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
         },
         "spinner": {},
         "branding": {
-            "agent_name": "Hermes Agent",
-            "welcome": "Welcome to Hermes Agent! Type your message or /help for commands.",
+            "agent_name": "Hades Agent",
+            "welcome": "Welcome to Hades Agent! Type your message or /help for commands.",
             "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Hermes ",
+            "response_label": " ⚕ Hades ",
             "prompt_symbol": "❯",
             "help_header": "(^_^)? Available Commands",
         },
@@ -374,10 +374,10 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
         },
         "spinner": {},
         "branding": {
-            "agent_name": "Hermes Agent",
-            "welcome": "Welcome to Hermes Agent! Type your message or /help for commands.",
+            "agent_name": "Hades Agent",
+            "welcome": "Welcome to Hades Agent! Type your message or /help for commands.",
             "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Hermes ",
+            "response_label": " ⚕ Hades ",
             "prompt_symbol": "❯",
             "help_header": "[?] Available Commands",
         },
@@ -411,10 +411,10 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
         },
         "spinner": {},
         "branding": {
-            "agent_name": "Hermes Agent",
-            "welcome": "Welcome to Hermes Agent! Type your message or /help for commands.",
+            "agent_name": "Hades Agent",
+            "welcome": "Welcome to Hades Agent! Type your message or /help for commands.",
             "goodbye": "Goodbye! \u2695",
-            "response_label": " \u2695 Hermes ",
+            "response_label": " \u2695 Hades ",
             "prompt_symbol": "\u276f",
             "help_header": "(^_^)? Available Commands",
         },

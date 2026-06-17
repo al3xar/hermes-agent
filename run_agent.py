@@ -437,8 +437,32 @@ class AIAgent:
         checkpoint_max_total_size_mb: int = 500,
         checkpoint_max_file_size_mb: int = 10,
         pass_session_id: bool = False,
+        runtime: str = "native",  # "native" | "deepagents"
     ):
-        """Forwarder — see ``agent.agent_init.init_agent``."""
+        """Forwarder — see ``agent.agent_init.init_agent`` (native runtime) or
+        ``_init_deepagents`` (deep-agents runtime).
+
+        ``runtime`` selects the execution backend.  Gateway/ACP/TUI call sites
+        splat a ``runtime`` key into ``AIAgent(**...)`` when deep-agents mode is
+        enabled (see ``resolve_agent_runtime``); it MUST stay a real parameter
+        so those sites don't hit ``unexpected keyword argument 'runtime'``.
+        """
+        if runtime == "deepagents":
+            self._init_deepagents(
+                base_url=base_url,
+                api_key=api_key,
+                provider=provider,
+                model=model,
+                max_iterations=max_iterations,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                quiet_mode=quiet_mode,
+                skip_memory=skip_memory,
+                skip_context_files=skip_context_files,
+                session_id=session_id,
+                platform=platform,
+            )
+            return
         from agent.agent_init import init_agent
 
         init_agent(

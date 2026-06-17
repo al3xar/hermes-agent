@@ -47,7 +47,7 @@ export default function Welcome() {
         size="lg"
         className="group inline-flex items-center gap-2 px-6"
       >
-        Install Hermes
+        Install Hades
         <ArrowRight
           size={18}
           className="transition-transform group-hover:translate-x-0.5"
