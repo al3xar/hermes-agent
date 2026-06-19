@@ -2,9 +2,19 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# Namespace. TODOS los recursos (Hades + el stack Langfuse) viven en el namespace
+# del release, lo que es REQUISITO para que la conexión Hades->Langfuse resuelva
+# por DNS de nombre corto (langfuse-web, langfuse-db, ...).
+# Con create=true el chart incluye el objeto Namespace (= namespace del release),
+# útil con GitOps/`kubectl apply`. Con `helm install` directo, pásalo igualmente
+# con `-n <name>` (añade `--create-namespace` si el namespace aún no existe).
+namespace:
+  create: true
+  name: "" # vacío => usa el namespace del release (.Release.Namespace)
+
 image:
   repository: al3xar/hermes-agent
-  tag: "latest"            # build local; subir a Harbor cuando haga falta
+  tag: "latest" # build local; subir a Harbor cuando haga falta
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -36,6 +46,12 @@ dashboard:
   # como el docker-compose); la auth real está en el borde (Ingress).
   insecure: true
 
+# Toolsets que vincula la sesión de chat (TUI) del dashboard, vía la env
+# HERMES_TUI_TOOLSETS. Debe incluir el nombre del servidor MCP `nyxstrike` para
+# exponer sus tools en el TUI; manténlo sincronizado con platform_toolsets.cli
+# del configmap.
+tuiToolsets: "terminal,web,browser,file,skills,todo,delegation,nyxstrike"
+
 # Secrets (provee via existingSecret o estos valores). Claves:
 #   ATHENA_VLLM_KEY, API_SERVER_KEY, NYXSTRIKE_API_TOKEN,
 #   HERMES_LANGFUSE_PUBLIC_KEY, HERMES_LANGFUSE_SECRET_KEY
@@ -46,20 +62,99 @@ secrets:
   nyxstrikeApiToken: ""
   langfusePublicKey: "pk-lf-dev"
   langfuseSecretKey: "sk-lf-dev"
+# URL interna del Langfuse desplegado por este chart (Service langfuse-web).
+# Hades (gateway+dashboard) envía aquí sus trazas vía el plugin observability/langfuse.
 langfuseBaseUrl: "http://langfuse-web:3000"
+
+# Stack de observabilidad Langfuse v3 — espejo del docker-compose.
+# Despliega web + worker + postgres + clickhouse + redis + minio dentro del
+# cluster y expone el dashboard de Langfuse en su propio dominio
+# (langfuse.ingress.host). Pon enabled=false si usas un Langfuse externo
+# (en ese caso ajusta langfuseBaseUrl y las claves de secrets.*).
+langfuse:
+  enabled: true
+  web:
+    image: "langfuse/langfuse:3"
+    replicaCount: 1
+    port: 3000
+    # URL pública que Langfuse anuncia (NEXTAUTH_URL). Vacío => se deduce del
+    # Ingress (o del Service interno si no hay Ingress). Sobreescríbelo cuando
+    # accedas por port-forward o un proxy externo, p.ej. http://localhost:3000.
+    publicUrl: ""
+  worker:
+    image: "langfuse/langfuse-worker:3"
+    replicaCount: 1
+  # Bootstrap del org/proyecto y del usuario admin (login del dashboard web).
+  # El proyecto se crea con las MISMAS claves que usa Hades (secrets.langfuse*),
+  # así la conexión queda emparejada sin pasos manuales.
+  init:
+    orgId: "org-hermes"
+    orgName: "Hermes"
+    projectId: "hermes-agent"
+    projectName: "Hermes Agent"
+    userEmail: "admin@hermes.local"
+    userName: "Hermes Admin"
+    userPassword: "hermes-admin-change-me" # CÁMBIALO
+  # Secretos internos del stack (valores dev por defecto — CÁMBIALOS en prod).
+  secret:
+    salt: "devsalt"
+    encryptionKey: "0000000000000000000000000000000000000000000000000000000000000000"
+    nextauthSecret: "secret"
+  postgres:
+    image: "postgres:17"
+    user: "postgres"
+    password: "postgres"
+    database: "postgres"
+    storage: "10Gi"
+  clickhouse:
+    image: "clickhouse/clickhouse-server:24"
+    user: "clickhouse"
+    password: "clickhouse"
+    storage: "20Gi"
+  redis:
+    image: "redis:7"
+    password: "myredissecret"
+  minio:
+    image: "minio/minio:latest"
+    rootUser: "minio"
+    rootPassword: "miniosecret"
+    bucket: "langfuse"
+    storage: "20Gi"
+  # Whitelist para que Langfuse pueda llamar al vLLM de Athena (evals/playground).
+  llmWhitelist:
+    host: "vllm.athena.cibertrs.cloud"
+    ips: "10.200.129.124"
+    ipSegments: "10.200.0.0/16"
+  # Ingress que expone el dashboard de Langfuse en su dominio.
+  ingress:
+    enabled: true
+    className: "nginx"
+    host: "langfuse.cibertrs.cloud"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/proxy-body-size: "256m"
+    tls:
+      enabled: true
+      secretName: "" # default <fullname>-langfuse-tls
+    # Langfuse ya trae su propio login; basic-auth en el borde es opcional.
+    basicAuth:
+      enabled: false
+      username: "hades"
+      password: "change-me"
+      existingSecret: ""
 
 # NyxStrike MCP. El bridge nyxstrike_mcp.py corre como SIDECAR del pod Gateway
 # (imagen NyxStrike, transporte HTTP) y Hades conecta por http://127.0.0.1:<mcpPort>/mcp.
 nyxstrike:
-  url: "http://nyxstrike.nyx.svc:8888"   # Service del server NyxStrike (DMZ)
+  url: "http://nyxstrike.nyx.svc:8888" # Service del server NyxStrike (DMZ)
   mcpPort: 9000
-  profile: "full"                         # TODO: 'cyber-range' cuando exista
+  profile: "full" # TODO: 'cyber-range' cuando exista
   sidecar:
     enabled: true
     image: "nyxstrike/nyxstrike:1.5.0"
-    # python que ejecuta el bridge dentro de la imagen NyxStrike
+    # El bridge importa psutil y demás deps instaladas SOLO en el venv de la
+    # imagen NyxStrike; hay que lanzarlo con el python del venv, no el del sistema.
     pythonBin: "/opt/nyxstrike/nyxstrike-env/bin/python3"
-    bridgePath: "/opt/nyxstrike/nyxstrike_mcp.py"
 
 # Ingress (nginx-ingress) que expone el Dashboard en el dominio de Hermes.
 ingress:
@@ -70,13 +165,13 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
   tls:
     enabled: true
-    secretName: ""        # default <fullname>-dashboard-tls
+    secretName: "" # default <fullname>-dashboard-tls
   # basic-auth en el nginx-ingress (capa extra ante exposición al navegador,
   # además de la auth propia del dashboard). El htpasswd se genera del user/pass.
   basicAuth:
     enabled: true
     username: "hades"
-    password: "change-me"   # CÁMBIALO, o usa existingSecret
-    existingSecret: ""      # Secret nginx basic-auth (clave 'auth', htpasswd)
+    password: "change-me" # CÁMBIALO, o usa existingSecret
+    existingSecret: "" # Secret nginx basic-auth (clave 'auth', htpasswd)
 
 resources: {}

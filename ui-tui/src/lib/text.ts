@@ -187,12 +187,65 @@ const countNewlines = (text: string, end: number) => {
 
 export const stripTrailingPasteNewlines = (text: string) => (/[^\n]/.test(text) ? text.replace(/\n+$/, '') : text)
 
-export const toolTrailLabel = (name: string) =>
-  name
-    .split('_')
-    .filter(Boolean)
-    .map(p => p[0]!.toUpperCase() + p.slice(1))
-    .join(' ') || name
+// Per-tool display emojis, mirroring the CLI's `agent.display.get_tool_emoji`
+// (tool registry) so the TUI tool trail reads the same as the classic CLI.
+// Unmapped tools fall back to ⚡ exactly like the CLI default. Skin-level
+// emoji overrides are not reflected here (the CLI resolves those in Python);
+// this is the stable registry baseline.
+const TOOL_EMOJI: Record<string, string> = {
+  terminal: '💻',
+  read_file: '📖',
+  read_terminal: '🖥️',
+  write_file: '✍️',
+  patch: '🔧',
+  search_files: '🔎',
+  skills_list: '📚',
+  skill_view: '📚',
+  skill_manage: '📝',
+  delegate_task: '🔀',
+  process: '⚙️',
+  todo: '📋',
+  memory: '🧠',
+  session_search: '🔍',
+  execute_code: '🐍',
+  clarify: '❓',
+  text_to_speech: '🔊',
+  web_search: '🔍',
+  web_extract: '📄',
+  image_generate: '🎨',
+  vision_analyze: '👁️',
+  browser_navigate: '🌐',
+  browser_snapshot: '📸',
+  browser_click: '👆',
+  browser_type: '⌨️',
+  browser_press: '⌨️',
+  browser_scroll: '📜',
+  browser_back: '◀️',
+  browser_console: '🖥️',
+  browser_get_images: '🖼️',
+  browser_vision: '👁️',
+  kanban_show: '📋',
+  kanban_list: '📋'
+}
+const DEFAULT_TOOL_EMOJI = '⚡'
+
+export const toolEmoji = (name: string) => TOOL_EMOJI[name] ?? DEFAULT_TOOL_EMOJI
+
+// Title-cases the tool name and prefixes its emoji (e.g. "terminal" → "💻
+// Terminal"). The emoji lives here rather than in `formatToolCall` so every
+// label site — live trail, completed trail strings, and `sameToolTrailGroup`
+// dedup (which compares this label against `formatToolCall` output) — stays
+// byte-consistent and grouping keeps working.
+export const toolTrailLabel = (name: string) => {
+  const label =
+    name
+      .split('_')
+      .filter(Boolean)
+      .map(p => p[0]!.toUpperCase() + p.slice(1))
+      .join(' ') || name
+
+  return `${toolEmoji(name)} ${label}`
+}
 
 export const formatToolCall = (name: string, context = '') => {
   const label = toolTrailLabel(name)

@@ -6281,6 +6281,22 @@ def redact_key(key: str) -> str:
     return mask_secret(key, empty=color("(not set)", Colors.DIM))
 
 
+def _resolve_deepagents_mode(config: "Dict[str, Any] | None") -> bool:
+    """Return True if the deepagents (LangGraph) runtime is enabled.
+
+    Mirrors the gateway/TUI/CLI precedence: ``gateway.deepagents_mode`` first,
+    then a top-level ``deepagents_mode`` fallback. Values are coerced from the
+    usual truthy strings (true/1/yes/on) so YAML scalars and env-style strings
+    both resolve.
+    """
+    cfg = config if isinstance(config, dict) else {}
+    gw = cfg.get("gateway")
+    raw = gw.get("deepagents_mode") if isinstance(gw, dict) else None
+    if raw is None:
+        raw = cfg.get("deepagents_mode")
+    return str(raw).strip().lower() in {"true", "1", "yes", "on"}
+
+
 def show_config():
     """Display current configuration."""
     config = load_config()
@@ -6335,6 +6351,11 @@ def show_config():
     print()
     print(color("◆ Model", Colors.CYAN, Colors.BOLD))
     print(f"  Model:        {config.get('model', 'not set')}")
+    # Execution runtime: native (Hermes loop) vs deepagents (LangGraph). Mirrors
+    # the precedence used by the gateway/TUI/CLI — gateway.deepagents_mode first,
+    # then a top-level deepagents_mode fallback.
+    _runtime = "deepagents" if _resolve_deepagents_mode(config) else "native"
+    print(f"  Runtime:      {_runtime}")
     _cfg_max_turns = config.get("agent", {}).get(
         "max_turns", DEFAULT_CONFIG["agent"]["max_turns"]
     )

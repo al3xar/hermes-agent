@@ -216,6 +216,14 @@ RUN chmod -R a+rX /opt/hermes && \
 # this a fast (~1s) egg-link creation with no resolution or downloads.
 RUN uv pip install --no-cache-dir --no-deps -e "."
 
+# ---------- Keyless web search backend (ddgs) ----------
+# The `web` toolset's web_search is gated on a backend being present: keyed
+# backends (exa/tavily) bind on their API key and lazy-install the package,
+# but the keyless DuckDuckGo backend (`ddgs`) is gated on the *package* being
+# importable — so it must be baked in, or web_search never binds and the model
+# hallucinates the call as text. Pinned to match the `ddgs` extra in pyproject.
+RUN uv pip install --no-cache-dir "ddgs==9.14.4"
+
 # ---------- Bake build-time git revision ----------
 # .dockerignore excludes .git, so `git rev-parse HEAD` from inside the
 # container always returns nothing — meaning `hermes dump` reports

@@ -12187,6 +12187,21 @@ class GatewayRunner(
                                 if new_defs
                                 else set()
                             )
+                            # DeepAgents bakes its tool list into a compiled
+                            # LangGraph graph, so assigning ``.tools`` above is a
+                            # no-op for that runtime — recompile and atomically
+                            # swap the graph instead so the new MCP tools take
+                            # effect on the next turn.
+                            _rebuild = getattr(_agent, "rebuild_agent", None)
+                            if callable(_rebuild):
+                                try:
+                                    _rebuild()
+                                except Exception as _rebuild_exc:
+                                    logger.debug(
+                                        "DeepAgents rebuild after MCP reload "
+                                        "failed: %s",
+                                        _rebuild_exc,
+                                    )
             except Exception as _exc:
                 logger.debug(
                     "Failed to update cached agent tools after MCP reload: %s",

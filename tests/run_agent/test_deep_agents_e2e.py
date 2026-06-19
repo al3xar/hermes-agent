@@ -300,51 +300,111 @@ class TestRunConversation:
 # ---------------------------------------------------------------------------
 
 
+def _make_bare_deepagents_agent(**kwargs):
+    """Create a DeepAgentsAIAgent via __new__ with the minimal attribute state
+    the non-LangGraph code paths read (no graph compiled)."""
+    from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+    agent = object.__new__(DeepAgentsAIAgent)
+    object.__setattr__(agent, "mode", "deepagents")
+    object.__setattr__(agent, "_quiet_mode", kwargs.get("quiet_mode", False))
+    object.__setattr__(agent, "_skip_memory", kwargs.get("skip_memory", True))
+    object.__setattr__(agent, "_platform", kwargs.get("platform"))
+    object.__setattr__(agent, "_session_id", kwargs.get("session_id", "test"))
+    object.__setattr__(agent, "_max_iterations", kwargs.get("max_iterations", 90))
+    object.__setattr__(agent, "provider", kwargs.get("provider", ""))
+    object.__setattr__(agent, "_model_raw", kwargs.get("model", "test-model"))
+    object.__setattr__(agent, "_api_key", kwargs.get("api_key"))
+    object.__setattr__(agent, "_base_url", kwargs.get("base_url"))
+    object.__setattr__(agent, "_callbacks", kwargs.get("_callbacks", {}))
+    return agent
+
+
+class TestDeepAgentsSystemPrompt:
+    """The deepagents runtime must run with the *real* Hermes system prompt
+    (identity + tool-use enforcement + skills guidance), not a trivial
+    'You are a helpful AI assistant.' fallback — otherwise the model describes
+    tools in prose / types tool names as text instead of calling them."""
+
+    def test_builds_full_hermes_prompt_not_trivial_fallback(self):
+        agent = _make_bare_deepagents_agent(model="qwen", provider="custom")
+        captured = {}
+
+        def _fake_build(view, system_message=None):
+            captured["view"] = view
+            return "RICH HERMES PROMPT WITH ENFORCEMENT"
+
+        with patch("agent.system_prompt.build_system_prompt", _fake_build):
+            sp = agent._build_hermes_system_prompt()
+
+        assert sp == "RICH HERMES PROMPT WITH ENFORCEMENT"
+        assert sp != "You are a helpful AI assistant."
+
+    def test_prompt_view_exposes_real_config(self):
+        """The view handed to build_system_prompt must carry the impl's real
+        model/provider/tool names so tool-aware guidance is injected."""
+        agent = _make_bare_deepagents_agent(model="qwen-x", provider="custom")
+        captured = {}
+
+        def _fake_build(view, system_message=None):
+            captured["view"] = view
+            return "ok"
+
+        with patch("agent.system_prompt.build_system_prompt", _fake_build), patch.object(
+            type(agent), "valid_tool_names", new=property(lambda self: ["skills_list", "ls"])
+        ):
+            agent._build_hermes_system_prompt()
+
+        view = captured["view"]
+        assert view.model == "qwen-x"
+        assert view.provider == "custom"
+        assert "skills_list" in view.valid_tool_names
+        # Context-file loading needs a file subsystem the deepagents impl lacks,
+        # so the prompt path must skip it (identity/SOUL still loads).
+        assert view.skip_context_files is True
+
+    def test_falls_back_to_identity_not_trivial_on_error(self):
+        """If prompt assembly raises, fall back to the real agent identity —
+        never the bare 'helpful AI assistant' string that strips enforcement."""
+        agent = _make_bare_deepagents_agent()
+        with patch(
+            "agent.system_prompt.build_system_prompt",
+            side_effect=RuntimeError("boom"),
+        ):
+            sp = agent._build_hermes_system_prompt()
+        assert sp
+        assert sp != "You are a helpful AI assistant."
+
+
 class TestStreamingEndToEnd:
     """E2E: streaming path — bridge processes events and callbacks fire."""
 
     def _make_deepagents_agent(self, **kwargs):
         """Create a DeepAgentsAIAgent via __new__ with a mock _agent."""
-        from agent.deep_agents_runtime import DeepAgentsAIAgent
-
-        agent = object.__new__(DeepAgentsAIAgent)
-        object.__setattr__(agent, "mode", "deepagents")
-        object.__setattr__(agent, "_quiet_mode", kwargs.get("quiet_mode", False))
-        object.__setattr__(agent, "_skip_memory", kwargs.get("skip_memory", True))
-        object.__setattr__(agent, "_platform", kwargs.get("platform"))
-        object.__setattr__(agent, "_session_id", kwargs.get("session_id", "test"))
-        object.__setattr__(agent, "_max_iterations", kwargs.get("max_iterations", 90))
-        object.__setattr__(agent, "provider", kwargs.get("provider", ""))
-        object.__setattr__(agent, "_api_key", kwargs.get("api_key"))
-        object.__setattr__(agent, "_base_url", kwargs.get("base_url"))
-        object.__setattr__(agent, "_callbacks", kwargs.get("_callbacks", {}))
-        return agent
+        return _make_bare_deepagents_agent(**kwargs)
 
     def test_streaming_path_fires_callbacks(self):
-        """When callbacks are set, run_conversation enters _run_streamed."""
+        """When callbacks are set, run_conversation enters _run_streamed and
+        token chunks (messages mode) drive stream_delta + step callbacks while
+        node updates carry the authoritative final messages."""
+        from langchain_core.messages import AIMessageChunk
+
         deltas = []
         steps = []
 
         agent = self._make_deepagents_agent()
         agent._agent = MagicMock()
 
+        final_ai = _make_langchain_message("assistant", content="final answer")
+
         def fake_stream(**kwargs):
-            yield {"events": [{"type": "AIMessageChunk", "data": {"content": "hi"}}]}
-            yield {"output": "final answer"}
-            return []
+            # messages mode: token-level chunks → live delta streaming
+            yield ("messages", (AIMessageChunk(content="final "), {}))
+            yield ("messages", (AIMessageChunk(content="answer"), {}))
+            # updates mode: completed node output → authoritative messages
+            yield ("updates", {"model": {"messages": [final_ai]}})
 
         agent._agent.stream.return_value = fake_stream()
-        agent._agent.get_state.return_value = type(
-            "State",
-            (),
-            {
-                "values": {
-                    "messages": [
-                        _make_langchain_message("assistant", content="final answer")
-                    ]
-                }
-            },
-        )
 
         # Set up callbacks via the _CAPTURED_NAMES mechanism
         agent.stream_delta_callback = lambda x: deltas.append(x)
@@ -353,8 +413,316 @@ class TestStreamingEndToEnd:
         response = agent.run_conversation(user_message="hello")
 
         assert response["final_response"] == "final answer"
-        assert "hi" in deltas
-        assert (1, []) in steps  # step callback fires on AIMessageChunk
+        assert deltas == ["final ", "answer"]
+        assert (1, []) in steps  # step callback fires on each token chunk
+        # Token streaming uses the multi-mode stream, not a single "updates" mode.
+        assert agent._agent.stream.call_args.kwargs["stream_mode"] == [
+            "updates",
+            "messages",
+        ]
+
+    def test_streaming_path_fires_tool_callbacks(self):
+        """Tool calls in updates mode drive tool_start/tool_complete like native."""
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        starts, completes = [], []
+
+        agent = self._make_deepagents_agent()
+        agent._agent = MagicMock()
+
+        ai = AIMessage(content="checking")
+        ai.tool_calls = [{"name": "read_file", "args": {"path": "x"}, "id": "c1"}]
+        tm = ToolMessage(content="contents", tool_call_id="c1", name="read_file")
+        final_ai = _make_langchain_message("assistant", content="done")
+
+        def fake_stream(**kwargs):
+            yield ("updates", {"model": {"messages": [ai]}})
+            yield ("updates", {"tools": {"messages": [tm]}})
+            yield ("updates", {"model": {"messages": [final_ai]}})
+
+        agent._agent.stream.return_value = fake_stream()
+        agent.tool_start_callback = lambda i, n, a: starts.append((i, n, a))
+        agent.tool_complete_callback = lambda i, n, a, r: completes.append((i, n, a, r))
+
+        response = agent.run_conversation(user_message="read it")
+
+        assert response["final_response"] == "done"
+        assert starts == [("c1", "read_file", {"path": "x"})]
+        assert completes == [("c1", "read_file", {"path": "x"}, "contents")]
+
+    def test_streaming_forwards_stream_callback_param(self):
+        """The TUI passes stream_callback to run_conversation (not as an attr);
+        it must reach the delta sink."""
+        from langchain_core.messages import AIMessageChunk
+
+        deltas = []
+        agent = self._make_deepagents_agent()
+        agent._agent = MagicMock()
+        final_ai = _make_langchain_message("assistant", content="hi there")
+
+        def fake_stream(**kwargs):
+            yield ("messages", (AIMessageChunk(content="hi "), {}))
+            yield ("messages", (AIMessageChunk(content="there"), {}))
+            yield ("updates", {"model": {"messages": [final_ai]}})
+
+        agent._agent.stream.return_value = fake_stream()
+
+        response = agent.run_conversation(
+            user_message="hello",
+            stream_callback=lambda x: deltas.append(x),
+        )
+        assert response["final_response"] == "hi there"
+        assert deltas == ["hi ", "there"]
+
+    def test_streaming_result_messages_include_history_and_user(self):
+        """The streaming path must return the FULL conversation in
+        result['messages'] — conversation_history + the user turn + this turn's
+        new messages — matching the native runtime (turn_context builds
+        ``list(conversation_history) + [user] + new``) and the sync path
+        (``agent.invoke`` returns the whole state).
+
+        The gateway does ``session['history'] = result['messages']``
+        (tui_gateway/server.py), so a streaming result that carries only the
+        node-output deltas silently truncates session history every turn,
+        re-feeding malformed history and duplicating tool-call chrome on screen.
+        """
+        agent = self._make_deepagents_agent()
+        agent._agent = MagicMock()
+
+        new_ai = _make_langchain_message("assistant", content="second answer")
+
+        def fake_stream(**kwargs):
+            # updates mode yields only the NEW node output, not the input state.
+            yield ("updates", {"model": {"messages": [new_ai]}})
+
+        agent._agent.stream.return_value = fake_stream()
+        agent.stream_delta_callback = lambda x: None
+
+        history = [
+            _make_hermes_message("user", "first question"),
+            _make_hermes_message("assistant", "first answer"),
+        ]
+
+        result = agent.run_conversation(
+            user_message="second question",
+            conversation_history=history,
+        )
+
+        roles_and_text = [(m["role"], m.get("content")) for m in result["messages"]]
+        # Full conversation: prior history + this turn's user + new assistant reply.
+        assert ("user", "first question") in roles_and_text
+        assert ("assistant", "first answer") in roles_and_text
+        assert ("user", "second question") in roles_and_text
+        assert ("assistant", "second answer") in roles_and_text
+        # No injected system message leaks into the returned history (the gateway
+        # supplies system separately; native history carries none here).
+        assert all(role != "system" for role, _ in roles_and_text)
+
+    def test_streaming_echoed_input_not_duplicated_in_result(self):
+        """When the real graph re-surfaces the input history in ``updates``
+        mode (a ``HumanMessage`` appears in the stream), result['messages'] must
+        be the streamed list as-is — NOT input + streamed, which would duplicate
+        the whole history and, fed back via session/history, snowball each turn.
+        """
+        from langchain_core.messages import HumanMessage
+
+        agent = self._make_deepagents_agent()
+        agent._agent = MagicMock()
+
+        # The graph echoes the input (user turn) plus this turn's new reply.
+        echoed_user = HumanMessage(content="second question")
+        new_ai = _make_langchain_message("assistant", content="second answer")
+
+        def fake_stream(**kwargs):
+            yield ("updates", {"model": {"messages": [echoed_user, new_ai]}})
+
+        agent._agent.stream.return_value = fake_stream()
+        agent.stream_delta_callback = lambda x: None
+
+        history = [
+            _make_hermes_message("user", "first question"),
+            _make_hermes_message("assistant", "first answer"),
+        ]
+
+        result = agent.run_conversation(
+            user_message="second question",
+            conversation_history=history,
+        )
+
+        users = [m for m in result["messages"] if m["role"] == "user"]
+        # Exactly one "second question" — the echo, not echo + prepended input.
+        assert sum(1 for m in users if m["content"] == "second question") == 1
+        assert ("assistant", "second answer") in [
+            (m["role"], m.get("content")) for m in result["messages"]
+        ]
+
+    def test_streaming_skips_historical_tool_calls_resurfaced_from_input(self):
+        """Tools already present in the input history must NOT re-fire
+        tool_start/tool_complete when the graph re-surfaces them in ``updates``
+        mode — otherwise every prior turn's tool trail reprints each turn.
+        Only this turn's NEW tool should drive the callbacks.
+        """
+        from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+
+        starts, completes = [], []
+
+        agent = self._make_deepagents_agent()
+        agent._agent = MagicMock()
+
+        # Prior turn's tool call (id "old1") lives in the conversation history.
+        history = [
+            _make_hermes_message("user", "earlier"),
+            _make_hermes_message(
+                "assistant",
+                "",
+                tool_calls=[{"name": "web_search", "args": {"q": "a"}, "id": "old1"}],
+            ),
+            _make_hermes_message("tool", "old result", tool_call_id="old1"),
+            _make_hermes_message("assistant", "earlier answer"),
+        ]
+
+        # The graph re-surfaces the historical tool messages, then runs ONE new
+        # tool ("new1") and replies.
+        old_ai = AIMessage(content="")
+        old_ai.tool_calls = [{"name": "web_search", "args": {"q": "a"}, "id": "old1"}]
+        old_tm = ToolMessage(content="old result", tool_call_id="old1", name="web_search")
+        new_ai = AIMessage(content="")
+        new_ai.tool_calls = [{"name": "web_search", "args": {"q": "b"}, "id": "new1"}]
+        new_tm = ToolMessage(content="new result", tool_call_id="new1", name="web_search")
+        final = _make_langchain_message("assistant", content="done")
+
+        def fake_stream(**kwargs):
+            yield ("updates", {"model": {"messages": [HumanMessage(content="again"), old_ai]}})
+            yield ("updates", {"tools": {"messages": [old_tm]}})
+            yield ("updates", {"model": {"messages": [new_ai]}})
+            yield ("updates", {"tools": {"messages": [new_tm]}})
+            yield ("updates", {"model": {"messages": [final]}})
+
+        agent._agent.stream.return_value = fake_stream()
+        agent.tool_start_callback = lambda i, n, a: starts.append((i, n, a))
+        agent.tool_complete_callback = lambda i, n, a, r: completes.append((i, n, a, r))
+
+        agent.run_conversation(user_message="again", conversation_history=history)
+
+        # Only the new tool fires; the re-surfaced historical "old1" is skipped.
+        assert starts == [("new1", "web_search", {"q": "b"})]
+        assert completes == [("new1", "web_search", {"q": "b"}, "new result")]
+
+    # --- text-embedded tool-call recovery (vLLM / quantized model drift) -----
+    # Recover tool calls a server returned as ``<model_tool_calls>`` text
+    # (vLLM without a matching --tool-call-parser / quantized model drift)
+    # instead of structured tool_calls.
+    _XML = (
+        "<model_tool_calls>\n"
+        '<tool name="web_search">\n'
+        "<query>\nEspaña vs Cabo Verde resultado</query>\n"
+        "</tool>\n"
+        "</model_tool_calls>"
+    )
+
+    def test_parse_observed_format(self):
+        from agent.deep_agents_runtime import _parse_text_tool_calls
+
+        calls = _parse_text_tool_calls(self._XML)
+        assert len(calls) == 1
+        assert calls[0]["name"] == "web_search"
+        assert calls[0]["args"] == {"query": "España vs Cabo Verde resultado"}
+        assert calls[0]["id"]
+
+    def test_parse_multiple_tools_and_args(self):
+        from agent.deep_agents_runtime import _parse_text_tool_calls
+
+        xml = (
+            "<model_tool_calls>"
+            '<tool name="web_search"><query>a</query><count>3</count></tool>'
+            '<tool name="web_extract"><url>http://x</url></tool>'
+            "</model_tool_calls>"
+        )
+        calls = _parse_text_tool_calls(xml)
+        assert [c["name"] for c in calls] == ["web_search", "web_extract"]
+        assert calls[0]["args"] == {"query": "a", "count": "3"}
+        assert calls[1]["args"] == {"url": "http://x"}
+
+    def test_parse_plain_text_returns_empty(self):
+        from agent.deep_agents_runtime import _parse_text_tool_calls
+
+        assert _parse_text_tool_calls("just a normal answer, no tools") == []
+
+    def test_parse_unclosed_wrapper(self):
+        from agent.deep_agents_runtime import _parse_text_tool_calls
+
+        xml = '<model_tool_calls><tool name="web_search"><query>x</query></tool>'
+        calls = _parse_text_tool_calls(xml)
+        assert calls and calls[0]["name"] == "web_search"
+
+    def test_strip_removes_block(self):
+        from agent.deep_agents_runtime import _strip_text_tool_calls
+
+        assert _strip_text_tool_calls(f"before {self._XML} after") == "before  after"
+
+    def test_repair_chat_result_populates_tool_calls(self):
+        from langchain_core.outputs import ChatGeneration, ChatResult
+        from langchain_core.messages import AIMessage
+        from agent.deep_agents_runtime import _repair_chat_result
+
+        msg = AIMessage(content=f"Voy a buscar.\n{self._XML}")
+        result = ChatResult(generations=[ChatGeneration(message=msg)])
+        _repair_chat_result(result)
+        assert msg.tool_calls and msg.tool_calls[0]["name"] == "web_search"
+        assert "<model_tool_calls>" not in msg.content
+        assert msg.content == "Voy a buscar."
+
+    def test_repair_chat_result_noop_when_already_structured(self):
+        from langchain_core.outputs import ChatGeneration, ChatResult
+        from langchain_core.messages import AIMessage
+        from agent.deep_agents_runtime import _repair_chat_result
+
+        msg = AIMessage(content="hi")
+        msg.tool_calls = [{"name": "x", "args": {}, "id": "real1"}]
+        result = ChatResult(generations=[ChatGeneration(message=msg)])
+        _repair_chat_result(result)
+        assert msg.tool_calls == [{"name": "x", "args": {}, "id": "real1"}]
+        assert msg.content == "hi"
+
+    def test_repair_stream_hides_xml_and_synthesizes_tool_call(self):
+        from langchain_core.outputs import ChatGenerationChunk
+        from langchain_core.messages import AIMessageChunk
+        from agent.deep_agents_runtime import _repair_stream
+
+        # Stream the visible preamble then the XML, token by token.
+        tokens = ["Voy ", "a buscar.\n", *list(self._XML)]
+        src = (
+            ChatGenerationChunk(message=AIMessageChunk(content=t)) for t in tokens
+        )
+        out = list(_repair_stream(src))
+
+        merged = None
+        for ch in out:
+            merged = ch.message if merged is None else merged + ch.message
+
+        assert "<model_tool_calls>" not in merged.content
+        assert merged.content.strip() == "Voy a buscar."
+        assert merged.tool_calls and merged.tool_calls[0]["name"] == "web_search"
+        assert merged.tool_calls[0]["args"] == {
+            "query": "España vs Cabo Verde resultado"
+        }
+
+    def test_repair_stream_passes_through_structured_tool_chunks(self):
+        from langchain_core.outputs import ChatGenerationChunk
+        from langchain_core.messages import AIMessageChunk
+        from agent.deep_agents_runtime import _repair_stream
+
+        # Server already returned a real structured tool chunk — don't touch it.
+        real = ChatGenerationChunk(
+            message=AIMessageChunk(
+                content="",
+                tool_call_chunks=[
+                    {"name": "web_search", "args": '{"q":"x"}', "id": "r1", "index": 0}
+                ],
+            )
+        )
+        out = list(_repair_stream(iter([real])))
+        assert len(out) == 1 and out[0] is real
 
     def test_streaming_path_no_callbacks_runs_sync(self):
         """Without callbacks, run_conversation degrades to sync path."""
@@ -373,59 +741,43 @@ class TestStreamingEndToEnd:
         agent._agent.stream.assert_not_called()
 
     def test_streaming_bridge_event_routing(self):
-        """Bridge routes AIMessageChunk to stream_delta, ToolCall to tool_progress."""
+        """Bridge routes messages-mode chunks to stream_delta and updates-mode
+        tool calls to tool_start/tool_progress."""
+        from langchain_core.messages import AIMessage, AIMessageChunk
         from agent.deep_agents_runtime import _HermesStreamingBridge
 
         deltas = []
-        tools = []
+        starts = []
+        progress = []
 
         bridge = _HermesStreamingBridge(
             agent=MagicMock(),
             stream_delta=lambda x: deltas.append(x),
-            tool_progress=lambda a, **kw: tools.append((a, kw)),
+            tool_start=lambda i, n, a: starts.append((i, n, a)),
+            tool_progress=lambda a, *rest: progress.append(a),
         )
 
-        bridge.process_event({
-            "events": [
-                {"type": "AIMessageChunk", "data": {"content": "stream "}},
-                {
-                    "type": "ToolCall",
-                    "data": {"name": "read_file", "args": {"path": "x.txt"}},
-                },
-            ]
-        })
+        bridge.process_stream_item(("messages", (AIMessageChunk(content="stream "), {})))
+        ai = AIMessage(content="")
+        ai.tool_calls = [{"name": "read_file", "args": {"path": "x.txt"}, "id": "c1"}]
+        bridge.process_stream_item(("updates", {"model": {"messages": [ai]}}))
 
         assert "stream " in deltas
-        assert len(tools) == 1
-        assert tools[0][0] == "tool.started"
-        assert tools[0][1]["tool_name"] == "read_file"
+        assert starts == [("c1", "read_file", {"path": "x.txt"})]
+        assert progress == ["tool.started"]
 
-    def test_streaming_bridge_output_event_yields_final_response(self):
-        """Bridge processes output events and extracts final_response text."""
-        from agent.deep_agents_runtime import _HermesStreamingBridge
-
-        deltas = []
-        bridge = _HermesStreamingBridge(
-            agent=MagicMock(),
-            stream_delta=lambda x: deltas.append(x),
-        )
-
-        bridge.process_event({"output": {"final_response": "done!", "api_calls": 2}})
-        bridge.process_event({"output": "plain text fallback"})
-
-        assert "done!" in deltas
-        assert "plain text fallback" in deltas
-
-    def test_streaming_bridge_handles_non_dicts_gracefully(self):
-        """Non-dict events in the stream don't crash the bridge."""
+    def test_streaming_bridge_handles_non_items_gracefully(self):
+        """Malformed stream items don't crash the bridge."""
         from agent.deep_agents_runtime import _HermesStreamingBridge
 
         bridge = _HermesStreamingBridge(agent=MagicMock())
 
-        bridge.process_event("string event")
-        bridge.process_event(None)
-        bridge.process_event(123)
-        bridge.process_event(["list", "of", "items"])
+        bridge.process_stream_item("string event")
+        bridge.process_stream_item(None)
+        bridge.process_stream_item(123)
+        bridge.process_stream_item(["list", "of", "items"])
+        bridge.process_stream_item(("messages", None))
+        bridge.process_stream_item(("updates", "not-a-dict"))
 
         # Should not raise
 
@@ -535,71 +887,202 @@ class TestToolDispatcherEndToEnd:
             assert "error" in result_obj
             assert "no such file" in result_obj["error"]
 
-    def test_build_hermes_tools_creates_tools_from_registry(self):
-        """build_hermes_tools queries the registry and returns adapters."""
+    def test_build_hermes_tools_creates_tools_from_definitions(self):
+        """build_hermes_tools resolves via get_tool_definitions and returns
+        a StructuredTool per definition."""
         from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
 
-        mock_entry = types.SimpleNamespace(
-            name="list_files",
-            toolset="terminal",
-            schema={
-                "name": "list_files",
-                "description": "list files",
-                "parameters": {},
-            },
-            description="list files",
-        )
-        mock_reg = MagicMock()
-        mock_reg.get_definitions.return_value = [{"name": "list_files"}]
-        mock_reg.registry = mock_reg  # Make MagicMock return itself for attr access
-        mock_reg.get_entry.return_value = mock_entry
-
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
+        definitions = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_files",
+                    "description": "list files",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                    },
+                },
+            }
+        ]
+        with patch.object(
+            model_tools, "get_tool_definitions", return_value=definitions
+        ):
             tools = build_hermes_tools(
                 enabled_toolsets=["terminal"], disabled_toolsets=[]
             )
-            assert len(tools) == 1
-            assert hasattr(tools[0], "func")  # StructuredTool has .func
-        finally:
-            if saved is not None:
-                sys.modules["tools.registry"] = saved
-            else:
-                sys.modules.pop("tools.registry", None)
+        assert len(tools) == 1
+        assert tools[0].name == "list_files"
+        assert hasattr(tools[0], "func")  # StructuredTool has .func
+        assert "path" in tools[0].args  # parameter schema forwarded
 
-    def test_build_hermes_tools_empty_on_missing_entry(self):
-        """Tools with None registry entry are skipped."""
+    def test_build_hermes_tools_includes_bridge_tools(self):
+        """tool_search/tool_describe/tool_call have no registry entry yet must
+        still be adapted (tool-search assembly emits them for big catalogs)."""
         from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
 
-        mock_reg = MagicMock()
-        mock_reg.get_definitions.return_value = [{"name": "missing"}]
-        mock_reg.registry = mock_reg
-        mock_reg.get_entry.return_value = None
+        definitions = [
+            {"type": "function", "function": {"name": "tool_search", "parameters": {}}},
+            {"type": "function", "function": {"name": "tool_call", "parameters": {}}},
+        ]
+        with patch.object(
+            model_tools, "get_tool_definitions", return_value=definitions
+        ):
+            tools = build_hermes_tools(enabled_toolsets=["x"], disabled_toolsets=[])
+        assert {t.name for t in tools} == {"tool_search", "tool_call"}
 
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
-            tools = build_hermes_tools(enabled_toolsets=[], disabled_toolsets=[])
-            assert tools == []
-        finally:
-            sys.modules.pop("tools.registry", None)
-
-    def test_build_hermes_tools_handles_registry_exception(self):
-        """If registry.get_definitions raises, an empty list is returned."""
+    def test_build_hermes_tools_handles_resolution_exception(self):
+        """If get_tool_definitions raises, an empty list is returned."""
         from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
 
-        mock_reg = MagicMock()
-        mock_reg.get_definitions.side_effect = ImportError("registry gone")
-        mock_reg.registry = mock_reg
-
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
+        with patch.object(
+            model_tools,
+            "get_tool_definitions",
+            side_effect=ImportError("registry gone"),
+        ):
             tools = build_hermes_tools(enabled_toolsets=[], disabled_toolsets=[])
-            assert tools == []
-        finally:
-            sys.modules.pop("tools.registry", None)
+        assert tools == []
+
+
+class TestEnsureMcpDiscovery:
+    """The deepagents runtime bakes tools once, so it must block until MCP
+    discovery completes before building (unlike native, which re-snapshots)."""
+
+    def _make_agent(self, timeout=42.0):
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        agent = object.__new__(DeepAgentsAIAgent)
+        object.__setattr__(agent, "_mcp_discovery_timeout", timeout)
+        return agent
+
+    def test_waits_for_background_discovery_when_running(self):
+        import hermes_cli.mcp_startup as ms
+        import tools.mcp_tool as mt
+
+        agent = self._make_agent(timeout=55.0)
+        with patch(
+            "hermes_cli.config.read_raw_config",
+            return_value={"mcp_servers": {"nyxstrike": {}}},
+        ), patch.object(ms, "_mcp_discovery_started", True), patch.object(
+            ms, "_mcp_discovery_thread", MagicMock()
+        ), patch.object(
+            ms, "wait_for_mcp_discovery"
+        ) as wait, patch.object(
+            mt, "discover_mcp_tools"
+        ) as disc:
+            agent._ensure_mcp_discovery()
+        # Joins the in-flight thread with our generous timeout; does NOT race
+        # it with a second discovery pass.
+        wait.assert_called_once_with(timeout=55.0)
+        assert not disc.called
+
+    def test_runs_synchronous_discovery_when_not_started(self):
+        import hermes_cli.mcp_startup as ms
+        import tools.mcp_tool as mt
+
+        agent = self._make_agent()
+        with patch(
+            "hermes_cli.config.read_raw_config",
+            return_value={"mcp_servers": {"nyxstrike": {}}},
+        ), patch.object(ms, "_mcp_discovery_started", False), patch.object(
+            ms, "_mcp_discovery_thread", None
+        ), patch.object(
+            ms, "wait_for_mcp_discovery"
+        ) as wait, patch.object(
+            mt, "discover_mcp_tools"
+        ) as disc:
+            agent._ensure_mcp_discovery()
+        disc.assert_called_once()
+        assert not wait.called
+
+    def test_noop_when_no_mcp_servers_configured(self):
+        import hermes_cli.mcp_startup as ms
+        import tools.mcp_tool as mt
+
+        agent = self._make_agent()
+        with patch(
+            "hermes_cli.config.read_raw_config", return_value={"mcp_servers": {}}
+        ), patch.object(ms, "wait_for_mcp_discovery") as wait, patch.object(
+            mt, "discover_mcp_tools"
+        ) as disc:
+            agent._ensure_mcp_discovery()
+        assert not wait.called and not disc.called
+
+    def test_never_raises_on_discovery_failure(self):
+        import tools.mcp_tool as mt
+
+        agent = self._make_agent()
+        with patch(
+            "hermes_cli.config.read_raw_config",
+            return_value={"mcp_servers": {"nyxstrike": {}}},
+        ), patch("hermes_cli.mcp_startup._mcp_discovery_started", False), patch(
+            "hermes_cli.mcp_startup._mcp_discovery_thread", None
+        ), patch.object(
+            mt, "discover_mcp_tools", side_effect=RuntimeError("boom")
+        ):
+            # Must not propagate — construction proceeds with available tools.
+            agent._ensure_mcp_discovery()
+
+
+class TestRebuildAgent:
+    """The compiled LangGraph graph bakes its tool list, so picking up new MCP
+    tools means recompiling and atomically swapping the graph in place."""
+
+    def _make_agent(self):
+        import threading
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        agent = object.__new__(DeepAgentsAIAgent)
+        object.__setattr__(agent, "_agent", MagicMock(name="old_graph"))
+        object.__setattr__(agent, "_agent_lock", threading.Lock())
+        object.__setattr__(
+            agent, "_build_kwargs", {"model": "m", "enabled_toolsets": ["x"]}
+        )
+        return agent
+
+    def test_rebuild_swaps_in_new_graph(self):
+        agent = self._make_agent()
+        old = agent._agent
+        new_graph = MagicMock(name="new_graph")
+        object.__setattr__(
+            agent, "_build_langgraph_agent", MagicMock(return_value=new_graph)
+        )
+
+        assert agent.rebuild_agent() is True
+        assert agent._agent is new_graph and agent._agent is not old
+        agent._build_langgraph_agent.assert_called_once_with(**agent._build_kwargs)
+
+    def test_rebuild_keeps_old_graph_on_failure(self):
+        agent = self._make_agent()
+        old = agent._agent
+        object.__setattr__(
+            agent,
+            "_build_langgraph_agent",
+            MagicMock(side_effect=RuntimeError("compile boom")),
+        )
+
+        assert agent.rebuild_agent() is False
+        assert agent._agent is old  # unchanged — session stays usable
+
+    def test_rebuild_without_build_kwargs_returns_false(self):
+        agent = self._make_agent()
+        object.__setattr__(agent, "_build_kwargs", None)
+        object.__setattr__(
+            agent, "_build_langgraph_agent", MagicMock(return_value=MagicMock())
+        )
+
+        assert agent.rebuild_agent() is False
+        agent._build_langgraph_agent.assert_not_called()
+
+    def test_current_agent_returns_live_graph(self):
+        agent = self._make_agent()
+        assert agent._current_agent() is agent._agent
+        new_graph = MagicMock()
+        object.__setattr__(agent, "_agent", new_graph)
+        assert agent._current_agent() is new_graph
 
 
 # ---------------------------------------------------------------------------

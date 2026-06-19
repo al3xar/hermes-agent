@@ -1,0 +1,48 @@
+{{- if and .Values.langfuse.enabled .Values.langfuse.ingress.enabled }}
+# Expone el dashboard de Langfuse en su propio dominio (langfuse.ingress.host).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-web
+  annotations:
+    {{- with .Values.langfuse.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.langfuse.ingress.basicAuth.enabled }}
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: {{ .Values.langfuse.ingress.basicAuth.existingSecret | default (printf "%s-langfuse-basic-auth" (include "hades.fullname" .)) }}
+    nginx.ingress.kubernetes.io/auth-realm: "Langfuse - authentication required"
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.langfuse.ingress.className }}
+  {{- if .Values.langfuse.ingress.tls.enabled }}
+  tls:
+    - hosts: [{{ .Values.langfuse.ingress.host | quote }}]
+      secretName: {{ .Values.langfuse.ingress.tls.secretName | default (printf "%s-langfuse-tls" (include "hades.fullname" .)) }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.langfuse.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: langfuse-web
+                port:
+                  number: {{ .Values.langfuse.web.port }}
+{{- end }}
+{{- if and .Values.langfuse.enabled .Values.langfuse.ingress.enabled .Values.langfuse.ingress.basicAuth.enabled (not .Values.langfuse.ingress.basicAuth.existingSecret) }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-basic-auth
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-web
+type: Opaque
+stringData:
+  auth: {{ htpasswd .Values.langfuse.ingress.basicAuth.username .Values.langfuse.ingress.basicAuth.password | quote }}
+{{- end }}

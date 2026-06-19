@@ -462,6 +462,34 @@ class AIAgent:
                 session_id=session_id,
                 platform=platform,
             )
+            # Forward display callbacks / request config passed at construction
+            # to the deepagents impl. The native path routes these through
+            # ``init_agent``; here they would otherwise be dropped, so the
+            # streaming bridge gets ``None`` and the UI shows no tool / thinking
+            # / status chrome (only text streams, via run_conversation's
+            # stream_callback). The TUI and CLI pass these as constructor
+            # kwargs; the gateway sets them post-init, so only TUI/CLI were
+            # affected. ``__setattr__`` captures _CAPTURED_NAMES into the impl.
+            for _name, _val in (
+                ("tool_progress_callback", tool_progress_callback),
+                ("tool_start_callback", tool_start_callback),
+                ("tool_complete_callback", tool_complete_callback),
+                ("thinking_callback", thinking_callback),
+                ("reasoning_callback", reasoning_callback),
+                ("clarify_callback", clarify_callback),
+                ("step_callback", step_callback),
+                ("stream_delta_callback", stream_delta_callback),
+                ("interim_assistant_callback", interim_assistant_callback),
+                ("tool_gen_callback", tool_gen_callback),
+                ("status_callback", status_callback),
+                ("notice_callback", notice_callback),
+                ("notice_clear_callback", notice_clear_callback),
+                ("reasoning_config", reasoning_config),
+                ("service_tier", service_tier),
+                ("request_overrides", request_overrides),
+            ):
+                if _val is not None:
+                    setattr(self, _name, _val)
             return
         from agent.agent_init import init_agent
 
@@ -656,6 +684,28 @@ class AIAgent:
             except AttributeError:
                 pass
         raise AttributeError(f"'{type(self).__name__}' object has no attr '{name}'")
+
+    @property
+    def active_runtime(self) -> str:
+        """Return the execution backend that was *actually instantiated*.
+
+        Unlike the ``deepagents_mode`` config flag (which only states intent),
+        this reflects the live object graph: it returns ``"deepagents"`` only
+        when a ``DeepAgentsAIAgent`` impl was built and self-reports its mode,
+        and ``"native"`` otherwise. Use it to surface/verify the running
+        runtime (TUI status bar, diagnostics) instead of trusting config — a
+        misconfigured or failed deepagents init would never claim deepagents
+        here, because no impl exists to claim it.
+        """
+        try:
+            mode = object.__getattribute__(self, "_runtime_mode")
+        except AttributeError:
+            return "native"
+        if mode == "deepagents":
+            impl = getattr(self, "_deep_agents_impl", None)
+            if impl is not None and getattr(impl, "mode", None) == "deepagents":
+                return "deepagents"
+        return "native"
 
     def _get_session_db_for_recall(self):
         """Return a SessionDB for recall, lazily creating it if an entrypoint forgot.

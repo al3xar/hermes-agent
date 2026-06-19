@@ -8,6 +8,7 @@ import {
   estimateRows,
   estimateTokensRough,
   fmtK,
+  formatToolCall,
   hasAnsi,
   isToolTrailResultLine,
   lastCotTrailIndex,
@@ -17,7 +18,9 @@ import {
   sanitizeAnsiForRender,
   splitToolDuration,
   stripAnsi,
-  thinkingPreview
+  thinkingPreview,
+  toolEmoji,
+  toolTrailLabel
 } from '../lib/text.js'
 
 describe('isToolTrailResultLine', () => {
@@ -28,13 +31,34 @@ describe('isToolTrailResultLine', () => {
   })
 })
 
+describe('toolTrailLabel / toolEmoji', () => {
+  it('prefixes the registry emoji and title-cases the name', () => {
+    expect(toolTrailLabel('terminal')).toBe('💻 Terminal')
+    expect(toolTrailLabel('skills_list')).toBe('📚 Skills List')
+    expect(toolTrailLabel('read_file')).toBe('📖 Read File')
+  })
+
+  it('falls back to ⚡ for unmapped tools, like the CLI default', () => {
+    expect(toolEmoji('task')).toBe('⚡')
+    expect(toolTrailLabel('some_unknown_tool')).toBe('⚡ Some Unknown Tool')
+  })
+
+  it('keeps dedup grouping consistent with formatToolCall output', () => {
+    // sameToolTrailGroup compares toolTrailLabel against a formatToolCall line;
+    // both must carry the emoji or completed tools never replace live ones.
+    const label = toolTrailLabel('terminal')
+    const line = formatToolCall('terminal', 'npm test')
+    expect(sameToolTrailGroup(label, `${line} ✓`)).toBe(true)
+  })
+})
+
 describe('buildToolTrailLine', () => {
   it('puts completion duration inline before the result marker', () => {
     const line = buildToolTrailLine('read_file', 'x', false, '', 0.94)
 
-    expect(line).toBe('Read File("x") (0.9s) ✓')
-    expect(parseToolTrailResultLine(line)).toEqual({ call: 'Read File("x") (0.9s)', detail: '', mark: '✓' })
-    expect(splitToolDuration('Read File("x") (0.9s)')).toEqual({ label: 'Read File("x")', duration: ' (0.9s)' })
+    expect(line).toBe('📖 Read File("x") (0.9s) ✓')
+    expect(parseToolTrailResultLine(line)).toEqual({ call: '📖 Read File("x") (0.9s)', detail: '', mark: '✓' })
+    expect(splitToolDuration('📖 Read File("x") (0.9s)')).toEqual({ label: '📖 Read File("x")', duration: ' (0.9s)' })
   })
 })
 
@@ -52,7 +76,7 @@ describe('buildVerboseToolTrailLine', () => {
     expect(line).toContain('Args:\n{')
     expect(line).toContain('Result:\nfirst line\nsecond :: line')
     expect(parseToolTrailResultLine(line)).toEqual({
-      call: 'Terminal("npm test") (1.3s)',
+      call: '💻 Terminal("npm test") (1.3s)',
       detail: 'Args:\n{\n  "cmd": "npm test"\n}\nResult:\nfirst line\nsecond :: line',
       mark: '✓'
     })
@@ -64,7 +88,7 @@ describe('buildVerboseToolTrailLine', () => {
     expect(line).toContain('Error:\ncommand failed')
     expect(line).not.toContain('Result:\ncommand failed')
     expect(parseToolTrailResultLine(line)).toEqual({
-      call: 'Terminal("npm test") (0.5s)',
+      call: '💻 Terminal("npm test") (0.5s)',
       detail: 'Error:\ncommand failed',
       mark: '✗'
     })

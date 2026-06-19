@@ -56,6 +56,9 @@ services:
       - API_SERVER_KEY=dev-key-change-me
       - HERMES_GATEWAY_BOOTSTRAP_STATE=running
       - GATEWAY_ALLOW_ALL_USERS=true
+      # TUI/dashboard chat toolset (platform_toolsets does not cover the TUI).
+      # Keep in sync with platform_toolsets.cli so web_search etc. are bound.
+      - HERMES_TUI_TOOLSETS=terminal,web,browser,file,skills,todo,delegation
     command: ["sleep", "infinity"]
 
   dashboard:
@@ -81,6 +84,12 @@ services:
       - HERMES_HOME=/opt/data
       - HERMES_DASHBOARD=1
       - HERMES_DASHBOARD_INSECURE=1
+      # The dashboard chat (TUI) resolves its toolset via HERMES_TUI_TOOLSETS,
+      # NOT platform_toolsets (which only applies to native gateway platforms
+      # like cli/telegram). Without this it falls back to the coding default —
+      # which omits `web`, so web_search isn't bound and the model hallucinates
+      # the call as text. Keep this in sync with platform_toolsets.cli.
+      - HERMES_TUI_TOOLSETS=terminal,web,browser,file,skills,todo,delegation
       - ATHENA_VLLM_KEY=${ATHENA_VLLM_KEY}
       - HERMES_LANGFUSE_PUBLIC_KEY=${HERMES_LANGFUSE_PUBLIC_KEY:-pk-lf-dev}
       - HERMES_LANGFUSE_SECRET_KEY=${HERMES_LANGFUSE_SECRET_KEY:-sk-lf-dev}

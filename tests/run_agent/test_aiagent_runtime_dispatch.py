@@ -54,6 +54,96 @@ def test_runtime_deepagents_dispatches_to_init_deepagents(monkeypatch):
     assert agent._runtime_mode == "deepagents"
 
 
+def test_active_runtime_reflects_instantiated_impl(monkeypatch):
+    """``active_runtime`` validates the *live* impl, not the config flag: it
+    reports 'deepagents' only when a DeepAgentsAIAgent impl self-reports it."""
+    import types
+
+    def fake_init_deepagents(self, **kwargs):
+        self._runtime_mode = "deepagents"
+        self._deep_agents_impl = types.SimpleNamespace(mode="deepagents")
+
+    monkeypatch.setattr(
+        run_agent.AIAgent, "_init_deepagents", fake_init_deepagents, raising=True
+    )
+    monkeypatch.setattr(
+        "agent.agent_init.init_agent",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("native must not run")),
+        raising=True,
+    )
+
+    agent = run_agent.AIAgent(runtime="deepagents", model="m", skip_memory=True)
+    assert agent.active_runtime == "deepagents"
+
+
+def test_active_runtime_falls_back_to_native_without_live_impl(monkeypatch):
+    """A deepagents flag with no real impl (failed/partial init) must NOT
+    masquerade as deepagents — there's no impl to claim it."""
+
+    def fake_init_deepagents(self, **kwargs):
+        # Flag set, but no DeepAgentsAIAgent self-reporting its mode.
+        self._runtime_mode = "deepagents"
+        self._deep_agents_impl = object()
+
+    monkeypatch.setattr(
+        run_agent.AIAgent, "_init_deepagents", fake_init_deepagents, raising=True
+    )
+
+    agent = run_agent.AIAgent(runtime="deepagents", model="m", skip_memory=True)
+    assert agent.active_runtime == "native"
+
+
+def test_active_runtime_native_by_default(monkeypatch):
+    monkeypatch.setattr(
+        "agent.agent_init.init_agent", lambda *a, **k: None, raising=True
+    )
+    agent = run_agent.AIAgent(model="m")
+    assert agent.active_runtime == "native"
+
+
+def test_deepagents_branch_forwards_display_callbacks(monkeypatch):
+    """Callbacks passed to ``AIAgent(...)`` at construction (as the TUI and CLI
+    do) must reach the deepagents impl — otherwise the streaming bridge gets
+    ``None`` and the UI shows no tool / thinking chrome (text streams only via
+    run_conversation's stream_callback). The gateway sets them post-init so it
+    was unaffected; the TUI/CLI construction path was not."""
+    import types
+
+    def fake_init_deepagents(self, **kwargs):
+        self._runtime_mode = "deepagents"
+        # SimpleNamespace records forwarded attrs like the real impl's
+        # __setattr__ capture into _callbacks.
+        self._deep_agents_impl = types.SimpleNamespace(mode="deepagents")
+
+    monkeypatch.setattr(
+        run_agent.AIAgent, "_init_deepagents", fake_init_deepagents, raising=True
+    )
+
+    cb_start = lambda *a: None
+    cb_complete = lambda *a: None
+    cb_gen = lambda *a: None
+    cb_think = lambda *a: None
+    cb_progress = lambda *a, **k: None
+
+    agent = run_agent.AIAgent(
+        runtime="deepagents",
+        model="m",
+        skip_memory=True,
+        tool_start_callback=cb_start,
+        tool_complete_callback=cb_complete,
+        tool_gen_callback=cb_gen,
+        thinking_callback=cb_think,
+        tool_progress_callback=cb_progress,
+    )
+
+    impl = agent._deep_agents_impl
+    assert impl.tool_start_callback is cb_start
+    assert impl.tool_complete_callback is cb_complete
+    assert impl.tool_gen_callback is cb_gen
+    assert impl.thinking_callback is cb_think
+    assert impl.tool_progress_callback is cb_progress
+
+
 def test_runtime_native_uses_standard_init(monkeypatch):
     seen = {}
 

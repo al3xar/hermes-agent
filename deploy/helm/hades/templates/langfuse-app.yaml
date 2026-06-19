@@ -1,0 +1,128 @@
+{{- if .Values.langfuse.enabled }}
+{{- $nextauthUrl := printf "http://langfuse-web:%v" .Values.langfuse.web.port -}}
+{{- if .Values.langfuse.ingress.enabled }}
+{{- $scheme := ternary "https" "http" .Values.langfuse.ingress.tls.enabled -}}
+{{- $nextauthUrl = printf "%s://%s" $scheme .Values.langfuse.ingress.host -}}
+{{- end }}
+{{- with .Values.langfuse.web.publicUrl }}
+{{- $nextauthUrl = . -}}
+{{- end }}
+# Langfuse web (UI/API) — Service langfuse-web:3000, igual que el docker-compose.
+# Hades apunta aquí vía langfuseBaseUrl. NEXTAUTH_URL usa el dominio público del
+# Ingress para que el login desde el navegador funcione.
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-web
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-web
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.langfuse.web.port }}
+      targetPort: {{ .Values.langfuse.web.port }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: langfuse-web
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-web
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-web
+spec:
+  replicas: {{ .Values.langfuse.web.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: langfuse-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: langfuse-web
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      hostAliases:
+        - ip: {{ .Values.vllm.ip | quote }}
+          hostnames: [{{ .Values.vllm.host | quote }}]
+      containers:
+        - name: langfuse-web
+          image: {{ .Values.langfuse.web.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.langfuse.web.port }}
+          env:
+            {{- include "hades.langfuse.commonEnv" . | nindent 12 }}
+            # El server Next.js de Langfuse se enlaza a $HOSTNAME, que K8s
+            # sobreescribe con el nombre del pod (escucharía solo en la IP del
+            # pod). Forzamos 0.0.0.0 para que sirva en todas las interfaces
+            # (necesario p.ej. para `kubectl port-forward`, que usa loopback).
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: NEXTAUTH_URL
+              value: {{ $nextauthUrl | quote }}
+            - name: LANGFUSE_INIT_ORG_ID
+              value: {{ .Values.langfuse.init.orgId | quote }}
+            - name: LANGFUSE_INIT_ORG_NAME
+              value: {{ .Values.langfuse.init.orgName | quote }}
+            - name: LANGFUSE_INIT_PROJECT_ID
+              value: {{ .Values.langfuse.init.projectId | quote }}
+            - name: LANGFUSE_INIT_PROJECT_NAME
+              value: {{ .Values.langfuse.init.projectName | quote }}
+            - name: LANGFUSE_INIT_USER_EMAIL
+              value: {{ .Values.langfuse.init.userEmail | quote }}
+            - name: LANGFUSE_INIT_USER_NAME
+              value: {{ .Values.langfuse.init.userName | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ include "hades.langfuse.secretName" . }}
+          readinessProbe:
+            httpGet:
+              path: /api/public/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+---
+# Langfuse worker — procesa la cola de ingest (sin Service, no expone puertos).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-worker
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-worker
+spec:
+  replicas: {{ .Values.langfuse.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: langfuse-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: langfuse-worker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      hostAliases:
+        - ip: {{ .Values.vllm.ip | quote }}
+          hostnames: [{{ .Values.vllm.host | quote }}]
+      containers:
+        - name: langfuse-worker
+          image: {{ .Values.langfuse.worker.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "hades.langfuse.commonEnv" . | nindent 12 }}
+          envFrom:
+            - secretRef:
+                name: {{ include "hades.langfuse.secretName" . }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}

@@ -70,6 +70,57 @@ def test_build_welcome_banner_uses_normalized_toolset_names():
     assert "web_tools:" not in output
 
 
+def test_build_welcome_banner_shows_runtime_when_provided():
+    """The welcome banner surfaces the active execution runtime so users can
+    confirm deepagents vs native at chat startup."""
+    with (
+        patch.object(
+            model_tools, "check_tool_availability", return_value=(["files"], [])
+        ),
+        patch.object(banner, "get_available_skills", return_value={}),
+        patch.object(banner, "get_update_result", return_value=None),
+        patch.object(tools.mcp_tool, "get_mcp_status", return_value=[]),
+    ):
+        console = Console(
+            record=True, force_terminal=False, color_system=None, width=160
+        )
+        banner.build_welcome_banner(
+            console=console,
+            model="nvidia/Qwen3.6-35B",
+            cwd="/tmp/project",
+            tools=[{"function": {"name": "read_file"}}],
+            get_toolset_for_tool=lambda name: "file",
+            runtime="deepagents",
+        )
+
+    output = console.export_text()
+    assert "Runtime: deepagents" in output
+
+
+def test_build_welcome_banner_omits_runtime_when_absent():
+    """Without an explicit runtime the banner shows no Runtime line."""
+    with (
+        patch.object(
+            model_tools, "check_tool_availability", return_value=(["files"], [])
+        ),
+        patch.object(banner, "get_available_skills", return_value={}),
+        patch.object(banner, "get_update_result", return_value=None),
+        patch.object(tools.mcp_tool, "get_mcp_status", return_value=[]),
+    ):
+        console = Console(
+            record=True, force_terminal=False, color_system=None, width=160
+        )
+        banner.build_welcome_banner(
+            console=console,
+            model="nvidia/Qwen3.6-35B",
+            cwd="/tmp/project",
+            tools=[{"function": {"name": "read_file"}}],
+            get_toolset_for_tool=lambda name: "file",
+        )
+
+    assert "Runtime:" not in console.export_text()
+
+
 def test_build_welcome_banner_title_is_hyperlinked_to_release():
     """Panel title (version label) is wrapped in an OSC-8 hyperlink to the GitHub release."""
     import io

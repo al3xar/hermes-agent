@@ -1,0 +1,313 @@
+{{- if .Values.langfuse.enabled }}
+# Datastores de Langfuse v3 (postgres, clickhouse, redis, minio).
+# Réplica del docker-compose: Services con los mismos nombres (langfuse-db,
+# langfuse-clickhouse, langfuse-redis, langfuse-minio) para que las URLs
+# internas de web/worker resuelvan sin cambios. Persistencia vía PVC.
+#
+# ----------------------------- Postgres -------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-db
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-db
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.langfuse.postgres.storage | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-db
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-db
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: langfuse-db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-db
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: langfuse-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: langfuse-db
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.langfuse.postgres.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: TZ
+              value: "UTC"
+            - name: PGTZ
+              value: "UTC"
+          envFrom:
+            - secretRef:
+                name: {{ include "hades.langfuse.secretName" . }}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.langfuse.postgres.user | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "hades.fullname" . }}-langfuse-db
+---
+# --------------------------- ClickHouse -------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-clickhouse
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-clickhouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.langfuse.clickhouse.storage | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-clickhouse
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-clickhouse
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+    - name: native
+      port: 9000
+      targetPort: 9000
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: langfuse-clickhouse
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-clickhouse
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-clickhouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: langfuse-clickhouse
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: langfuse-clickhouse
+    spec:
+      securityContext:
+        fsGroup: 101
+      containers:
+        - name: clickhouse
+          image: {{ .Values.langfuse.clickhouse.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8123
+            - containerPort: 9000
+          env:
+            - name: CLICKHOUSE_DB
+              value: "default"
+          envFrom:
+            - secretRef:
+                name: {{ include "hades.langfuse.secretName" . }}
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: logs
+              mountPath: /var/log/clickhouse-server
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "hades.fullname" . }}-langfuse-clickhouse
+        - name: logs
+          emptyDir: {}
+---
+# ------------------------------- Redis --------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-redis
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-redis
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: langfuse-redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-redis
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: langfuse-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: langfuse-redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.langfuse.redis.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "--requirepass"
+            - "$(REDIS_AUTH)"
+            - "--maxmemory-policy"
+            - "noeviction"
+          env:
+            - name: REDIS_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hades.langfuse.secretName" . }}
+                  key: REDIS_AUTH
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+# ------------------------------- MinIO --------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-minio
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-minio
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.langfuse.minio.storage | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-minio
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-minio
+spec:
+  type: ClusterIP
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: langfuse-minio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hades.fullname" . }}-langfuse-minio
+  labels: {{- include "hades.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-minio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: langfuse-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: langfuse-minio
+    spec:
+      containers:
+        - name: minio
+          image: {{ .Values.langfuse.minio.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Crea el bucket (path-style) antes de arrancar, igual que el compose.
+          command: ["sh", "-c"]
+          args:
+            - 'mkdir -p /data/{{ .Values.langfuse.minio.bucket }} && minio server --address ":9000" --console-address ":9001" /data'
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hades.langfuse.secretName" . }}
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hades.langfuse.secretName" . }}
+                  key: MINIO_ROOT_PASSWORD
+          ports:
+            - containerPort: 9000
+            - containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "hades.fullname" . }}-langfuse-minio
+{{- end }}

@@ -2,8 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "hades.fullname" . }}-gateway
-  labels:
-    {{- include "hades.labels" . | nindent 4 }}
+  labels: {{- include "hades.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway
 spec:
   replicas: {{ .Values.gateway.replicaCount }}
@@ -13,6 +12,11 @@ spec:
       app.kubernetes.io/component: gateway
   template:
     metadata:
+      annotations:
+        # Reinicia el pod cuando cambian el ConfigMap (plugins, modelo, MCP) o
+        # los secretos, para que recoja la config nueva (p.ej. activar Langfuse).
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: gateway
@@ -23,13 +27,20 @@ spec:
       hostAliases:
         - ip: {{ .Values.vllm.ip | quote }}
           hostnames: [{{ .Values.vllm.host | quote }}]
+      initContainers:
+        - name: init-config
+          image: busybox:1.37
+          command: ["/bin/sh", "-c", "cp /init/* {{ .Values.hermesHome }}/"]
+          volumeMounts:
+            - name: init-config
+              mountPath: /init
+            - name: data
+              mountPath: {{ .Values.hermesHome }}
       containers:
         - name: gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Mantiene vivo el contenedor (el gateway corre como servicio s6 en
-          # background); espejo del docker-compose `command: [sleep, infinity]`.
-          # Sin esto el wrapper ejecuta el `hermes` interactivo, que sale sin TTY.
+          # Espejo del docker-compose `command: [sleep, infinity]`.
           args: ["sleep", "infinity"]
           ports:
             - name: http
@@ -57,30 +68,26 @@ spec:
             - secretRef:
                 name: {{ include "hades.secretName" . }}
           volumeMounts:
-            - name: config
-              mountPath: {{ .Values.hermesHome }}/config.yaml
-              subPath: config.yaml
-              readOnly: true
+            - name: data
+              mountPath: {{ .Values.hermesHome }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
         {{- if .Values.nyxstrike.sidecar.enabled }}
-        # Sidecar: bridge MCP de NyxStrike en HTTP. Hades lo consume por
-        # http://127.0.0.1:{{ .Values.nyxstrike.mcpPort }}/mcp (mismo pod).
         - name: nyxstrike-mcp
           image: {{ .Values.nyxstrike.sidecar.image | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - {{ .Values.nyxstrike.sidecar.pythonBin | quote }}
-            - {{ .Values.nyxstrike.sidecar.bridgePath | quote }}
+            - {{ .Values.nyxstrike.sidecar.pythonBin | default "/opt/nyxstrike/nyxstrike-env/bin/python3" | quote }}
+            - "/opt/nyxstrike/nyxstrike_mcp.py"
             - "--server"
-            - {{ .Values.nyxstrike.url | quote }}
+            - "{{ .Values.nyxstrike.url }}"
+            - "--profile"
+            - {{ .Values.nyxstrike.profile | quote }}
             - "--transport"
             - "http"
             - "--mcp-host"
             - "127.0.0.1"
             - "--mcp-port"
             - {{ .Values.nyxstrike.mcpPort | quote }}
-            - "--profile"
-            - {{ .Values.nyxstrike.profile | quote }}
             - "--auth-token"
             - "$(NYXSTRIKE_API_TOKEN)"
           env:
@@ -94,23 +101,8 @@ spec:
               containerPort: {{ .Values.nyxstrike.mcpPort }}
         {{- end }}
       volumes:
-        - name: config
+        - name: init-config
           configMap:
-            name: {{ include "hades.fullname" . }}-config
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "hades.fullname" . }}-gateway
-  labels:
-    {{- include "hades.labels" . | nindent 4 }}
-    app.kubernetes.io/component: gateway
-spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: {{ .Values.gateway.port }}
-      targetPort: http
-  selector:
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: gateway
+            name: {{ include "hades.fullname" . }}-init-config
+        - name: data
+          emptyDir: {}

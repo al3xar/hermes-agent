@@ -1144,3 +1144,54 @@ class TestWriteApprovalMigration:
             # gate ends up off and there's no leftover write_mode key.
             assert raw["memory"].get("write_approval", False) is False
             assert "write_mode" not in raw.get("memory", {})
+
+
+class TestResolveDeepagentsMode:
+    """`hermes config` surfaces whether the deepagents runtime is active,
+    using the same precedence as the gateway/TUI/CLI."""
+
+    def test_gateway_section_true(self):
+        from hermes_cli.config import _resolve_deepagents_mode
+
+        assert _resolve_deepagents_mode({"gateway": {"deepagents_mode": True}}) is True
+
+    def test_gateway_section_string_true(self):
+        from hermes_cli.config import _resolve_deepagents_mode
+
+        assert _resolve_deepagents_mode({"gateway": {"deepagents_mode": "yes"}}) is True
+
+    def test_gateway_section_false(self):
+        from hermes_cli.config import _resolve_deepagents_mode
+
+        assert _resolve_deepagents_mode({"gateway": {"deepagents_mode": False}}) is False
+
+    def test_top_level_fallback(self):
+        from hermes_cli.config import _resolve_deepagents_mode
+
+        assert _resolve_deepagents_mode({"deepagents_mode": "on"}) is True
+
+    def test_gateway_section_wins_over_top_level(self):
+        from hermes_cli.config import _resolve_deepagents_mode
+
+        cfg = {"gateway": {"deepagents_mode": True}, "deepagents_mode": False}
+        assert _resolve_deepagents_mode(cfg) is True
+
+    def test_defaults_and_robustness(self):
+        from hermes_cli.config import _resolve_deepagents_mode
+
+        assert _resolve_deepagents_mode({}) is False
+        assert _resolve_deepagents_mode(None) is False
+        assert _resolve_deepagents_mode({"gateway": "not-a-dict"}) is False
+
+    def test_show_config_prints_runtime_line(self, capsys):
+        from hermes_cli import config as cfg_mod
+
+        with patch.object(
+            cfg_mod,
+            "load_config",
+            return_value={"model": "qwen", "gateway": {"deepagents_mode": True}},
+        ):
+            cfg_mod.show_config()
+        out = capsys.readouterr().out
+        assert "Runtime:" in out
+        assert "deepagents" in out

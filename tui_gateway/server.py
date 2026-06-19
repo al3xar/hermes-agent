@@ -2533,6 +2533,10 @@ def _session_info(agent, session: dict | None = None) -> dict:
     info: dict = {
         "model": getattr(agent, "model", ""),
         "provider": getattr(agent, "provider", ""),
+        # Backend that was actually instantiated (validates the live runtime,
+        # not just the deepagents_mode config flag). The status bar shows a
+        # badge when this is "deepagents".
+        "runtime": getattr(agent, "active_runtime", "native"),
         "reasoning_effort": reasoning_effort,
         "service_tier": service_tier,
         "fast": service_tier == "priority",
@@ -8124,6 +8128,12 @@ def _(rid, params: dict) -> dict:
                 agent.valid_tool_names = (
                     {t["function"]["name"] for t in new_defs} if new_defs else set()
                 )
+                # DeepAgents bakes its tool list into a compiled LangGraph
+                # graph, so assigning ``.tools`` above is a no-op there —
+                # recompile and atomically swap the graph instead.
+                _rebuild = getattr(agent, "rebuild_agent", None)
+                if callable(_rebuild):
+                    _rebuild()
             except Exception as _exc:
                 logger.warning(
                     "Failed to refresh cached agent tools after /reload-mcp: %s",

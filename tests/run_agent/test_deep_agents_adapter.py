@@ -653,308 +653,537 @@ class TestHermesToolAdapter:
         assert adapter._tool.description == "schema desc"
 
 
+def _fn_def(name, parameters=None, description=None):
+    """Build an OpenAI-format tool definition as get_tool_definitions returns."""
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description if description is not None else f"{name} tool",
+            "parameters": parameters
+            if parameters is not None
+            else {"type": "object", "properties": {"path": {"type": "string"}}},
+        },
+    }
+
+
 class TestBuildHermesTools:
-    def _mock_reg(self, definitions, entry_fn):
-        """Create mock registry that works with `from tools.registry import registry`."""
-        m = MagicMock()
-        m.get_definitions.return_value = definitions
-        if entry_fn is not None:
-            m.get_entry.side_effect = entry_fn
-        # `from tools.registry import registry` reads the *registry* attribute
-        # from the module. Without this assignment, MagicMock auto-creates a
-        # child MagicMock, so we make registry return the mock itself.
-        m.registry = m
-        return m
+    """build_hermes_tools resolves toolsets via model_tools.get_tool_definitions
+    (the native path) and builds a StructuredTool per definition — including
+    synthetic bridge tools that have no registry entry."""
+
+    def _patch_defs(self, definitions):
+        """Patch model_tools.get_tool_definitions to return *definitions*."""
+        import model_tools
+
+        return patch.object(
+            model_tools, "get_tool_definitions", return_value=definitions
+        )
 
     def test_builds_structured_tools_from_definitions(self):
         from langchain_core.tools import StructuredTool
         from agent.deep_agents_runtime import build_hermes_tools
 
-        ea = _make_tool_entry("tool_a", toolset="ts1")
-        eb = _make_tool_entry("tool_b", toolset="ts2")
-        mock_reg = self._mock_reg(
-            [{"name": "tool_a"}, {"name": "tool_b"}],
-            lambda n: {"tool_a": ea, "tool_b": eb}.get(n),
-        )
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
+        with self._patch_defs([_fn_def("tool_a"), _fn_def("tool_b")]):
             tools = build_hermes_tools(
                 enabled_toolsets=["ts1", "ts2"], disabled_toolsets=[]
             )
-            assert len(tools) == 2 and all(isinstance(t, StructuredTool) for t in tools)
-        finally:
-            if saved is not None:
-                sys.modules["tools.registry"] = saved
-            else:
-                sys.modules.pop("tools.registry", None)
+        assert len(tools) == 2 and all(isinstance(t, StructuredTool) for t in tools)
+        assert {t.name for t in tools} == {"tool_a", "tool_b"}
 
-    def test_handles_missing_tool_entries(self):
+    def test_forwards_parameter_schema_as_args_schema(self):
+        """The model must see each tool's real parameters, not an empty schema."""
         from agent.deep_agents_runtime import build_hermes_tools
 
-        ep = _make_tool_entry("present", toolset="ts")
-        mock_reg = self._mock_reg(
-            [{"name": "present"}, {"name": "missing"}],
-            lambda n: ep if n == "present" else None,
-        )
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
-            assert (
-                len(build_hermes_tools(enabled_toolsets=["ts"], disabled_toolsets=[]))
-                == 1
-            )
-        finally:
-            if saved is not None:
-                sys.modules["tools.registry"] = saved
-            else:
-                sys.modules.pop("tools.registry", None)
+        params = {
+            "type": "object",
+            "properties": {"command": {"type": "string"}},
+            "required": ["command"],
+        }
+        with self._patch_defs([_fn_def("run_terminal_command", parameters=params)]):
+            tools = build_hermes_tools(enabled_toolsets=["terminal"], disabled_toolsets=[])
+        assert len(tools) == 1
+        # The StructuredTool exposes the forwarded parameter as a callable arg.
+        assert "command" in tools[0].args
+
+    def test_builds_bridge_tools_without_registry_entry(self):
+        """tool_search/tool_describe/tool_call have no registry entry but are
+        emitted by tool-search assembly — they must still get adapters."""
+        from agent.deep_agents_runtime import build_hermes_tools
+
+        defs = [_fn_def("tool_search"), _fn_def("tool_describe"), _fn_def("tool_call")]
+        with self._patch_defs(defs):
+            tools = build_hermes_tools(enabled_toolsets=["x"], disabled_toolsets=[])
+        assert {t.name for t in tools} == {"tool_search", "tool_describe", "tool_call"}
 
     def test_handles_empty_definitions(self):
         from agent.deep_agents_runtime import build_hermes_tools
 
-        mock_reg = self._mock_reg([], None)
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
+        with self._patch_defs([]):
             assert build_hermes_tools(enabled_toolsets=[], disabled_toolsets=[]) == []
-        finally:
-            if saved is not None:
-                sys.modules["tools.registry"] = saved
-            else:
-                sys.modules.pop("tools.registry", None)
 
-    def test_returns_empty_list_on_registry_error(self):
+    def test_returns_empty_list_on_resolution_error(self):
         from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
 
-        mock_reg = self._mock_reg([], None)
-        mock_reg.get_definitions.side_effect = ImportError("registry unavailable")
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
+        with patch.object(
+            model_tools,
+            "get_tool_definitions",
+            side_effect=ImportError("registry unavailable"),
+        ):
             assert (
                 build_hermes_tools(enabled_toolsets=["ts"], disabled_toolsets=[]) == []
             )
-        finally:
-            if saved is not None:
-                sys.modules["tools.registry"] = saved
-            else:
-                sys.modules.pop("tools.registry", None)
 
     def test_empty_name_tool_skipped(self):
         from agent.deep_agents_runtime import build_hermes_tools
 
-        mock_reg = self._mock_reg([{"name": ""}], None)
-        mock_reg.get_entry.return_value = None
-        saved = sys.modules.get("tools.registry")
-        try:
-            sys.modules["tools.registry"] = mock_reg
+        with self._patch_defs([_fn_def("")]):
             assert build_hermes_tools(enabled_toolsets=[], disabled_toolsets=[]) == []
-        finally:
-            if saved is not None:
-                sys.modules["tools.registry"] = saved
-            else:
-                sys.modules.pop("tools.registry", None)
+
+
+def _ai_chunk(content, tool_call_chunks=None, additional_kwargs=None):
+    """Build an AIMessageChunk as the ``messages`` stream mode yields."""
+    from langchain_core.messages import AIMessageChunk
+
+    chunk = AIMessageChunk(content=content)
+    if tool_call_chunks is not None:
+        chunk.tool_call_chunks = tool_call_chunks
+    if additional_kwargs is not None:
+        chunk.additional_kwargs = additional_kwargs
+    return chunk
 
 
 class TestHermesStreamingBridge:
+    """The bridge translates *real* LangGraph stream items — ``("messages",
+    (chunk, meta))`` token chunks and ``("updates", {node: {...}})`` node
+    outputs — into the native runtime's callback signatures."""
+
     def _make_bridge(self, **kwargs):
         from agent.deep_agents_runtime import _HermesStreamingBridge
 
-        agent_mock = MagicMock()
-        for k, v in kwargs.items():
-            setattr(agent_mock, k, v)
         return _HermesStreamingBridge(
-            agent=agent_mock,
+            agent=MagicMock(),
             stream_delta=kwargs.get("stream_delta"),
             tool_progress=kwargs.get("tool_progress"),
             thinking=kwargs.get("thinking"),
             step=kwargs.get("step"),
+            tool_start=kwargs.get("tool_start"),
+            tool_complete=kwargs.get("tool_complete"),
+            tool_gen=kwargs.get("tool_gen"),
         )
+
+    # -- any_callbacks_set ---------------------------------------------------
 
     def test_any_callbacks_set_with_stream_delta(self):
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        assert self._make_bridge(stream_delta=lambda x: None).any_callbacks_set()
 
-        bridge = _HermesStreamingBridge(agent=MagicMock(), stream_delta=lambda x: None)
-        assert bridge.any_callbacks_set() is True
+    def test_any_callbacks_set_with_tool_start(self):
+        assert self._make_bridge(tool_start=lambda *a: None).any_callbacks_set()
 
-    def test_any_callbacks_set_with_tool_progress(self):
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+    def test_any_callbacks_set_false_when_none(self):
+        assert self._make_bridge().any_callbacks_set() is False
 
-        bridge = _HermesStreamingBridge(
-            agent=MagicMock(), tool_progress=lambda *a, **kw: None
-        )
-        assert bridge.any_callbacks_set() is True
+    # -- routing / robustness ------------------------------------------------
 
-    def test_any_callbacks_set_always_true_with_noop_fallback(self):
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+    def test_process_stream_item_non_tuple_non_dict_ignored(self):
+        assert self._make_bridge().process_stream_item("not an item") is None
+        assert self._make_bridge().process_stream_item(None) is None
 
-        assert _HermesStreamingBridge(agent=MagicMock()).any_callbacks_set() is True
+    # -- messages mode: token streaming --------------------------------------
 
-    def test_process_event_non_dict_ignored(self):
-        result = self._make_bridge().process_event("not a dict")
-        assert result is None
-
-    def test_process_event_with_events_key(self):
-        from agent.deep_agents_runtime import _noop_cb
-
-        cals = []
-        tp = lambda action, **kw: cals.append((action, kw))
-        bridge = self._make_bridge(stream_delta=_noop_cb("sd"), tool_progress=tp)
-        bridge.process_event({
-            "events": [
-                {"type": "AIMessageChunk", "data": {"content": "hello"}},
-                {
-                    "type": "ToolCall",
-                    "data": {"name": "read_file", "args": {"path": "a.txt"}},
-                },
-            ]
-        })
-        assert (
-            len(cals) == 1
-            and cals[0][0] == "tool.started"
-            and "read_file" in cals[0][1].get("tool_name", "")
-        )
-
-    def test_process_event_with_output_key_text(self):
+    def test_messages_mode_string_content_streams_delta(self):
         deltas = []
-        self._make_bridge(stream_delta=lambda x: deltas.append(x)).process_event({
-            "output": "Final response text"
-        })
-        assert deltas == ["Final response text"]
+        bridge = self._make_bridge(stream_delta=lambda x: deltas.append(x))
+        bridge.process_stream_item(("messages", (_ai_chunk("hello "), {})))
+        bridge.process_stream_item(("messages", (_ai_chunk("world"), {})))
+        assert deltas == ["hello ", "world"]
 
-    def test_process_event_with_output_key_dict(self):
-        deltas = []
-        self._make_bridge(stream_delta=lambda x: deltas.append(x)).process_event({
-            "output": {"final_response": "Done!"}
-        })
-        assert deltas == ["Done!"]
-
-    def test_process_event_with_output_key_non_dict(self):
-        deltas = []
-        self._make_bridge(stream_delta=lambda x: deltas.append(x)).process_event({
-            "output": [1, 2, 3]
-        })
-        assert deltas[0] == "[1, 2, 3]"
-
-    def test_process_event_with_missing_keys_ignored(self):
-        from agent.deep_agents_runtime import _noop_cb
-
-        sd = MagicMock()
-        self._make_bridge(stream_delta=sd).process_event({"something_else": "value"})
-        sd.assert_not_called()
-
-    def test_ai_message_chunk_uses_stream_delta(self):
-        deltas = []
-        self._make_bridge(stream_delta=lambda x: deltas.append(x))._process_sub_event({
-            "type": "AIMessageChunk",
-            "data": {"content": "streaming text"},
-        })
-        assert deltas == ["streaming text"]
-
-    def test_ai_message_chunk_empty_content_no_emit(self):
-        deltas = []
-        self._make_bridge(stream_delta=lambda x: deltas.append(x))._process_sub_event({
-            "type": "AIMessageChunk",
-            "data": {"content": ""},
-        })
-        assert deltas == []
-
-    def test_ai_message_chunk_with_step_callback(self):
+    def test_messages_mode_fires_step_callback(self):
         steps = []
         bridge = self._make_bridge(
             stream_delta=lambda x: None, step=lambda n, s: steps.append((n, s))
         )
-        bridge._process_sub_event({
-            "type": "AIMessageChunk",
-            "data": {"content": "test"},
-        })
+        bridge.process_stream_item(("messages", (_ai_chunk("x"), {})))
         assert steps == [(1, [])]
 
-    def test_tool_call_uses_tool_progress(self):
-        cals = []
-        self._make_bridge(
-            tool_progress=lambda a, **kw: cals.append((a, kw))
-        )._process_sub_event({
-            "type": "ToolCall",
-            "data": {
-                "name": "write_file",
-                "args": {"path": "big.txt", "content": "x" * 300},
-            },
-        })
+    def test_messages_mode_empty_content_no_delta(self):
+        deltas = []
+        bridge = self._make_bridge(stream_delta=lambda x: deltas.append(x))
+        bridge.process_stream_item(("messages", (_ai_chunk(""), {})))
+        assert deltas == []
+
+    def test_messages_mode_splits_thinking_from_text(self):
+        deltas, thinks = [], []
+        bridge = self._make_bridge(
+            stream_delta=lambda x: deltas.append(x),
+            thinking=lambda x: thinks.append(x),
+        )
+        content = [
+            {"type": "thinking", "thinking": "let me reason"},
+            {"type": "text", "text": "the answer"},
+        ]
+        bridge.process_stream_item(("messages", (_ai_chunk(content), {})))
+        assert deltas == ["the answer"]
+        assert thinks == ["let me reason"]
+
+    def test_messages_mode_reasoning_content_additional_kwargs(self):
+        thinks = []
+        bridge = self._make_bridge(thinking=lambda x: thinks.append(x))
+        chunk = _ai_chunk("", additional_kwargs={"reasoning_content": "deepthink"})
+        bridge.process_stream_item(("messages", (chunk, {})))
+        assert thinks == ["deepthink"]
+
+    def test_messages_mode_tool_gen_announces_once(self):
+        gens = []
+        bridge = self._make_bridge(tool_gen=lambda name: gens.append(name))
+        tcc = [{"name": "read_file", "args": "", "id": "c1", "index": 0}]
+        bridge.process_stream_item(("messages", (_ai_chunk("", tool_call_chunks=tcc), {})))
+        # A later chunk for the same call (name often only on the first) — no dup.
+        tcc2 = [{"name": "read_file", "args": '{"p":1}', "id": "c1", "index": 0}]
+        bridge.process_stream_item(("messages", (_ai_chunk("", tool_call_chunks=tcc2), {})))
+        assert gens == ["read_file"]
+
+    def test_raising_tool_start_callback_does_not_abort_stream(self):
+        """A callback that raises (e.g. a TUI websocket/render hiccup) must be
+        isolated — the bridge must keep processing so the tool still executes
+        and the final answer streams. Otherwise the turn aborts leaving only
+        the tool box (the deepagents/TUI 'box shown, no result' symptom)."""
+        from langchain_core.messages import AIMessage
+
+        completes = []
+        bridge = self._make_bridge(
+            tool_start=lambda *a: (_ for _ in ()).throw(RuntimeError("ws closed")),
+            tool_complete=lambda tc_id, name, args, result: completes.append(name),
+        )
+        ai = AIMessage(content="")
+        ai.tool_calls = [{"name": "terminal", "args": {"command": "x"}, "id": "c1"}]
+        # Must NOT raise even though tool_start blows up.
+        bridge.process_stream_item(("updates", {"model": {"messages": [ai]}}))
+        # And a later tool result must still drive tool_complete.
+        from langchain_core.messages import ToolMessage
+
+        tm = ToolMessage(content="ok", tool_call_id="c1", name="terminal")
+        bridge.process_stream_item(("updates", {"tools": {"messages": [tm]}}))
+        assert completes == ["terminal"]
+
+    def test_reasoning_leak_in_content_is_routed_to_thinking(self):
+        """Some models (Qwen3.x on vLLM with a rich prompt) emit reasoning into
+        the *content* channel wrapped in <think>…</think> / <|mask_start|>…
+        <mask_end>. That must NOT reach the visible body — it is routed to the
+        thinking channel so it still shows as the agent's reasoning."""
+        deltas, thinks = [], []
+        bridge = self._make_bridge(
+            stream_delta=lambda x: deltas.append(x),
+            thinking=lambda x: thinks.append(x),
+        )
+        bridge.process_stream_item(("messages", (_ai_chunk("Hello "), {})))
+        bridge.process_stream_item(
+            ("messages", (_ai_chunk("<think>secret reasoning</think>"), {}))
+        )
+        bridge.process_stream_item(
+            ("messages", (_ai_chunk("<|mask_start|>more reasoning<mask_end>"), {}))
+        )
+        bridge.process_stream_item(("messages", (_ai_chunk("world"), {})))
+        bridge.flush_visible()
+        body = "".join(deltas)
+        think = "".join(thinks)
+        assert "secret reasoning" not in body
+        assert "more reasoning" not in body
+        assert "<think>" not in body and "mask_start" not in body
+        assert "Hello " in body and "world" in body
+        # The reasoning still surfaces — on the thinking channel.
+        assert "secret reasoning" in think
+        assert "more reasoning" in think
+
+    def test_reasoning_leak_marker_split_across_deltas_is_routed(self):
+        """A reasoning marker split across two deltas must still be caught."""
+        deltas, thinks = [], []
+        bridge = self._make_bridge(
+            stream_delta=lambda x: deltas.append(x),
+            thinking=lambda x: thinks.append(x),
+        )
+        bridge.process_stream_item(("messages", (_ai_chunk("A<thi"), {})))
+        bridge.process_stream_item(("messages", (_ai_chunk("nk>hidden</thi"), {})))
+        bridge.process_stream_item(("messages", (_ai_chunk("nk>B"), {})))
+        bridge.flush_visible()
+        assert "".join(deltas) == "AB"
+        assert "hidden" in "".join(thinks)
+
+    def test_clean_text_passes_through_unchanged(self):
+        deltas = []
+        bridge = self._make_bridge(stream_delta=lambda x: deltas.append(x))
+        for piece in ("Here is ", "a normal ", "answer."):
+            bridge.process_stream_item(("messages", (_ai_chunk(piece), {})))
+        bridge.flush_visible()
+        assert "".join(deltas) == "Here is a normal answer."
+
+    def test_stray_unpaired_close_marker_stripped_from_body(self):
+        """Models sometimes emit a lone <|mask_end|> with no matching open. It's
+        a reasoning delimiter token and must not appear in the visible body."""
+        deltas = []
+        bridge = self._make_bridge(stream_delta=lambda x: deltas.append(x))
+        bridge.process_stream_item(("messages", (_ai_chunk("Answer<|mask_end|> done"), {})))
+        bridge.flush_visible()
+        assert "".join(deltas) == "Answer done"
+
+    def test_raising_stream_delta_does_not_abort(self):
+        """A raising stream_delta likewise must not propagate."""
+        from langchain_core.messages import AIMessage
+
+        bridge = self._make_bridge(
+            stream_delta=lambda x: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+        # Must not raise.
+        bridge.process_stream_item(("messages", (_ai_chunk("hi"), {})))
+
+    def test_messages_mode_tool_message_not_streamed_as_text(self):
+        """LangGraph ``messages`` mode also yields the tool node's ToolMessage.
+        Its ``content`` is the tool *result* — it must NOT leak into the
+        assistant body via stream_delta (updates mode owns tool chrome)."""
+        from langchain_core.messages import ToolMessage
+
+        deltas = []
+        bridge = self._make_bridge(stream_delta=lambda x: deltas.append(x))
+        tm = ToolMessage(
+            content='{"success": true, "skills": []}', tool_call_id="c1"
+        )
+        bridge.process_stream_item(("messages", (tm, {})))
+        assert deltas == []
+
+    def test_messages_mode_tool_message_chunk_not_streamed_as_text(self):
+        """ToolMessageChunk (streamed tool result) likewise stays out of the
+        assistant body."""
+        from langchain_core.messages import ToolMessageChunk
+
+        deltas = []
+        bridge = self._make_bridge(stream_delta=lambda x: deltas.append(x))
+        tmc = ToolMessageChunk(content="partial result", tool_call_id="c1")
+        bridge.process_stream_item(("messages", (tmc, {})))
+        assert deltas == []
+
+    # -- updates mode: tool chrome -------------------------------------------
+
+    def test_updates_mode_tool_call_fires_tool_start(self):
+        from langchain_core.messages import AIMessage
+
+        starts, progress = [], []
+        bridge = self._make_bridge(
+            tool_start=lambda tc_id, name, args: starts.append((tc_id, name, args)),
+            tool_progress=lambda a, *r: progress.append((a, r)),
+        )
+        ai = AIMessage(content="")
+        ai.tool_calls = [
+            {"name": "read_file", "args": {"path": "a.txt"}, "id": "call_1"}
+        ]
+        bridge.process_stream_item(("updates", {"model": {"messages": [ai]}}))
+        assert starts == [("call_1", "read_file", {"path": "a.txt"})]
+        assert progress and progress[0][0] == "tool.started"
+
+    def test_updates_mode_fires_tool_gen_when_chunks_never_announced(self):
+        """LangGraph surfaces tool calls complete in ``updates`` mode without
+        incremental ``tool_call_chunks`` in ``messages`` mode, so the
+        "preparing…" beat never fired from chunks. ``tool_start`` must emit it
+        as a fallback so the generating indicator always shows."""
+        from langchain_core.messages import AIMessage
+
+        gens, starts = [], []
+        bridge = self._make_bridge(
+            tool_gen=lambda name: gens.append(name),
+            tool_start=lambda tc_id, name, args: starts.append(name),
+        )
+        ai = AIMessage(content="")
+        ai.tool_calls = [{"name": "read_file", "args": {"path": "a"}, "id": "c1"}]
+        bridge.process_stream_item(("updates", {"model": {"messages": [ai]}}))
+        assert gens == ["read_file"]
+        assert starts == ["read_file"]
+
+    def test_updates_mode_does_not_double_announce_tool_gen(self):
+        """If a ``messages``-mode chunk already announced the tool name, the
+        ``updates``-mode fallback must not announce it a second time."""
+        from langchain_core.messages import AIMessage
+
+        gens = []
+        bridge = self._make_bridge(
+            tool_gen=lambda name: gens.append(name),
+            tool_start=lambda tc_id, name, args: None,
+        )
+        tcc = [{"name": "read_file", "args": "", "id": "c1", "index": 0}]
+        bridge.process_stream_item(("messages", (_ai_chunk("", tool_call_chunks=tcc), {})))
+        ai = AIMessage(content="")
+        ai.tool_calls = [{"name": "read_file", "args": {"path": "a"}, "id": "c1"}]
+        bridge.process_stream_item(("updates", {"model": {"messages": [ai]}}))
+        assert gens == ["read_file"]  # exactly once, not twice
+
+    def test_updates_mode_tool_result_fires_tool_complete(self):
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        starts, completes = [], []
+        bridge = self._make_bridge(
+            tool_start=lambda tc_id, name, args: starts.append((tc_id, name)),
+            tool_complete=lambda tc_id, name, args, result: completes.append(
+                (tc_id, name, args, result)
+            ),
+        )
+        ai = AIMessage(content="")
+        ai.tool_calls = [{"name": "read_file", "args": {"path": "a.txt"}, "id": "c1"}]
+        bridge.process_stream_item(("updates", {"model": {"messages": [ai]}}))
+        tm = ToolMessage(content="file body", tool_call_id="c1", name="read_file")
+        bridge.process_stream_item(("updates", {"tools": {"messages": [tm]}}))
+        # Completion echoes the original call's name + args (ToolMessage lacks args).
+        assert completes == [("c1", "read_file", {"path": "a.txt"}, "file body")]
+
+    def test_updates_mode_bare_dict_treated_as_updates(self):
+        from langchain_core.messages import AIMessage
+
+        starts = []
+        bridge = self._make_bridge(
+            tool_start=lambda tc_id, name, args: starts.append(name)
+        )
+        ai = AIMessage(content="")
+        ai.tool_calls = [{"name": "ping", "args": {}, "id": "c1"}]
+        # No ("updates", ...) wrapper — a bare dict still routes as updates.
+        bridge.process_stream_item({"model": {"messages": [ai]}})
+        assert starts == ["ping"]
+
+    def test_updates_mode_tool_complete_list_content_flattened(self):
+        from langchain_core.messages import ToolMessage
+
+        completes = []
+        bridge = self._make_bridge(
+            tool_complete=lambda tc_id, name, args, result: completes.append(result)
+        )
+        tm = ToolMessage(
+            content=[{"type": "text", "text": "part1"}, {"type": "text", "text": "part2"}],
+            tool_call_id="c9",
+            name="grep",
+        )
+        bridge.process_stream_item(("updates", {"tools": {"messages": [tm]}}))
+        assert completes == ["part1part2"]
+
+
+class TestReasoningConfig:
+    """``reasoning_config`` (effort/enabled) must reach the provider binding so
+    the deepagents model actually enables extended thinking."""
+
+    def test_reasoning_enabled_truthy(self):
+        from agent.deep_agents_runtime import _reasoning_enabled
+
+        assert _reasoning_enabled({"enabled": True}) is True
+        assert _reasoning_enabled({"effort": "high"}) is True  # absent enabled
+        assert _reasoning_enabled({"enabled": False}) is False
+        assert _reasoning_enabled(None) is False
+
+    def test_reasoning_effort_defaults_medium(self):
+        from agent.deep_agents_runtime import _reasoning_effort
+
+        assert _reasoning_effort({"effort": "high"}) == "high"
+        assert _reasoning_effort({}) == "medium"
+        assert _reasoning_effort(None) == "medium"
+
+    def test_build_reasoning_model_disabled_returns_none(self):
+        from agent.deep_agents_runtime import _build_reasoning_model
+
         assert (
-            len(cals) == 1
-            and cals[0][0] == "tool.started"
-            and len(cals[0][1]["preview"]) <= 200
+            _build_reasoning_model("anthropic", "claude-sonnet-4-0", {"enabled": False})
+            is None
         )
 
-    def test_unknown_event_type_ignored(self):
-        self._make_bridge()._process_sub_event({"type": "UnknownType", "data": {}})
+    def test_build_reasoning_model_anthropic_sets_thinking(self):
+        from agent.deep_agents_runtime import _build_reasoning_model
 
-    def test_sub_event_non_dict_ignored(self):
-        b = self._make_bridge()
-        b._process_sub_event("not a dict")
-        b._process_sub_event(None)
+        captured = {}
 
-    def test_output_dict_missing_final_response_uses_str(self):
-        deltas = []
-        self._make_bridge(stream_delta=lambda x: deltas.append(x))._process_output({
-            "some_key": "value",
-            "other": 123,
-        })
-        assert deltas[0] == str({"some_key": "value", "other": 123})
+        class FakeChatAnthropic:
+            def __init__(self, **kw):
+                captured.update(kw)
 
-    def test_tool_call_no_args_fires_progress(self):
-        cals = []
-        self._make_bridge(
-            tool_progress=lambda a, **kw: cals.append((a, kw))
-        )._process_sub_event({"type": "ToolCall", "data": {"name": "ping"}})
-        assert len(cals) == 1
+        fake_mod = types.ModuleType("langchain_anthropic")
+        fake_mod.ChatAnthropic = FakeChatAnthropic
+        with patch.dict(sys.modules, {"langchain_anthropic": fake_mod}):
+            model = _build_reasoning_model(
+                "anthropic", "claude-sonnet-4-0", {"enabled": True, "effort": "high"}
+            )
+        assert isinstance(model, FakeChatAnthropic)
+        assert captured["thinking"] == {"type": "enabled", "budget_tokens": 16000}
+        assert captured["max_tokens"] > 16000
 
-    def test_tool_call_no_name_defaults_empty(self):
-        cals = []
-        self._make_bridge(
-            tool_progress=lambda a, **kw: cals.append((a, kw))
-        )._process_sub_event({"type": "ToolCall", "data": {"args": "no-name"}})
-        assert cals[0][1]["tool_name"] == ""
+    def test_build_reasoning_model_anthropic_haiku_skipped(self):
+        from agent.deep_agents_runtime import _build_reasoning_model
 
-    def test_noop_callback_does_not_raise(self):
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        assert (
+            _build_reasoning_model(
+                "anthropic", "claude-haiku-4-5", {"enabled": True, "effort": "high"}
+            )
+            is None
+        )
 
-        bridge = _HermesStreamingBridge(agent=MagicMock())
-        bridge.process_event({
-            "events": [{"type": "AIMessageChunk", "data": {"content": "x"}}]
-        })
-        bridge.process_event({"output": "y"})
+    def test_build_reasoning_model_openai_non_reasoning_skipped(self):
+        from agent.deep_agents_runtime import _build_reasoning_model
 
-    def test_bridge_fetches_callbacks_from_agent(self):
-        from agent.deep_agents_runtime import _HermesStreamingBridge
+        # gpt-4o has no reasoning_effort — must not be constructed with one.
+        assert (
+            _build_reasoning_model("openai", "gpt-4o", {"enabled": True}) is None
+        )
 
-        agent_mock = MagicMock()
-        agent_mock.stream_delta_callback = lambda x: None
-        agent_mock.tool_progress_callback = lambda *a, **kw: None
-        agent_mock.step_callback = None
-        bridge = _HermesStreamingBridge(agent=agent_mock)
-        assert bridge.any_callbacks_set() is True
-        assert bridge._stream_delta == agent_mock.stream_delta_callback
+    def test_build_reasoning_model_openai_reasoning_sets_effort(self):
+        from agent.deep_agents_runtime import _build_reasoning_model
+
+        captured = {}
+
+        class FakeChatOpenAI:
+            def __init__(self, **kw):
+                captured.update(kw)
+
+        fake_mod = types.ModuleType("langchain_openai")
+        fake_mod.ChatOpenAI = FakeChatOpenAI
+        with patch.dict(sys.modules, {"langchain_openai": fake_mod}):
+            model = _build_reasoning_model("openai", "o3", {"enabled": True, "effort": "low"})
+        assert isinstance(model, FakeChatOpenAI)
+        assert captured["reasoning_effort"] == "low"
+
+    def test_build_reasoning_model_import_failure_returns_none(self):
+        from agent.deep_agents_runtime import _build_reasoning_model
+
+        # No fake module registered → import inside raises → graceful None.
+        with patch.dict(sys.modules, {"langchain_anthropic": None}):
+            assert (
+                _build_reasoning_model("anthropic", "claude-sonnet-4-0", {"enabled": True})
+                is None
+            )
 
 
-class TestNoopCallback:
-    def test_noop_accepts_args(self):
-        from agent.deep_agents_runtime import _noop_cb
+class TestStreamHelpers:
+    def test_split_stream_item_tuple(self):
+        from agent.deep_agents_runtime import _split_stream_item
 
-        cb = _noop_cb("test")
-        cb(1, 2, 3, "keyword")
+        assert _split_stream_item(("messages", "payload")) == ("messages", "payload")
 
-    def test_noop_return_none(self):
-        from agent.deep_agents_runtime import _noop_cb
+    def test_split_stream_item_bare_dict_is_updates(self):
+        from agent.deep_agents_runtime import _split_stream_item
 
-        assert _noop_cb("test")() is None
+        assert _split_stream_item({"node": {}}) == ("updates", {"node": {}})
 
-    def test_noop_has_name(self):
-        from agent.deep_agents_runtime import _noop_cb
+    def test_split_stream_item_unknown_returns_none(self):
+        from agent.deep_agents_runtime import _split_stream_item
 
-        assert _noop_cb("my_name").__name__ == "noop"
+        assert _split_stream_item(42) == (None, None)
+
+    def test_split_chunk_content_string(self):
+        from agent.deep_agents_runtime import _split_chunk_content
+
+        assert _split_chunk_content(_ai_chunk("hi")) == ("hi", "")
+
+    def test_split_chunk_content_blocks(self):
+        from agent.deep_agents_runtime import _split_chunk_content
+
+        chunk = _ai_chunk(
+            [
+                {"type": "text", "text": "A"},
+                {"type": "thinking", "thinking": "B"},
+            ]
+        )
+        assert _split_chunk_content(chunk) == ("A", "B")
 
 
 class TestDeepAgentsAIAgentAttributes:

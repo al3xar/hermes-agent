@@ -2,8 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "hades.fullname" . }}-dashboard
-  labels:
-    {{- include "hades.labels" . | nindent 4 }}
+  labels: {{- include "hades.labels" . | nindent 4 }}
     app.kubernetes.io/component: dashboard
 spec:
   replicas: {{ .Values.dashboard.replicaCount }}
@@ -13,6 +12,11 @@ spec:
       app.kubernetes.io/component: dashboard
   template:
     metadata:
+      annotations:
+        # Reinicia el pod cuando cambian el ConfigMap (plugins, modelo, MCP) o
+        # los secretos, para que recoja la config nueva (p.ej. activar Langfuse).
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: dashboard
@@ -23,12 +27,19 @@ spec:
       hostAliases:
         - ip: {{ .Values.vllm.ip | quote }}
           hostnames: [{{ .Values.vllm.host | quote }}]
+      initContainers:
+        - name: init-config
+          image: busybox:1.37
+          command: ["/bin/sh", "-c", "cp /init/* {{ .Values.hermesHome }}/"]
+          volumeMounts:
+            - name: init-config
+              mountPath: /init
+            - name: data
+              mountPath: {{ .Values.hermesHome }}
       containers:
         - name: dashboard
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Mantiene vivo el contenedor; el dashboard corre como servicio s6
-          # (espejo del docker-compose `command: [sleep, infinity]`).
           args: ["sleep", "infinity"]
           ports:
             - name: http
@@ -44,35 +55,55 @@ spec:
               value: "1"
             - name: HERMES_DASHBOARD_INSECURE
               value: {{ ternary "1" "0" .Values.dashboard.insecure | quote }}
+            # The dashboard chat (TUI) resolves its toolset via this env, NOT
+            # platform_toolsets (which only covers native gateway platforms).
+            # Without `web`, web_search isn't bound and the model hallucinates
+            # the call as text. Keep in sync with platform_toolsets.cli.
+            - name: HERMES_TUI_TOOLSETS
+              value: {{ .Values.tuiToolsets | default "terminal,web,browser,file,skills,todo,delegation" | quote }}
             - name: HERMES_LANGFUSE_BASE_URL
               value: {{ .Values.langfuseBaseUrl | quote }}
           envFrom:
             - secretRef:
                 name: {{ include "hades.secretName" . }}
           volumeMounts:
-            - name: config
-              mountPath: {{ .Values.hermesHome }}/config.yaml
-              subPath: config.yaml
-              readOnly: true
+            - name: data
+              mountPath: {{ .Values.hermesHome }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.nyxstrike.sidecar.enabled }}
+        # El dashboard tiene embedded-chat: ejecuta el agente y necesita el MCP,
+        # igual que el gateway. Mismo bridge stateless contra el server NyxStrike.
+        - name: nyxstrike-mcp
+          image: {{ .Values.nyxstrike.sidecar.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - {{ .Values.nyxstrike.sidecar.pythonBin | default "/opt/nyxstrike/nyxstrike-env/bin/python3" | quote }}
+            - "/opt/nyxstrike/nyxstrike_mcp.py"
+            - "--server"
+            - "{{ .Values.nyxstrike.url }}"
+            - "--profile"
+            - {{ .Values.nyxstrike.profile | quote }}
+            - "--transport"
+            - "http"
+            - "--mcp-host"
+            - "127.0.0.1"
+            - "--mcp-port"
+            - {{ .Values.nyxstrike.mcpPort | quote }}
+            - "--auth-token"
+            - "$(NYXSTRIKE_API_TOKEN)"
+          env:
+            - name: NYXSTRIKE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hades.secretName" . }}
+                  key: NYXSTRIKE_API_TOKEN
+          ports:
+            - name: mcp
+              containerPort: {{ .Values.nyxstrike.mcpPort }}
+        {{- end }}
       volumes:
-        - name: config
+        - name: init-config
           configMap:
-            name: {{ include "hades.fullname" . }}-config
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "hades.fullname" . }}-dashboard
-  labels:
-    {{- include "hades.labels" . | nindent 4 }}
-    app.kubernetes.io/component: dashboard
-spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: {{ .Values.dashboard.port }}
-      targetPort: http
-  selector:
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: dashboard
+            name: {{ include "hades.fullname" . }}-init-config
+        - name: data
+          emptyDir: {}

@@ -171,6 +171,25 @@ class CLIAgentSetupMixin:
 
         return True
 
+    @staticmethod
+    def _resolve_deepagents_runtime(config: dict | None) -> str:
+        """Map config.yaml's ``deepagents_mode`` flag to an AIAgent ``runtime``.
+
+        Mirrors the gateway/TUI precedence (``gateway.deepagents_mode`` first,
+        then a top-level ``deepagents_mode`` fallback) so the classic CLI runs
+        the same runtime as the other surfaces. Without this the CLI always
+        defaulted to ``runtime="native"`` and `hermes chat` inside the
+        container silently skipped the DeepAgents (LangGraph) runtime even with
+        ``deepagents_mode: true`` configured.
+        """
+        cfg = config if isinstance(config, dict) else {}
+        gw = cfg.get("gateway")
+        raw = gw.get("deepagents_mode") if isinstance(gw, dict) else None
+        if raw is None:
+            raw = cfg.get("deepagents_mode")
+        truthy = str(raw).strip().lower() in {"true", "1", "yes", "on"}
+        return "deepagents" if truthy else "native"
+
     def _resolve_turn_agent_config(self, user_message: str) -> dict:
         """Build the effective model/runtime config for a single user turn.
 
@@ -342,6 +361,9 @@ class CLIAgentSetupMixin:
             effective_model = model_override or self.model
             self.agent = AIAgent(
                 model=effective_model,
+                runtime=self._resolve_deepagents_runtime(
+                    getattr(self, "config", None)
+                ),
                 api_key=runtime.get("api_key"),
                 base_url=runtime.get("base_url"),
                 provider=runtime.get("provider"),

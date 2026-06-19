@@ -6,6 +6,8 @@ model:
 
 terminal:
   backend: local
+display:
+  skin: default
 
 gateway:
   deepagents_mode: true
@@ -80,7 +82,7 @@ mcp_servers:
       - "--server"
       - "${NYXSTRIKE_URL:-http://nyxstrike:8888}"
       - "--profile"
-      - "full"                       # TODO: cambiar a 'cyber-range' cuando exista en NyxStrike
+      - "full" # TODO: cambiar a 'cyber-range' cuando exista en NyxStrike
       - "--auth-token"
       - "${NYXSTRIKE_API_TOKEN}"
     timeout: 300

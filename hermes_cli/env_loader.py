@@ -209,6 +209,21 @@ def _sanitize_env_file_if_needed(path: Path) -> None:
         pass  # best-effort — don't block gateway startup
 
 
+def _safe_exists(path: Path) -> bool:
+    """``Path.exists()`` that returns False instead of raising.
+
+    On NFS ``root_squash`` mounts (the container's ``/opt/data`` HERMES_HOME),
+    a process can lack permission to ``stat`` a file owned by another uid.
+    Python 3.13's ``Path.exists()`` propagates that ``PermissionError`` rather
+    than returning False, which crashed ``hermes`` at startup. An env file we
+    can't stat is unusable anyway, so treat it as absent.
+    """
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
 def load_hermes_dotenv(
     *,
     hermes_home: str | os.PathLike | None = None,
@@ -229,16 +244,16 @@ def load_hermes_dotenv(
     project_env_path = Path(project_env) if project_env else None
 
     # Fix corrupted .env files before python-dotenv parses them (#8908).
-    if user_env.exists():
+    if _safe_exists(user_env):
         _sanitize_env_file_if_needed(user_env)
-    if project_env_path and project_env_path.exists():
+    if project_env_path and _safe_exists(project_env_path):
         _sanitize_env_file_if_needed(project_env_path)
 
-    if user_env.exists():
+    if _safe_exists(user_env):
         _load_dotenv_with_fallback(user_env, override=True)
         loaded.append(user_env)
 
-    if project_env_path and project_env_path.exists():
+    if project_env_path and _safe_exists(project_env_path):
         _load_dotenv_with_fallback(project_env_path, override=not loaded)
         loaded.append(project_env_path)
 

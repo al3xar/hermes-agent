@@ -1,10 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "hades.fullname" . }}-config
+  name: {{ include "hades.fullname" . }}-init-config
   labels: {{- include "hades.labels" . | nindent 4 }}
 data:
   config.yaml: |
+    _config_version: 29
     model:
       provider: custom
       default: nvidia/Qwen3.6-35B-A3B-NVFP4
@@ -17,6 +18,10 @@ data:
     agent:
       max_turns: 120
       reasoning_effort: "high"
+      model_config:
+        provider: custom
+        default: "nvidia/Qwen3.6-35B-A3B-NVFP4"
+        base_url: "https://{{ .Values.vllm.host }}/v1"
       personalities:
         hades: >
           You are Hades, an autonomous offensive-security (red-team) operator in an
@@ -30,13 +35,14 @@ data:
         - /opt/hermes/optional-skills/security
     plugins:
       enabled:
-        - observability/langfuse
         - memory
+        {{- if .Values.langfuse.enabled }}
+        - observability/langfuse
+        {{- end }}
     platform_toolsets:
-      cli: [terminal, web, browser, file, skills, todo, delegation]
-      telegram: [terminal, web, browser, file, skills, todo, delegation]
+      cli: [terminal, web, browser, file, skills, todo, delegation, nyxstrike]
+      telegram: [terminal, web, browser, file, skills, todo, delegation, nyxstrike]
     mcp_servers:
       nyxstrike:
-        # El bridge corre como sidecar (HTTP) en este mismo pod.
         url: "http://127.0.0.1:{{ .Values.nyxstrike.mcpPort }}/mcp"
         timeout: 300

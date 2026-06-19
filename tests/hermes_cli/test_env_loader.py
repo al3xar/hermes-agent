@@ -103,3 +103,28 @@ def test_main_import_applies_user_env_over_shell_values(tmp_path, monkeypatch):
 
     assert os.getenv("OPENAI_BASE_URL") == "https://new.example/v1"
     assert os.getenv("HERMES_INFERENCE_PROVIDER") == "custom"
+
+
+def test_unreadable_user_env_does_not_crash(tmp_path, monkeypatch):
+    """On NFS root_squash (container `/opt/data`), stat'ing the user .env can
+    raise PermissionError. Python 3.13's Path.exists() propagates it — the
+    loader must treat an unstattable env as absent, not crash startup."""
+    home = tmp_path / "hermes"
+    home.mkdir()
+    user_env = home / ".env"
+    user_env.write_text("OPENAI_API_KEY=sk-unreadable\n", encoding="utf-8")
+
+    import pathlib
+
+    real_stat = pathlib.Path.stat
+
+    def fake_stat(self, *a, **k):
+        if str(self) == str(user_env):
+            raise PermissionError(13, "Permission denied")
+        return real_stat(self, *a, **k)
+
+    monkeypatch.setattr(pathlib.Path, "stat", fake_stat)
+
+    # Must not raise.
+    loaded = load_hermes_dotenv(hermes_home=home)
+    assert user_env not in loaded

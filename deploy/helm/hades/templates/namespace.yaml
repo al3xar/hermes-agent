@@ -1,0 +1,10 @@
+{{- if .Values.namespace.create }}
+# Namespace del despliegue. Su nombre coincide con el namespace del release para
+# que Hades y todo el stack Langfuse compartan namespace (necesario para el DNS
+# de nombre corto entre ellos). Helm lo ordena primero en la instalación.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace.name | default .Release.Namespace }}
+  labels: {{- include "hades.labels" . | nindent 4 }}
+{{- end }}

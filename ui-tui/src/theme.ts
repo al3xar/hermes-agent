@@ -256,11 +256,14 @@ const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
 
 export const DARK_THEME: Theme = {
   color: {
-    primary: '#FFD700',
-    accent: '#FFBF00',
-    border: '#CD7F32',
+    // Garnet / dark-red brand palette — matches the caduceus art's
+    // CADUCEUS_COLORS so the rest of the UI reads as the same Hades garnet
+    // rather than the old gold/bronze Hermes palette.
+    primary: '#A31621',
+    accent: '#8B0000',
+    border: '#800020',
     text: '#FFF8DC',
-    muted: '#CC9B1F',
+    muted: '#6E0D0D',
     // Bumped from the old `#B8860B` darkgoldenrod (~53% luminance) which
     // read as barely-visible on dark terminals for long body text.  The
     // new value sits ~60% luminance — readable without losing the "muted /
@@ -271,7 +274,7 @@ export const DARK_THEME: Theme = {
     completionMetaBg: '#1a1a2e',
     completionMetaCurrentBg: '#333355',
 
-    label: '#DAA520',
+    label: '#B33951',
     ok: '#4caf50',
     error: '#ef5350',
     warn: '#ffa726',
@@ -280,8 +283,8 @@ export const DARK_THEME: Theme = {
     // sessionLabel/sessionBorder intentionally track the `dim` value — they
     // are "same role, same colour" by design.  fromSkin's banner_dim fallback
     // relies on this pairing (#11300).
-    sessionLabel: '#CC9B1F',
-    sessionBorder: '#CC9B1F',
+    sessionLabel: '#6E0D0D',
+    sessionBorder: '#6E0D0D',
 
     statusBg: '#1a1a2e',
     statusFg: '#C0C0C0',
