@@ -44,6 +44,7 @@ build-image:
       --build-arg TARGETARCH=amd64
       --destination "$IMAGE:latest"
       --destination "$IMAGE:$CI_COMMIT_SHORT_SHA"
+      --registry-mirror=mirror.gcr.io
       --snapshot-mode=redo
       --use-new-run
   rules:
