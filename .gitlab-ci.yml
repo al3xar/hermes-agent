@@ -1,0 +1,50 @@
+# GitLab CI — build the Hades (hermes-agent) image (linux/amd64) natively on the
+# in-cluster Kubernetes GitLab Runner and push it to Harbor. Runner selected by
+# the `k8s` tag. Uses kaniko (no Docker daemon / privileged needed).
+#
+# Required project CI/CD variables (Settings → CI/CD → Variables; mask them):
+#   HARBOR_USER      -> robot$athena-dev+athena
+#   HARBOR_PASSWORD  -> the robot account token
+#
+# The Dockerfile is multi-stage and arch-aware via ARG TARGETARCH (selects the
+# right s6-overlay build); kaniko does not auto-populate it, so we pass
+# TARGETARCH=amd64 explicitly (the k8s runner nodes are amd64).
+
+stages:
+  - build
+
+variables:
+  HARBOR_HOST: "harbor.athena.cibertrs.cloud"
+  IMAGE: "harbor.athena.cibertrs.cloud/athena-dev/hermes-agent"
+  KUBERNETES_CPU_REQUEST: "2"
+  KUBERNETES_CPU_LIMIT: "4"
+  KUBERNETES_MEMORY_REQUEST: "4Gi"
+  KUBERNETES_MEMORY_LIMIT: "8Gi"
+  KUBERNETES_EPHEMERAL_STORAGE_REQUEST: "25Gi"
+  KUBERNETES_EPHEMERAL_STORAGE_LIMIT: "40Gi"
+
+build-image:
+  stage: build
+  tags:
+    - k8s
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - |
+      AUTH=$(printf '%s:%s' "$HARBOR_USER" "$HARBOR_PASSWORD" | base64 | tr -d '\n')
+      cat > /kaniko/.docker/config.json <<EOF
+      {"auths":{"$HARBOR_HOST":{"auth":"$AUTH"}}}
+      EOF
+    - >-
+      /kaniko/executor
+      --context "$CI_PROJECT_DIR"
+      --dockerfile "$CI_PROJECT_DIR/Dockerfile"
+      --build-arg TARGETARCH=amd64
+      --destination "$IMAGE:latest"
+      --destination "$IMAGE:$CI_COMMIT_SHORT_SHA"
+      --snapshot-mode=redo
+      --use-new-run
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
