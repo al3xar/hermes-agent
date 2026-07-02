@@ -14,7 +14,12 @@ data:
     terminal:
       backend: local
     gateway:
-      deepagents_mode: true
+      # Native runtime (not deepagents): with tools.tool_search off below, the
+      # model sees the mcp_nyxstrike_* tools directly instead of a search bridge.
+      deepagents_mode: false
+    tools:
+      tool_search:
+        enabled: "off"
     agent:
       max_turns: 120
       reasoning_effort: "high"
@@ -45,4 +50,4 @@ data:
     mcp_servers:
       nyxstrike:
         url: "http://127.0.0.1:{{ .Values.nyxstrike.mcpPort }}/mcp"
-        timeout: 300
+        timeout: 900

@@ -27,6 +27,17 @@ spec:
       hostAliases:
         - ip: {{ .Values.vllm.ip | quote }}
           hostnames: [{{ .Values.vllm.host | quote }}]
+      {{- if .Values.gateway.hostNetwork }}
+      # Run in the node's netns so the agent reaches vLLM / the cyber-range net.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with .Values.gateway.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.gateway.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
         - name: init-config
           image: busybox:1.37
