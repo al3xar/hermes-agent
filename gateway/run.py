@@ -16023,7 +16023,6 @@ class GatewayRunner(
                 _interim_assistant_cb if _want_interim_messages else None
             )
             agent.status_callback = _status_callback_sync
-
             # Credits / out-of-band notices (usage bands, depletion, restored).
             # Messaging has no persistent status bar, so each notice is a
             # standalone push: render to a single plaintext line and deliver via

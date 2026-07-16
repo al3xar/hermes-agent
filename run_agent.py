@@ -5787,6 +5787,7 @@ class AIAgent:
                 task_id,
                 stream_callback,
                 persist_user_message,
+                persist_user_timestamp,
             )
 
     def chat(self, message: str, stream_callback: Optional[callable] = None) -> str:
