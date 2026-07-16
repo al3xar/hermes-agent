@@ -1,0 +1,64 @@
+# Values del despliegue de Hades en el Red Cluster de Athena (athena-red-cluster).
+# Overrides sobre values.yaml (chart hades). Fuente de verdad del deploy en Athena.
+#
+# Desplegar / actualizar:
+#   helm upgrade --install hades ./ -n hades \
+#     -f values-athena.yaml
+#
+# NOTA UID/GID: NO fijamos hermesUid/hermesGid => se usa el default "" del chart
+# => sin remap => sin chown-on-boot de los build trees (arranque rápido).
+
+namespace:
+  create: false           # el ns hades ya existe; Helm NO lo gestiona (evita borrados en cascada)
+
+image:
+  repository: harbor.athena.cibertrs.cloud/athena-dev/hermes-agent
+  tag: latest
+  pullPolicy: IfNotPresent
+
+gateway:
+  hostNetwork: true
+  nodeSelector:
+    zone: dmz
+  tolerations:
+    - effect: NoSchedule
+      key: zone
+      operator: Equal
+      value: dmz
+
+langfuse:
+  enabled: false
+
+nyxstrike:
+  mcpPort: 9000
+  profile: full
+  url: http://nyxstrike.nyx.svc:8888
+  sidecar:
+    enabled: true
+    image: harbor.athena.cibertrs.cloud/athena-dev/nyxstrike:1.5.0
+    pythonBin: /opt/nyxstrike/nyxstrike-env/bin/python3
+
+vllm:
+  host: vllm.athena.cibertrs.cloud
+  ip: 10.200.129.124
+
+secrets:
+  athenaVllmKey: ""
+  nyxstrikeApiToken: ""
+
+ingress:
+  enabled: true
+  host: hades.athena.cibertrs.cloud
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns   # el ClusterIssuer que existe en el cluster
+  # ---- Basic-auth del dashboard en el nginx-ingress ----
+  # DESHABILITADO TEMPORALMENTE. El dashboard queda accesible sin credenciales.
+  # Para reactivarlo: enabled=true y pasar la contraseña (o un existingSecret):
+  #   helm upgrade hades ./ -n hades -f values-athena.yaml \
+  #     --set ingress.basicAuth.enabled=true \
+  #     --set ingress.basicAuth.password='<TU_PASSWORD>'
+  # (o rellena existingSecret con un Secret htpasswd ya creado).
+  basicAuth:
+    enabled: false
+    username: "hades"
+    existingSecret: ""

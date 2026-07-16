@@ -18,9 +18,17 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
-# UID/GID que el s6-overlay remapea (deben poder escribir HERMES_HOME).
-hermesUid: 501
-hermesGid: 20
+# UID/GID que el s6-overlay remapea (para hacer coincidir la propiedad de
+# ficheros con un usuario host en bind-mounts, p.ej. el docker-compose de dev).
+# DÉJALO VACÍO en Kubernetes: aquí no hay bind-mounts de un usuario host, así que
+# el remap solo consigue que el hermes de runtime deje de ser dueño de los build
+# trees horneados en la imagen (.venv, ui-tui, gateway, node_modules, ~1.2 GB) y
+# el stage2-hook lance un `chown -R` en CADA arranque (no hay PVC que lo persista),
+# con copy-up de overlayfs = arranque de ~1h. Vacío => hermes se queda en su UID
+# horneado, .venv ya le pertenece y el chown se salta. Solo ponlos si montas
+# HERMES_HOME desde un host y necesitas casar la propiedad con tu UID/GID.
+hermesUid: ""
+hermesGid: ""
 hermesHome: /opt/data
 
 # vLLM (Qwen local de Athena): alias host->IP, igual que el docker-compose.

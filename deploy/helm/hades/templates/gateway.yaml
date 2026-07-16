@@ -59,10 +59,14 @@ spec:
           env:
             - name: HERMES_HOME
               value: {{ .Values.hermesHome | quote }}
+            {{- if .Values.hermesUid }}
             - name: HERMES_UID
               value: {{ .Values.hermesUid | quote }}
+            {{- end }}
+            {{- if .Values.hermesGid }}
             - name: HERMES_GID
               value: {{ .Values.hermesGid | quote }}
+            {{- end }}
             - name: API_SERVER_HOST
               value: "0.0.0.0"
             - name: API_SERVER_PORT
