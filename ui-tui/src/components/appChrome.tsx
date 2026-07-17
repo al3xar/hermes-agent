@@ -378,12 +378,14 @@ const shortModelLabel = (model: string) =>
 // backend (not just the deepagents_mode flag). Native is the default and shows
 // nothing to keep the bar uncluttered.
 const runtimeLabel = (runtime?: string) =>
-  String(runtime ?? '').trim().toLowerCase() === 'deepagents' ? 'deepagents' : ''
+  String(runtime ?? '')
+    .trim()
+    .toLowerCase() === 'deepagents'
+    ? 'deepagents'
+    : ''
 
 const modelLabel = (model: string, effort?: string, fast?: boolean, runtime?: string) =>
-  [shortModelLabel(model), effortLabel(effort), fast ? 'fast' : '', runtimeLabel(runtime)]
-    .filter(Boolean)
-    .join(' ')
+  [shortModelLabel(model), effortLabel(effort), fast ? 'fast' : '', runtimeLabel(runtime)].filter(Boolean).join(' ')
 
 export function GoodVibesHeart({ tick, t }: { tick: number; t: Theme }) {
   const [active, setActive] = useState(false)

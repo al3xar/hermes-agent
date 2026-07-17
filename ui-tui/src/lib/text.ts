@@ -228,6 +228,7 @@ const TOOL_EMOJI: Record<string, string> = {
   kanban_show: '📋',
   kanban_list: '📋'
 }
+
 const DEFAULT_TOOL_EMOJI = '⚡'
 
 export const toolEmoji = (name: string) => TOOL_EMOJI[name] ?? DEFAULT_TOOL_EMOJI
