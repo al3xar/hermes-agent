@@ -7767,6 +7767,10 @@ def _session_info(agent, session: dict | None = None) -> dict:
         "model": pending_model or mirror.get("model", getattr(agent, "model", "")),
         "provider": pending_provider
         or mirror.get("provider", getattr(agent, "provider", "")),
+        # Backend that was actually instantiated (validates the live runtime,
+        # not just the deepagents_mode config flag). The status bar shows a
+        # badge when this is "deepagents".
+        "runtime": getattr(agent, "active_runtime", "native"),
         "reasoning_effort": reasoning_effort,
         "service_tier": service_tier,
         "fast": service_tier == "priority",
@@ -9304,6 +9308,21 @@ def _make_agent(
             if not resolution.selected_model:
                 raise RuntimeError("Auth fallback resolved without a model")
             model = resolution.selected_model
+    # Honor gateway.deepagents_mode (or top-level deepagents_mode) from
+    # config.yaml — same precedence as api_server._create_agent — so the
+    # TUI / dashboard runs the same runtime as the gateway platforms.
+    # Without this the TUI defaults to runtime="native", diverging from the
+    # gateway and skipping the DeepAgents/LangGraph runtime (and its Langfuse
+    # CallbackHandler tracing).
+    _gw_section = cfg.get("gateway")
+    _deepagents_raw = (
+        _gw_section.get("deepagents_mode") if isinstance(_gw_section, dict) else None
+    )
+    if _deepagents_raw is None:
+        _deepagents_raw = cfg.get("deepagents_mode")
+    _runtime_kwargs: dict = {}
+    if str(_deepagents_raw).strip().lower() in {"true", "1", "yes", "on"}:
+        _runtime_kwargs["runtime"] = "deepagents"
     _pr = _load_provider_routing()
     agent = AIAgent(
         model=model,
@@ -9351,6 +9370,7 @@ def _make_agent(
         skip_memory=is_truthy_value(os.environ.get("HERMES_IGNORE_RULES")),
         fallback_model=_load_fallback_model(),
         **_agent_cbs(sid),
+        **_runtime_kwargs,
     )
     if context_cwd_is_launch_artifact is None:
         with _sessions_lock:

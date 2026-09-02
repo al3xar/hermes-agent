@@ -66,6 +66,18 @@ from types import SimpleNamespace
 from hermes_constants import get_hermes_home
 
 
+def resolve_agent_runtime() -> str:
+    """Return the agent runtime identifier.
+
+    ``"native"`` is the default production runtime.  Callers that
+    pass this to ``AIAgent(runtime=...)`` get the standard behaviour;
+    deep-agents mode is selected by setting the runtime value to
+    ``"deepagents"`` at construction or via the ``agent.runtime``
+    config key.
+    """
+    return "native"
+
+
 def _launch_cwd_for_session(source: str) -> Optional[str]:
     """Working directory to stamp on a new session row, or None.
 
@@ -569,8 +581,65 @@ class AIAgent:
         pass_session_id: bool = False,
         requested_provider: str = None,
         capabilities: Dict[str, bool] | None = None,
+        runtime: str = "native",  # "native" | "deepagents"
     ):
-        """Forwarder — see ``agent.agent_init.init_agent``."""
+        """Forwarder — see ``agent.agent_init.init_agent`` (native runtime) or
+        ``_init_deepagents`` (deep-agents runtime).
+
+        ``runtime`` selects the execution backend.  Gateway/ACP/TUI call sites
+        splat a ``runtime`` key into ``AIAgent(**...)`` when deep-agents mode is
+        enabled (see ``resolve_agent_runtime``); it MUST stay a real parameter
+        so those sites don't hit ``unexpected keyword argument 'runtime'``.
+        """
+        if runtime == "deepagents":
+            self._init_deepagents(
+                base_url=base_url,
+                api_key=api_key,
+                provider=provider,
+                model=model,
+                max_iterations=max_iterations,
+                enabled_toolsets=enabled_toolsets,
+                disabled_toolsets=disabled_toolsets,
+                quiet_mode=quiet_mode,
+                skip_memory=skip_memory,
+                skip_context_files=skip_context_files,
+                session_id=session_id,
+                platform=platform,
+                reasoning_config=reasoning_config,
+                service_tier=service_tier,
+                request_overrides=request_overrides,
+                ephemeral_system_prompt=ephemeral_system_prompt,
+                credential_pool=credential_pool,
+            )
+            # Forward display callbacks / request config passed at construction
+            # to the deepagents impl. The native path routes these through
+            # ``init_agent``; here they would otherwise be dropped, so the
+            # streaming bridge gets ``None`` and the UI shows no tool / thinking
+            # / status chrome (only text streams, via run_conversation's
+            # stream_callback). The TUI and CLI pass these as constructor
+            # kwargs; the gateway sets them post-init, so only TUI/CLI were
+            # affected. ``__setattr__`` captures _CAPTURED_NAMES into the impl.
+            for _name, _val in (
+                ("tool_progress_callback", tool_progress_callback),
+                ("tool_start_callback", tool_start_callback),
+                ("tool_complete_callback", tool_complete_callback),
+                ("thinking_callback", thinking_callback),
+                ("reasoning_callback", reasoning_callback),
+                ("clarify_callback", clarify_callback),
+                ("step_callback", step_callback),
+                ("stream_delta_callback", stream_delta_callback),
+                ("interim_assistant_callback", interim_assistant_callback),
+                ("tool_gen_callback", tool_gen_callback),
+                ("status_callback", status_callback),
+                ("notice_callback", notice_callback),
+                ("notice_clear_callback", notice_clear_callback),
+                ("reasoning_config", reasoning_config),
+                ("service_tier", service_tier),
+                ("request_overrides", request_overrides),
+            ):
+                if _val is not None:
+                    setattr(self, _name, _val)
+            return
         if tool_delay is not None:
             warnings.warn(
                 "tool_delay is deprecated and ignored; sequential tool calls "
@@ -661,6 +730,116 @@ class AIAgent:
             checkpoint_max_file_size_mb=checkpoint_max_file_size_mb,
             pass_session_id=pass_session_id,
         )
+
+    def _init_deepagents(
+        self,
+        base_url,
+        api_key,
+        provider,
+        model,
+        max_iterations,
+        enabled_toolsets,
+        disabled_toolsets,
+        quiet_mode,
+        skip_memory,
+        skip_context_files,
+        session_id,
+        platform,
+        # Gateway / TUI / CLI extras:
+        reasoning_config=None,
+        service_tier=None,
+        request_overrides=None,
+        ephemeral_system_prompt=None,
+        credential_pool=None,
+    ):
+        """Initialize as DeepAgents-backed runtime.
+
+        Only the base config plus the reasoning/config kwargs that the
+        committed ``DeepAgentsAIAgent`` accepts are forwarded; the impl
+        captures every other callback via ``__setattr__`` after
+        construction.
+        """
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        self._runtime_mode = "deepagents"
+        self._deep_agents_impl = DeepAgentsAIAgent(
+            base_url=base_url,
+            api_key=api_key,
+            provider=provider,
+            model=model,
+            max_iterations=max_iterations,
+            enabled_toolsets=enabled_toolsets,
+            disabled_toolsets=disabled_toolsets,
+            quiet_mode=quiet_mode,
+            skip_memory=skip_memory,
+            skip_context_files=skip_context_files,
+            session_id=session_id,
+            platform=platform,
+            reasoning_config=reasoning_config,
+            service_tier=service_tier,
+            request_overrides=request_overrides,
+            ephemeral_system_prompt=ephemeral_system_prompt,
+            credential_pool=credential_pool,
+        )
+        # Expose gateway-facing attrs via the impl's __setattr__ forwarders.
+        self.reasoning_config = reasoning_config
+        self.service_tier = service_tier
+        self.request_overrides = request_overrides
+
+    # Callback forwarding for deepagents runtime mode: the gateway sets
+    # ``agent.tool_progress_callback = cb`` etc. These must reach
+    # self._deep_agents_impl (which has __setattr__ forwarding of its own).
+    def __setattr__(self, name, value):
+        if name == "_deep_agents_impl" or name == "_runtime_mode":
+            # These are set in __init__ — allow normally.
+            object.__setattr__(self, name, value)
+            return
+        try:
+            _mode = object.__getattribute__(self, "_runtime_mode")
+        except AttributeError:
+            _mode = "native"  # __init__ hasn't finished
+        if _mode == "deepagents" and hasattr(self, "_deep_agents_impl"):
+            from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+            if name in DeepAgentsAIAgent._CAPTURED_NAMES:
+                self._deep_agents_impl.__setattr__(name, value)
+                return
+        object.__setattr__(self, name, value)
+
+    def __getattr__(self, name):
+        # Forward attribute reads to _deep_agents_impl when in deepagents mode.
+        try:
+            _mode = object.__getattribute__(self, "_runtime_mode")
+        except AttributeError:
+            _mode = "native"
+        if _mode == "deepagents" and hasattr(self, "_deep_agents_impl"):
+            try:
+                return getattr(self._deep_agents_impl, name)
+            except AttributeError:
+                pass
+        raise AttributeError(f"'{type(self).__name__}' object has no attr '{name}'")
+
+    @property
+    def active_runtime(self) -> str:
+        """Return the execution backend that was *actually instantiated*.
+
+        Unlike the ``deepagents_mode`` config flag (which only states intent),
+        this reflects the live object graph: it returns ``"deepagents"`` only
+        when a ``DeepAgentsAIAgent`` impl was built and self-reports its mode,
+        and ``"native"`` otherwise. Use it to surface/verify the running
+        runtime (TUI status bar, diagnostics) instead of trusting config — a
+        misconfigured or failed deepagents init would never claim deepagents
+        here, because no impl exists to claim it.
+        """
+        try:
+            mode = object.__getattribute__(self, "_runtime_mode")
+        except AttributeError:
+            return "native"
+        if mode == "deepagents":
+            impl = getattr(self, "_deep_agents_impl", None)
+            if impl is not None and getattr(impl, "mode", None) == "deepagents":
+                return "deepagents"
+        return "native"
 
     def _get_session_db_for_recall(self):
         """Return a SessionDB for recall, lazily creating it if an entrypoint forgot.
@@ -9221,7 +9400,16 @@ class AIAgent:
         persist_user_platform_id: Optional[str] = None,
         moa_config: Optional[dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Forwarder — see ``agent.conversation_loop.run_conversation``."""
+        """Forwarder — see ``agent.conversation_loop.run_conversation`` (native
+        runtime) or delegate to the deep-agents impl."""
+        if hasattr(self, "_deep_agents_impl"):
+            return self._deep_agents_impl.run_conversation(
+                user_message=user_message,
+                system_message=system_message,
+                conversation_history=conversation_history,
+                task_id=task_id,
+                stream_callback=stream_callback,
+            )
         # A review deliberately shares this agent's session_id for prompt-cache
         # parity. Fence review startup or interrupt an admitted request, then
         # await that request's exit before opening any live-turn Relay or task

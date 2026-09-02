@@ -7477,6 +7477,11 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
     _systemd_watchdog: Optional[Any] = None
     _startup_restore_in_progress: bool = False
     _startup_warmup_task: Optional[asyncio.Task] = None
+    # Class-level default so helpers that resolve runtime state
+    # (e.g. ``_resolve_session_agent_runtime``) work on instances built
+    # without ``__init__`` running — mirrors ``_session_model_overrides``.
+    # ``__init__`` overrides this with the config-derived value.
+    _deepagents_mode: bool = False
 
     # ------------------------------------------------------------------
     # Legacy per-session dict adapters.  All per-session state lives in
@@ -7600,6 +7605,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         self._reasoning_config = self._load_reasoning_config()
         self._service_tier = self._load_service_tier()
         self._show_reasoning = self._load_show_reasoning()
+        self._deepagents_mode = bool(getattr(self.config, "deepagents_mode", False))
         self._busy_input_mode = self._load_busy_input_mode()
         self._busy_text_mode = self._load_busy_text_mode()
         # Secondary-profile busy modes are snapshotted during multiplex
@@ -8943,6 +8949,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             )
 
         runtime_kwargs = _resolve_runtime_agent_kwargs()
+        runtime_kwargs["deepagents_mode"] = self._deepagents_mode
         runtime_model = runtime_kwargs.pop("model", None)
         if runtime_model:
             logger.info(
@@ -9069,6 +9076,11 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             "max_tokens": runtime_kwargs.get("max_tokens"),
             "capabilities": dict(runtime_kwargs.get("capabilities") or {}),
         }
+        # ``runtime`` is splatted into AIAgent(**...), whose signature has no
+        # ``deepagents_mode`` kwarg — map the flag onto the ``runtime``
+        # selector instead of forwarding it.
+        if runtime_kwargs.pop("deepagents_mode", False):
+            runtime["runtime"] = "deepagents"
         base_request_overrides = dict(runtime_kwargs.get("request_overrides") or {})
         route = {
             "model": model,

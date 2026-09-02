@@ -1030,6 +1030,9 @@ class GatewayConfig:
     # fresh session exactly as if the reset policy had fired.  0 = disabled.
     session_store_max_age_days: int = 90
 
+    # When true, all gateway message turns use the DeepAgents runtime instead of the
+    # native conversation loop. Toggled at runtime via /runtime command or config.yaml.
+    deepagents_mode: bool = False
     # Profile-based routing: route specific guilds/channels/threads to
     # different profiles. See gateway/profile_routing.py. Each entry is a
     # dict with: name, platform, profile, and optional guild_id/chat_id/thread_id.
@@ -1315,6 +1318,12 @@ class GatewayConfig:
         except (TypeError, ValueError):
             session_store_max_age_days = 90
 
+        deepagents_raw = (
+            nested_gateway.get("deepagents_mode") if nested_gateway else None
+        )
+        if deepagents_raw is None:
+            deepagents_raw = data.get("deepagents_mode")
+        deepagents_mode = _coerce_bool(deepagents_raw, False)
         # Parse profile routes (validated by gateway.profile_routing)
         from gateway.profile_routing import parse_profile_routes
         profile_routes = parse_profile_routes(data.get("profile_routes") or [])
@@ -1348,6 +1357,7 @@ class GatewayConfig:
             unauthorized_dm_behavior=unauthorized_dm_behavior,
             streaming=StreamingConfig.from_dict(data.get("streaming", {})),
             session_store_max_age_days=session_store_max_age_days,
+            deepagents_mode=deepagents_mode,
             profile_routes=profile_routes,
         )
 
@@ -1524,6 +1534,15 @@ def load_gateway_config() -> GatewayConfig:
 
             if "max_concurrent_sessions" in yaml_cfg:
                 gw_data["max_concurrent_sessions"] = yaml_cfg["max_concurrent_sessions"]
+
+            if (
+                isinstance(gateway_section, dict)
+                and "deepagents_mode" in gateway_section
+            ):
+                gw_data["deepagents_mode"] = gateway_section["deepagents_mode"]
+
+            if "deepagents_mode" in yaml_cfg:
+                gw_data["deepagents_mode"] = yaml_cfg["deepagents_mode"]
 
             streaming_cfg = yaml_cfg.get("streaming")
             if not isinstance(streaming_cfg, dict) and isinstance(gateway_section, dict):
