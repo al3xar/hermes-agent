@@ -112,7 +112,7 @@ jobs:
 
       - name: Create/attach release
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
-        uses: actions/create-or-update-release@v1
+        uses: softprops/action-creator-release@v1
         with:
           release_name: Hermes ${{ steps.version.outputs.version }}
           tag_name: v${{ steps.version.outputs.version }}
