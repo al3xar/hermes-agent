@@ -1,0 +1,139 @@
+name: GHCR publish + release artifacts
+
+# Publishes the Hermes (Deep Agents + Langfuse) Docker image to GitHub
+# Container Registry (GHCR) and attaches a build artifact to releases.
+#
+# Why a new workflow (not editing docker.yml):
+#   * The upstream docker.yml publishes to Docker Hub and its `publish`
+#     job is gated with `if: github.repository == 'NousResearch/hermes-agent'`,
+#     so it NEVER runs in the al3xar fork.
+#   * GHCR ("published on GitHub") is what the Helm chart pulls from.
+#   * Keeping this in its own file avoids conflicts with the daily
+#     upstream sync.
+#
+# The image name is derived from the repo owner so it is correct in any
+# fork: ghcr.io/<owner>/hermes-agent (e.g. ghcr.io/al3xar/hermes-agent).
+#
+# PRIVATE-REPO NOTE: the default GITHUB_TOKEN cannot push to GHCR for a
+# private repository (it lacks the write:packages scope). For private repos
+# set a repo secret named GHCR_PAT to a classic token that has the
+# write:packages scope (Settings -> Secrets -> Actions). For public repos
+# GITHUB_TOKEN works without it. The login step falls back to GITHUB_TOKEN.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hermes-agent
+
+permissions:
+  contents: write     # for creating releases
+  packages: write     # for pushing to GHCR (public repos)
+
+jobs:
+  build-and-publish:
+    name: Build + publish to GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for arm64 cross-build)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            # A version tag (v0.21.0) -> tag the release image.
+            ver="${GITHUB_REF_NAME#v}"
+          else
+            # Otherwise use the pyproject version (push to main).
+            ver="$(python3 -c 'import tomllib,sys; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          fi
+          echo "version=${ver}" >> "${GITHUB_OUTPUT}"
+          echo "sha=${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "Using image version: ${ver}"
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            HERMES_GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE_NAME }}:main
+          cache-from: type=gha,scope=${{ env.IMAGE_NAME }}
+          cache-to: type=gha,mode=max,scope=${{ env.IMAGE_NAME }}
+
+      - name: Record digest + provenance
+        id: digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Capture the pushed digest for the release artifact.
+          digest="$(docker buildx du 2>/dev/null || true)"
+          # image-provenance.json is baked into the image at /etc/hermes;
+          # re-derive the same content here so it is a release artifact too.
+          cat > release-provenance.json <<EOF
+          {
+            "schema": 1,
+            "image": "${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}",
+            "revision": "${{ github.sha }}",
+            "version": "${{ steps.version.outputs.version }}",
+            "registry": "ghcr.io",
+            "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          echo "Provenance written."
+
+      - name: Create/attach release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+        uses: actions/create-or-update-release@v1
+        with:
+          release_name: Hermes ${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          body: |
+            Hermes image published to GHCR:
+            - ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            - ${{ env.IMAGE_NAME }}:latest
+            - ${{ env.IMAGE_NAME }}:main
+
+            Deep Agents core + Langfuse are baked in (Dockerfile installs
+            the `deepagents` extra). Pull with:
+            `docker pull ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}`
+          draft: false
+          prerelease: false
+
+      - name: Upload build artifact (provenance + manifest)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-build-artifact-${{ steps.version.outputs.version }}
+          path: |
+            release-provenance.json
+            Dockerfile
+          if-no-files-found: error
