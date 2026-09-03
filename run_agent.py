@@ -752,17 +752,18 @@ class AIAgent:
         ephemeral_system_prompt=None,
         credential_pool=None,
     ):
-        """Initialize as DeepAgents-backed runtime.
+        """Deep-agents runtime seam.
 
-        Only the base config plus the reasoning/config kwargs that the
-        committed ``DeepAgentsAIAgent`` accepts are forwarded; the impl
-        captures every other callback via ``__setattr__`` after
-        construction.
+        The live construction logic lives in ``agent.deep_agents_wiring`` so
+        it can re-synchronise against an upstream change to ``run_agent.py``
+        without touching the core. ``run_agent.py`` only keeps this stable
+        seam (the ``if runtime == "deepagents": self._init_deepagents(...)``
+        dispatch in ``__init__``); the behaviour is delegated, not inlined.
         """
-        from agent.deep_agents_runtime import DeepAgentsAIAgent
+        from agent import deep_agents_wiring
 
-        self._runtime_mode = "deepagents"
-        self._deep_agents_impl = DeepAgentsAIAgent(
+        return deep_agents_wiring._deepagents_init(
+            self,
             base_url=base_url,
             api_key=api_key,
             provider=provider,
@@ -781,65 +782,27 @@ class AIAgent:
             ephemeral_system_prompt=ephemeral_system_prompt,
             credential_pool=credential_pool,
         )
-        # Expose gateway-facing attrs via the impl's __setattr__ forwarders.
-        self.reasoning_config = reasoning_config
-        self.service_tier = service_tier
-        self.request_overrides = request_overrides
 
     # Callback forwarding for deepagents runtime mode: the gateway sets
-    # ``agent.tool_progress_callback = cb`` etc. These must reach
-    # self._deep_agents_impl (which has __setattr__ forwarding of its own).
+    # ``agent.tool_progress_callback = cb`` etc. The forwarding behaviour
+    # lives in ``agent.deep_agents_wiring`` (it can re-synchronise against an
+    # upstream change to ``run_agent.py`` without touching the core). These
+    # dunder methods are thin, stable seams that delegate to that module.
     def __setattr__(self, name, value):
-        if name == "_deep_agents_impl" or name == "_runtime_mode":
-            # These are set in __init__ — allow normally.
-            object.__setattr__(self, name, value)
-            return
-        try:
-            _mode = object.__getattribute__(self, "_runtime_mode")
-        except AttributeError:
-            _mode = "native"  # __init__ hasn't finished
-        if _mode == "deepagents" and hasattr(self, "_deep_agents_impl"):
-            from agent.deep_agents_runtime import DeepAgentsAIAgent
+        from agent import deep_agents_wiring
 
-            if name in DeepAgentsAIAgent._CAPTURED_NAMES:
-                self._deep_agents_impl.__setattr__(name, value)
-                return
-        object.__setattr__(self, name, value)
+        deep_agents_wiring.apply_setattr(self, name, value)
 
     def __getattr__(self, name):
-        # Forward attribute reads to _deep_agents_impl when in deepagents mode.
-        try:
-            _mode = object.__getattribute__(self, "_runtime_mode")
-        except AttributeError:
-            _mode = "native"
-        if _mode == "deepagents" and hasattr(self, "_deep_agents_impl"):
-            try:
-                return getattr(self._deep_agents_impl, name)
-            except AttributeError:
-                pass
-        raise AttributeError(f"'{type(self).__name__}' object has no attr '{name}'")
+        from agent import deep_agents_wiring
+
+        return deep_agents_wiring.apply_getattr(self, name)
 
     @property
     def active_runtime(self) -> str:
-        """Return the execution backend that was *actually instantiated*.
+        from agent import deep_agents_wiring
 
-        Unlike the ``deepagents_mode`` config flag (which only states intent),
-        this reflects the live object graph: it returns ``"deepagents"`` only
-        when a ``DeepAgentsAIAgent`` impl was built and self-reports its mode,
-        and ``"native"`` otherwise. Use it to surface/verify the running
-        runtime (TUI status bar, diagnostics) instead of trusting config — a
-        misconfigured or failed deepagents init would never claim deepagents
-        here, because no impl exists to claim it.
-        """
-        try:
-            mode = object.__getattribute__(self, "_runtime_mode")
-        except AttributeError:
-            return "native"
-        if mode == "deepagents":
-            impl = getattr(self, "_deep_agents_impl", None)
-            if impl is not None and getattr(impl, "mode", None) == "deepagents":
-                return "deepagents"
-        return "native"
+        return deep_agents_wiring.resolve_active_runtime(self)
 
     def _get_session_db_for_recall(self):
         """Return a SessionDB for recall, lazily creating it if an entrypoint forgot.
