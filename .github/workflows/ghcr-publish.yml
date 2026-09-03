@@ -110,23 +110,35 @@ jobs:
           EOF
           echo "Provenance written."
 
-      - name: Create/attach release
+      - name: Create release + attach artifact
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
-        uses: softprops/action-creator-release@v1
-        with:
-          release_name: Hermes ${{ steps.version.outputs.version }}
-          tag_name: v${{ steps.version.outputs.version }}
-          body: |
-            Hermes image published to GHCR:
-            - ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            - ${{ env.IMAGE_NAME }}:latest
-            - ${{ env.IMAGE_NAME }}:main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.version.outputs.version }}"
+          VER="${{ steps.version.outputs.version }}"
+          cat > release-notes.md <<EOF
+          Hermes image published to GHCR:
+          - ${{ env.IMAGE_NAME }}:${VER}
+          - ${{ env.IMAGE_NAME }}:latest
+          - ${{ env.IMAGE_NAME }}:main
 
-            Deep Agents core + Langfuse are baked in (Dockerfile installs
-            the `deepagents` extra). Pull with:
-            `docker pull ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}`
-          draft: false
-          prerelease: false
+          Deep Agents core + Langfuse are baked in (Dockerfile installs the
+          'deepagents' extra). Pull with:
+          \`docker pull ${{ env.IMAGE_NAME }}:${VER}\`
+          EOF
+          # Create the release if it does not already exist, else reuse it.
+          gh release create "${TAG}" \
+            --repo "${{ github.repository }}" \
+            --title "Hermes ${VER}" \
+            --notes-file release-notes.md \
+            --draft=false --prerelease=false || \
+          gh release edit "${TAG}" \
+            --repo "${{ github.repository }}" \
+            --notes-file release-notes.md
+          echo "Release ${TAG} ready."
 
       - name: Upload build artifact (provenance + manifest)
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
