@@ -140,12 +140,18 @@ jobs:
             --notes-file release-notes.md
           echo "Release ${TAG} ready."
 
-      - name: Upload build artifact (provenance + manifest)
+      - name: Upload build artifact to the release
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: hermes-build-artifact-${{ steps.version.outputs.version }}
-          path: |
-            release-provenance.json
-            Dockerfile
-          if-no-files-found: error
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.version.outputs.version }}"
+          # Attach the provenance + Dockerfile to the RELEASE (not just the run).
+          # gh release upload makes these downloadable from the release page.
+          gh release upload "${TAG}" \
+            --repo "${{ github.repository }}" \
+            release-provenance.json Dockerfile \
+            --clobber
+          echo "Artifact uploaded to release ${TAG}."
