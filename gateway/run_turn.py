@@ -133,7 +133,11 @@ class GatewayTurnMixin:
             )
 
         runtime_kwargs = _resolve_runtime_agent_kwargs()
-        runtime_kwargs["deepagents_mode"] = self._deepagents_mode
+        # Map the deep-agents flag onto the ``runtime`` selector (the same seam
+        # api_server / tui_gateway use) instead of forwarding a ``deepagents_mode``
+        # kwarg that ``AIAgent.__init__`` no longer accepts.
+        if self._deepagents_mode:
+            runtime_kwargs["runtime"] = "deepagents"
         runtime_model = runtime_kwargs.pop("model", None)
         if runtime_model:
             logger.info("Runtime provider supplied explicit model override: %s -> %s", model, runtime_model)
@@ -203,15 +207,11 @@ class GatewayTurnMixin:
         runtime = {
             k: runtime_kwargs.get(k) for k in (
                 "api_key", "base_url", "provider", "requested_provider", "api_mode", "command", "args",
-                "credential_pool", "max_tokens", "capabilities",
+                "credential_pool", "max_tokens", "capabilities", "runtime",
             )
         }
         runtime["args"] = list(runtime["args"] or [])
         runtime["capabilities"] = dict(runtime["capabilities"] or {})
-        # ``runtime`` is splatted into AIAgent(**...), whose signature has no ``deepagents_mode``
-        # kwarg — map the flag onto the ``runtime`` selector instead of forwarding it.
-        if runtime_kwargs.pop("deepagents_mode", False):
-            runtime["runtime"] = "deepagents"
         base_request_overrides = dict(runtime_kwargs.get("request_overrides") or {})
         route = {
             "model": model,
