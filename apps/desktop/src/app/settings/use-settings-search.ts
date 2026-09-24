@@ -190,6 +190,15 @@ export function useSettingsSearchCatalog(enabled: boolean) {
     },
     {
       context: appearanceContext,
+      description: appearance.textDirectionDesc,
+      icon: Palette,
+      id: `setting:${APPEARANCE_SETTING_IDS.textDirection}`,
+      keywords: ['rtl', 'ltr', 'right to left', 'left to right', 'bidi', 'arabic', 'hebrew', 'persian', 'align'],
+      label: appearance.textDirectionTitle,
+      target: { setting: APPEARANCE_SETTING_IDS.textDirection, view: 'config:appearance' }
+    },
+    {
+      context: appearanceContext,
       description: appearance.backdropDesc,
       icon: Palette,
       id: `setting:${APPEARANCE_SETTING_IDS.backdrop}`,
@@ -205,6 +214,15 @@ export function useSettingsSearchCatalog(enabled: boolean) {
       keywords: ['splash', 'wordmark', 'empty chat', 'new chat'],
       label: appearance.introSplashTitle,
       target: { setting: APPEARANCE_SETTING_IDS.introSplash, view: 'config:appearance' }
+    },
+    {
+      context: appearanceContext,
+      description: t.interfaceMode.hint,
+      icon: Palette,
+      id: `setting:${APPEARANCE_SETTING_IDS.interfaceMode}`,
+      keywords: ['simple', 'advanced', 'mode', 'interface', 'chrome', 'minimal', 'focus'],
+      label: t.interfaceMode.title,
+      target: { setting: APPEARANCE_SETTING_IDS.interfaceMode, view: 'config:appearance' }
     },
     {
       context: appearanceContext,

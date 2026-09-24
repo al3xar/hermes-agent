@@ -17,6 +17,13 @@ import { cn } from '@/lib/utils'
 import { $backdrop, setBackdrop } from '@/store/backdrop'
 import { $composerPopoutGesturesEnabled, setComposerPopoutGesturesEnabled } from '@/store/composer-popout'
 import { $embedAllowed, $embedMode, clearEmbedAllowed, type EmbedMode, setEmbedMode } from '@/store/embed-consent'
+import {
+  $interfaceMode,
+  $modeShadowed,
+  INTERFACE_MODES,
+  type InterfaceMode,
+  setInterfaceMode
+} from '@/store/interface-mode'
 import { $introSplash, setIntroSplash } from '@/store/intro-splash'
 import { notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
@@ -24,6 +31,7 @@ import { $reactionsEnabled, setReactionsEnabled } from '@/store/reactions-enable
 import { $reasoningCollapsedByDefault, setReasoningCollapsedByDefault } from '@/store/reasoning-disclosure'
 import { $sessionListDensity, type SessionListDensity, setSessionListDensity } from '@/store/session-list-density'
 import { $tabStripDefault, setTabStripDefault, type TabStripDefault } from '@/store/tabstrip-prefs'
+import { $textDirection, setTextDirection, TEXT_DIRECTIONS, type TextDirection } from '@/store/text-direction'
 import { $hideThreadTimeline, setHideThreadTimeline } from '@/store/thread-timeline'
 import { $spentTipCount, $tipsEnabled, resetTips, setTipsEnabled } from '@/store/tips'
 import {
@@ -409,9 +417,13 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
   const { t, isSavingLocale } = useI18n()
   const { themeName, mode, resolvedMode, availableThemes, setTheme, setMode } = useTheme()
   const toolViewMode = useStore($toolViewMode)
+  const toolViewShadowed = useStore($modeShadowed('toolViewMode'))
   const hideCodeDiffs = useStore($hideCodeDiffs)
+  const hideCodeDiffsShadowed = useStore($modeShadowed('hideCodeDiffs'))
   const hideThreadTimeline = useStore($hideThreadTimeline)
   const reasoningCollapsedByDefault = useStore($reasoningCollapsedByDefault)
+  const reasoningCollapsedShadowed = useStore($modeShadowed('reasoningCollapsedByDefault'))
+  const interfaceMode = useStore($interfaceMode)
   const sessionListDensity = useStore($sessionListDensity)
   const tabStripDefault = useStore($tabStripDefault)
   const titlebarAppActionsSide = useStore($titlebarAppActionsSide)
@@ -422,6 +434,7 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
   const translucency = useStore($translucency)
   const glassMode = translucency.mode === 'glass' && GLASS_SUPPORTED
   const userBubbleTransparency = useStore($userBubbleTransparency)
+  const textDirection = useStore($textDirection)
   const reactionsEnabled = useStore($reactionsEnabled)
   const tipsEnabled = useStore($tipsEnabled)
   const toursEnabled = useStore($toursEnabled)
@@ -503,6 +516,19 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
     { id: 'detailed', label: a.sessionDensityDetailed }
   ] as const satisfies readonly { id: SessionListDensity; label: string }[]
 
+  const interfaceModeOptions = INTERFACE_MODES.map(id => ({
+    id,
+    label: t.interfaceMode[id].label
+  })) satisfies readonly {
+    id: InterfaceMode
+    label: string
+  }[]
+
+  // A row whose value Simple mode currently decides says so where the
+  // preference text would otherwise promise a persistence it cannot deliver.
+  const withModeNote = (description: string, shadowed: boolean) =>
+    shadowed ? `${description} ${t.interfaceMode.sessionNote}` : description
+
   const tabStripOptions = [
     { id: 'auto', label: a.tabStripAuto },
     { id: 'always', label: a.tabStripAlways },
@@ -513,6 +539,11 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
     { id: 'right', label: a.appActionsRight },
     { id: 'left', label: a.appActionsLeft }
   ] as const satisfies readonly { id: TitlebarAppActionsSide; label: string }[]
+
+  const textDirectionOptions = TEXT_DIRECTIONS.map(id => ({
+    id,
+    label: a.textDirection[id]
+  })) satisfies readonly { id: TextDirection; label: string }[]
 
   const embedOptions = [
     { id: 'ask', label: a.embedsAsk },
@@ -682,6 +713,24 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
                 <SegmentedControl
                   onChange={id => {
                     triggerHaptic('selection')
+                    setInterfaceMode(id)
+                  }}
+                  options={interfaceModeOptions}
+                  value={interfaceMode}
+                />
+              }
+              description={t.interfaceMode.hint}
+              id={appearanceSettingElementId(APPEARANCE_SETTING_IDS.interfaceMode)}
+              title={t.interfaceMode.title}
+            />
+          )}
+
+          {show('window-layout') && (
+            <ListRow
+              action={
+                <SegmentedControl
+                  onChange={id => {
+                    triggerHaptic('selection')
                     setSessionListDensity(id)
                   }}
                   options={sessionDensityOptions}
@@ -835,6 +884,24 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
               description={a.userBubbleDesc}
               id={appearanceSettingElementId(APPEARANCE_SETTING_IDS.userBubble)}
               title={a.userBubbleTitle}
+            />
+          )}
+
+          {show('chat-display') && (
+            <ListRow
+              action={
+                <SegmentedControl
+                  onChange={id => {
+                    triggerHaptic('selection')
+                    setTextDirection(id)
+                  }}
+                  options={textDirectionOptions}
+                  value={textDirection}
+                />
+              }
+              description={a.textDirectionDesc}
+              id={appearanceSettingElementId(APPEARANCE_SETTING_IDS.textDirection)}
+              title={a.textDirectionTitle}
             />
           )}
 
@@ -1020,7 +1087,7 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
                   value={toolViewMode}
                 />
               }
-              description={a.toolViewDesc}
+              description={withModeNote(a.toolViewDesc, toolViewShadowed)}
               id={appearanceSettingElementId(APPEARANCE_SETTING_IDS.toolView)}
               title={a.toolViewTitle}
             />
@@ -1041,7 +1108,7 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
                   value={hideCodeDiffs ? 'on' : 'off'}
                 />
               }
-              description={a.hideCodeDiffsDesc}
+              description={withModeNote(a.hideCodeDiffsDesc, hideCodeDiffsShadowed)}
               id={appearanceSettingElementId(APPEARANCE_SETTING_IDS.hideCodeDiffs)}
               title={a.hideCodeDiffsTitle}
             />
@@ -1062,7 +1129,7 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
                   value={reasoningCollapsedByDefault ? 'on' : 'off'}
                 />
               }
-              description={a.reasoningCollapsedDesc}
+              description={withModeNote(a.reasoningCollapsedDesc, reasoningCollapsedShadowed)}
               title={a.reasoningCollapsedTitle}
             />
           )}

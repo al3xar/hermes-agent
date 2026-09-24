@@ -20,8 +20,10 @@ export const APPEARANCE_SETTING_IDS = {
   introSplash: 'appearance.intro-splash',
   language: 'appearance.language',
   minimizeToTray: 'appearance.minimize-to-tray',
+  textDirection: 'appearance.text-direction',
   theme: 'appearance.theme',
   toolView: 'appearance.tool-view',
+  interfaceMode: 'appearance.interface-mode',
   translucency: 'appearance.translucency',
   uiScale: 'appearance.ui-scale',
   userBubble: 'appearance.user-bubble'
