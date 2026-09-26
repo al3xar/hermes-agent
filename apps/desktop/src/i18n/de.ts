@@ -492,6 +492,10 @@ export const deOverrides = {
     backendOutOfDateTitle: 'Backend veraltet',
     backendOutOfDateMessage:
       'Ihr Hermes-Backend ist älter als dieser Desktop-Build und funktioniert möglicherweise nicht richtig. Aktualisieren Sie, um beide abzugleichen.',
+    desktopOutOfDateTitle: 'Hermes-App veraltet',
+    desktopOutOfDateMessage:
+      'Diese Hermes-App ist älter als das verbundene Backend und funktioniert möglicherweise nicht richtig. Aktualisieren Sie die App, um beide abzugleichen.',
+    updateDesktopApp: 'App aktualisieren',
     installMethodUnsupportedTitle: 'Nicht unterstützte Installationsmethode',
     updateHermes: 'Hermes aktualisieren',
     updateReadyTitle: 'Update bereit',
@@ -909,6 +913,8 @@ export const deOverrides = {
         agentSuccess: name => `Agent-Plugin ${name} installiert`,
         desktopSuccess: name => `Desktop-Plugin ${name} installiert`,
         agentFailed: 'Installation des Agent-Plugins fehlgeschlagen',
+        installUncertain:
+          'Hermes wartet nicht mehr auf das Installationsergebnis, aber das Plugin wird möglicherweise noch installiert. Schließe dieses Fenster und aktualisiere die Pluginliste, bevor du die Installation erneut startest.',
         desktopFailed: 'Installation des Desktop-Plugins fehlgeschlagen',
         missingEnv: (name, vars) =>
           `${name} ist installiert, benötigt aber einen Schlüssel, um zu funktionieren: ${vars}. Fügen Sie ihn jetzt hinzu, sonst schlagen die Tools des Plugins fehl.`
@@ -3527,7 +3533,18 @@ export const deOverrides = {
       gatewayUnreachable: gateway => `${gateway} · nicht erreichbar`,
       onGateway: (name, gateway) => `${name} · ${gateway}`,
       switchTo: (name, gateway) => `Zu ${name} auf ${gateway} wechseln`,
-      deleteOn: gateway => ` auf ${gateway}`
+      deleteOn: gateway => ` auf ${gateway}`,
+      localDevice:
+        'Dieses Gerät (lokales Backend — installiert Hermes, falls es fehlt, sonst öffnet es eine neue Sitzung)',
+      switchDeviceTitle: 'Zu diesem Gerät wechseln?',
+      switchDeviceDesc:
+        'Das öffnet eine neue Sitzung auf diesem Computer. Das aktuelle Gespräch bleibt auf dem anderen Gateway.',
+      switchDeviceConfirm: 'Wechseln',
+      installDeviceTitle: 'Zu diesem Gerät wechseln?',
+      installDeviceDesc:
+        'Hermes wird lokal installiert und danach eine neue Sitzung auf diesem Computer geöffnet. Ohne Bestätigung startet keine Installation.',
+      installDeviceConfirm: 'Lokal installieren',
+      connectExistingInstead: 'Stattdessen vorhandenes verbinden'
     },
     status: {
       unread: (count: number) => (count === 1 ? '1 ungelesene Sitzung' : `${count} ungelesene Sitzungen`),
@@ -4029,6 +4046,7 @@ export const deOverrides = {
       branchFrom: 'Branch',
       rename: 'Umbenennen…',
       archive: 'Archivieren',
+      unarchive: 'Archivierung aufheben',
       newWindow: 'Neues Fenster',
       openInTerminal: 'Im Terminal öffnen',
       hideTabBar: 'Tab-Leiste ausblenden',
@@ -4431,7 +4449,7 @@ export const deOverrides = {
       copyFailure: 'Kriterium konnte nicht in die Zwischenablage kopiert werden',
       continuationFailed: 'Ziel-Fortsetzung konnte nicht übermittelt werden',
       continuationQueued: 'Ziel fortgesetzt — Fortsetzung in der Warteschlange, bis die aktuelle Runde endet',
-      continuationBusy: 'Ziel fortgesetzt — Session ist beschäftigt, /interrupt zum Fortsetzen der aktuellen Runde',
+      continuationBusy: 'Ziel fortgesetzt — Session ist beschäftigt; stoppe zuerst die aktuelle Antwort (Stopp-Button oder Esc), um fortzufahren',
       controlUnavailable: msg => `Session-Steuerung nicht verfügbar: ${msg}`,
       dismissError: 'Fehler verwerfen',
       add: 'Hinzufügen'
@@ -4579,9 +4597,12 @@ export const deOverrides = {
     maybeLater: 'Später',
     moreChanges: count => `+ ${count} weitere Änderung${count === 1 ? '' : 'en'} enthalten.`,
     manualTitle: 'Über Ihr Terminal aktualisieren',
+    manualUnavailableTitle: 'Aktualisierung hier nicht möglich',
     manualBody:
       'Sie haben Hermes über die Befehlszeile installiert, daher laufen Updates auch dort. Fügen Sie dies in Ihr Terminal ein:',
     manualPickedUp: 'Hermes übernimmt die neue Version beim nächsten Start.',
+    manualBodyBackend: 'Das Hermes-Backend wird außerhalb dieser App verwaltet. Führen Sie dies auf dem Server aus, der es hostet:',
+    manualPickedUpBackend: 'Das Backend lädt die neue Version, sobald das Update abgeschlossen ist.',
     guiSkewTitle: 'Desktop-App aktualisieren',
     guiSkewBody:
       'Das Backend wurde aktualisiert, aber dieses Desktop-App-Paket nicht. Aktualisieren oder installieren Sie die Hermes-Desktop-App neu (Ihr AppImage / .deb / .rpm), um beide abzugleichen.',
@@ -4779,6 +4800,7 @@ export const deOverrides = {
     replaceCurrent: 'Aktuellen Wert ersetzen',
     pasteApiKey: 'API-Key einfügen',
     localApiKeyPlaceholder: 'API-Key (optional – nur falls Ihr Endpunkt einen benötigt)',
+    localModelNamePlaceholder: 'Modellname (z. B. command-a-plus-05-2026)',
     couldNotSave: 'Anmeldedaten konnten nicht gespeichert werden.',
     connecting: 'Verbinden',
     update: 'Aktualisieren',
@@ -4932,6 +4954,7 @@ export const deOverrides = {
       search: 'Modelle durchsuchen',
       noModels: 'Keine Modelle gefunden',
       editModels: 'Modelle bearbeiten…',
+      followDefault: 'Standard aus den Einstellungen verwenden',
       refreshModels: 'Modelle aktualisieren',
       fast: 'Schnell'
     },
@@ -5067,7 +5090,8 @@ export const deOverrides = {
         title: 'Kontext-Verbrauch',
         tokenSummary: (used, max) => `${used} / ${max} Tokens`
       },
-      session: 'Session',
+      focusedSince: 'Fokussiert seit',
+      focusedSinceTitle: 'Zeit seit dem Fokussieren dieses Chats — nicht die Laufzeit eines Turns',
       yoloOn: 'YOLO an — gefährliche Befehle werden automatisch genehmigt. Shift+Klick schaltet global um.',
       yoloOff: 'YOLO aus. Shift+Klick schaltet global um.',
       modelNone: 'keines',
@@ -5930,6 +5954,8 @@ export const deOverrides = {
     deleteFailed: 'Löschen fehlgeschlagen',
     archived: 'Archiviert',
     archiveFailed: 'Archivieren fehlgeschlagen',
+    restored: 'Wiederhergestellt',
+    unarchiveFailed: 'Archivierung aufheben fehlgeschlagen',
     cwdChangeFailed: 'Arbeitsverzeichnis-Änderung fehlgeschlagen',
     cwdStagedTitle: 'Arbeitsverzeichnis bereitgestellt',
     cwdStagedMessage: 'Starten Sie das Desktop-Backend neu, um cwd-Änderungen auf diese aktive Session anzuwenden.',
