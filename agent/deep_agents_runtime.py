@@ -1553,6 +1553,11 @@ class DeepAgentsAIAgent:
             enabled_toolsets=enabled_toolsets,
             disabled_toolsets=disabled_toolsets,
         )
+        # Signature of the baked (directly-visible) tool set, so run_conversation
+        # can detect a mid-session change and rebuild — native parity (the native
+        # loop re-snapshots tools every turn). Deferred tools need no rebuild: the
+        # tool_search bridge reads the live registry per call.
+        self._baked_tool_sig = frozenset(getattr(t, "name", "") for t in tools)
 
         # Optional: LangGraph checkpointer for tracing / state persistence
         checkpointer = None
@@ -1705,6 +1710,42 @@ class DeepAgentsAIAgent:
         logger.info("DeepAgents agent rebuilt (tool list refreshed)")
         return True
 
+    def _maybe_refresh_tools(self) -> None:
+        """Rebuild the graph when the directly-visible tool set changed since the
+        last build — so tools that appear mid-conversation (e.g. an MCP server
+        that connects, or a toolset that becomes available) are usable in the
+        SAME session, matching the native runtime, which re-snapshots tools every
+        turn. Deferred tools need no rebuild: the tool_search bridge reads the
+        live registry on each call. A rebuild is a prompt-cache break, so it
+        fires only on an actual change — the same freshness/cost trade the native
+        loop makes. Best-effort: a signature failure leaves the current graph.
+        """
+        try:
+            from model_tools import get_tool_definitions
+
+            bk = getattr(self, "_build_kwargs", None) or {}
+            defs = get_tool_definitions(
+                enabled_toolsets=bk.get("enabled_toolsets"),
+                disabled_toolsets=bk.get("disabled_toolsets"),
+                quiet_mode=True,
+            ) or []
+            current = frozenset(
+                (d.get("function", {}) or {}).get("name", "")
+                for d in defs
+                if isinstance(d, dict)
+            )
+        except Exception:
+            logger.debug("tool-refresh signature failed", exc_info=True)
+            return
+
+        baked = getattr(self, "_baked_tool_sig", None)
+        if baked is not None and current != baked:
+            logger.info(
+                "DeepAgents: visible tool set changed (%d→%d), rebuilding graph",
+                len(baked), len(current),
+            )
+            self.rebuild_agent()
+
     # ------------------------------------------------------------------
     # Callback forwarding (__setattr__ / _get_cap / __getattr__)
     #
@@ -1758,6 +1799,10 @@ class DeepAgentsAIAgent:
         the forwarding dict so the gateway's per-turn attribute-setting
         pattern works without modification.
         """
+        # Native parity: pick up tools that appeared since the graph was baked
+        # (e.g. a mid-session MCP connection) before running this turn.
+        self._maybe_refresh_tools()
+
         langchain_history = _convert_messages_to_langchain(conversation_history or [])
         if system_message:
             langchain_history = [

@@ -1410,3 +1410,45 @@ class TestRoundTripConversion:
         step1 = _convert_messages_to_langchain(original)
         step2 = _convert_langchain_to_hermes(step1)
         assert step2[0]["role"] == "assistant" and step2[0]["tool_calls"] == tool_calls
+
+
+class TestMaybeRefreshTools:
+    """run_conversation refreshes the baked tool set when it changed since the
+    last build, so tools that appear mid-session (e.g. an MCP connection) are
+    usable in the SAME conversation — native parity (the native loop re-snapshots
+    tools every turn). Rebuild fires ONLY on an actual change (cache safety)."""
+
+    def _make_agent(self, baked_names):
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        a = DeepAgentsAIAgent.__new__(DeepAgentsAIAgent)
+        object.__setattr__(a, "_build_kwargs",
+                           {"enabled_toolsets": ["nyxstrike"], "disabled_toolsets": []})
+        object.__setattr__(a, "_baked_tool_sig", frozenset(baked_names))
+        object.__setattr__(a, "_rebuilt", [])
+
+        def _fake_rebuild():
+            a._rebuilt.append(True)
+            return True
+
+        object.__setattr__(a, "rebuild_agent", _fake_rebuild)
+        return a
+
+    def test_rebuilds_when_visible_tool_set_changed(self):
+        import model_tools
+
+        agent = self._make_agent({"tool_search", "terminal"})
+        # A new tool is now resolvable that was not baked.
+        new_defs = [_fn_def("tool_search"), _fn_def("terminal"), _fn_def("newly_arrived")]
+        with patch.object(model_tools, "get_tool_definitions", return_value=new_defs):
+            agent._maybe_refresh_tools()
+        assert agent._rebuilt == [True], "expected a rebuild when the tool set changed"
+
+    def test_no_rebuild_when_tool_set_unchanged(self):
+        import model_tools
+
+        agent = self._make_agent({"tool_search", "terminal"})
+        same_defs = [_fn_def("tool_search"), _fn_def("terminal")]
+        with patch.object(model_tools, "get_tool_definitions", return_value=same_defs):
+            agent._maybe_refresh_tools()
+        assert agent._rebuilt == [], "must not rebuild when the tool set is unchanged"
