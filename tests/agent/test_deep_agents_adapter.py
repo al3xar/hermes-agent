@@ -706,6 +706,36 @@ class TestBuildHermesTools:
         # The StructuredTool exposes the forwarded parameter as a callable arg.
         assert "command" in tools[0].args
 
+    def test_forwards_session_toolset_scope_to_handle_function_call(self):
+        """Native parity: a built tool must forward the session's enabled/disabled
+        toolsets to handle_function_call. The tool_search bridge scopes its
+        deferred-tool catalog to that scope (model_tools._dispatch_bridge_tool);
+        without it the bridge sees only default deferrables, so a large session
+        catalog (e.g. an MCP server) is invisible to tool_search and the model
+        loops. tool_executor passes agent.enabled_toolsets — deepagents must too."""
+        from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
+
+        captured = {}
+
+        def _fake(function_name=None, function_args=None,
+                  enabled_toolsets=None, disabled_toolsets=None, **kw):
+            captured["enabled_toolsets"] = enabled_toolsets
+            captured["disabled_toolsets"] = disabled_toolsets
+            return "{}"
+
+        # Patch BEFORE build: _structured_tool_from_schema binds
+        # model_tools.handle_function_call at build time (see the adapter test).
+        with self._patch_defs([_fn_def("tool_search")]), \
+                patch.object(model_tools, "handle_function_call", side_effect=_fake):
+            tools = build_hermes_tools(
+                enabled_toolsets=["terminal", "nyxstrike"], disabled_toolsets=["x"]
+            )
+            tools[0].func(queries=["health"])
+
+        assert captured["enabled_toolsets"] == ["terminal", "nyxstrike"]
+        assert captured["disabled_toolsets"] == ["x"]
+
     def test_builds_bridge_tools_without_registry_entry(self):
         """tool_search/tool_describe/tool_call have no registry entry but are
         emitted by tool-search assembly — they must still get adapters."""

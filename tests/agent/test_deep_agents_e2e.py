@@ -860,6 +860,8 @@ class TestToolDispatcherEndToEnd:
             mock_hfc.assert_called_once_with(
                 function_name="test_tool",
                 function_args={"myarg": "value"},
+                enabled_toolsets=None,
+                disabled_toolsets=None,
             )
 
     def test_tool_adapter_wraps_errors_as_json(self):

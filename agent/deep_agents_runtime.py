@@ -351,7 +351,8 @@ def _build_reasoning_model(provider, model_name, reasoning_config):
 # ---------------------------------------------------------------------------
 
 
-def _structured_tool_from_schema(name, description, parameters):
+def _structured_tool_from_schema(name, description, parameters,
+                                 enabled_toolsets=None, disabled_toolsets=None):
     """Build a LangChain ``StructuredTool`` that routes to Hermes dispatch.
 
     The tool's parameter schema (OpenAI/JSON-schema object) MUST be forwarded
@@ -366,12 +367,24 @@ def _structured_tool_from_schema(name, description, parameters):
     is the native runtime's dispatch entrypoint — it covers registry tools,
     MCP tools, and the synthetic ``tool_search`` / ``tool_describe`` /
     ``tool_call`` bridge tools alike.
+
+    ``enabled_toolsets`` / ``disabled_toolsets`` are the session's toolset scope
+    and MUST be forwarded to ``handle_function_call`` exactly as the native
+    runtime does (``agent/tool_executor.py`` passes ``agent.enabled_toolsets``).
+    The tool_search bridge builds its deferred-tool catalog from that scope
+    (``model_tools._dispatch_bridge_tool``); without it the bridge sees only the
+    default event-triggered deferrables, so a large session catalog (e.g. an MCP
+    server's tools) is invisible to ``tool_search`` and the model loops trying to
+    reach tools it can never find. Passing the scope reaches native parity.
     """
     from model_tools import handle_function_call
 
     def _execute_sync(**kwargs):
         try:
-            return handle_function_call(function_name=name, function_args=kwargs)
+            return handle_function_call(
+                function_name=name, function_args=kwargs,
+                enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
+            )
         except Exception as e:
             error_str = str(e)
             return json.dumps({"error": error_str}, ensure_ascii=False)
@@ -469,7 +482,8 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets):
             continue
         tools.append(
             _structured_tool_from_schema(
-                tool_name, fn.get("description", ""), fn.get("parameters")
+                tool_name, fn.get("description", ""), fn.get("parameters"),
+                enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
             )
         )
     return tools
