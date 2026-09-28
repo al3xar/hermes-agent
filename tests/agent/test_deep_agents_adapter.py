@@ -746,6 +746,48 @@ class TestBuildHermesTools:
             tools = build_hermes_tools(enabled_toolsets=["x"], disabled_toolsets=[])
         assert {t.name for t in tools} == {"tool_search", "tool_describe", "tool_call"}
 
+    def test_drops_deepagents_duplicates_keeps_distinct_named(self):
+        """Prefer the DeepAgents base: Hermes tools that duplicate a DeepAgents
+        built-in BY NAME are not added (no colliding pair). Distinct-named Hermes
+        tools are kept, so no capability is lost."""
+        from agent.deep_agents_runtime import build_hermes_tools
+
+        defs = [
+            _fn_def("read_file"), _fn_def("write_file"), _fn_def("glob"), _fn_def("grep"),
+            _fn_def("terminal"), _fn_def("delegate_task"), _fn_def("search_files"),
+            _fn_def("tool_search"),
+        ]
+        with self._patch_defs(defs):
+            tools = build_hermes_tools(enabled_toolsets=["x"], disabled_toolsets=[])
+        names = {t.name for t in tools}
+        # DeepAgents provides these from its base middleware — not duplicated.
+        assert names.isdisjoint({"read_file", "write_file", "glob", "grep"})
+        # Distinct-named Hermes tools stay — no lost functionality.
+        assert {"terminal", "delegate_task", "search_files", "tool_search"} <= names
+
+    def test_deepagents_builtin_set_matches_library(self):
+        """Drift guard: the hardcoded built-in set must match what a bare
+        create_deep_agent actually injects, so a library upgrade that adds/renames
+        a base tool is caught here instead of silently re-introducing collisions."""
+        from langchain_core.language_models.fake_chat_models import FakeListChatModel
+        from agent.deep_agents_runtime import (
+            create_deep_agent, _DEEPAGENTS_BUILTIN_TOOL_NAMES,
+        )
+
+        graph = create_deep_agent(
+            model=FakeListChatModel(responses=["ok"]), tools=[],
+            system_prompt="x", name="probe",
+        )
+        live = set()
+        for node in getattr(graph, "nodes", {}).values():
+            bound = getattr(node, "bound", None) or node
+            tbn = getattr(bound, "tools_by_name", None)
+            if isinstance(tbn, dict):
+                live |= set(tbn)
+        assert live == set(_DEEPAGENTS_BUILTIN_TOOL_NAMES), (
+            f"DeepAgents built-in tools drifted: {live ^ set(_DEEPAGENTS_BUILTIN_TOOL_NAMES)}"
+        )
+
     def test_handles_empty_definitions(self):
         from agent.deep_agents_runtime import build_hermes_tools
 

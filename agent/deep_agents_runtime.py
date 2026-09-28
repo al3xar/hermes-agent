@@ -437,6 +437,20 @@ class _HermesToolAdapter:
         return self._entry.toolset
 
 
+# Tools that ``create_deep_agent`` provides from its own required scaffolding
+# (FilesystemMiddleware + SubAgentMiddleware — see graph._REQUIRED_MIDDLEWARE,
+# unstrippable by design). We do NOT add the Hermes tools that duplicate these
+# by name: the project's choice is to prefer the DeepAgents base for filesystem
+# and shell, so the model sees one implementation, not two colliding ones. Only
+# same-name duplicates are dropped — Hermes tools with a distinct name (terminal,
+# execute_code, search_files, delegate_task, …) are kept, so no capability is
+# lost. The drift guard test in tests/agent/test_deep_agents_adapter.py asserts
+# this set still matches the live DeepAgents built-ins.
+_DEEPAGENTS_BUILTIN_TOOL_NAMES = frozenset({
+    "read_file", "write_file", "edit_file", "ls", "delete", "glob", "grep", "execute", "task",
+})
+
+
 def build_hermes_tools(enabled_toolsets, disabled_toolsets):
     """Build LangChain StructuredTool list from Hermes tool definitions.
 
@@ -479,6 +493,11 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets):
             fn = tool_def if isinstance(tool_def, dict) else {}
         tool_name = fn.get("name", "")
         if not tool_name:
+            continue
+        # DeepAgents already provides this tool from its base middleware — don't
+        # add the Hermes duplicate (prefer the DeepAgents base, avoid a same-name
+        # collision). Distinct-named Hermes tools fall through and are kept.
+        if tool_name in _DEEPAGENTS_BUILTIN_TOOL_NAMES:
             continue
         tools.append(
             _structured_tool_from_schema(
@@ -1640,8 +1659,23 @@ class DeepAgentsAIAgent:
                     )
                 model = _make_repair_chat_openai(**_repair_kwargs)
 
+        # DeepAgents' default backend is StateBackend() — an in-memory VIRTUAL
+        # filesystem. Its read_file/write_file would then operate on a scratchpad,
+        # not the real disk, so the base file tools could not read real files
+        # (the native read_file reads any path). Back the base filesystem with a
+        # real-disk FilesystemBackend (virtual_mode=False → absolute paths pass
+        # through, relative resolve under cwd) so the DeepAgents file tools have
+        # the same reach as the native runtime — no lost capability.
+        backend = None
+        try:
+            from deepagents.backends import FilesystemBackend
+
+            backend = FilesystemBackend(virtual_mode=False)
+        except Exception:
+            logger.debug("deepagents FilesystemBackend unavailable; default backend", exc_info=True)
+
         # Create the LangGraph agent (recursion_limit set per-call via config)
-        agent = create_deep_agent(
+        _dagent_kwargs = dict(
             model=model,
             tools=tools,
             system_prompt=system_prompt,
@@ -1651,6 +1685,9 @@ class DeepAgentsAIAgent:
             debug=bool(debug_val),
             name="hermes-agent",
         )
+        if backend is not None:
+            _dagent_kwargs["backend"] = backend
+        agent = create_deep_agent(**_dagent_kwargs)
 
         # Store refs for per-call tracing hooks
         self._checkpointer = checkpointer
