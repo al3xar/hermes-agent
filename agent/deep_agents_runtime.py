@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import threading
+import time
 import uuid
 from typing import Any, List, Optional
 
@@ -514,6 +515,107 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets, agent=None):
             )
         )
     return tools
+
+
+def _make_api_hook_callback(*, session_id, platform, model, provider, base_url):
+    """Build the LangChain callback that bridges model-call lifecycle events to
+    the Hermes ``pre_api_request`` / ``post_api_request`` plugin hooks.
+
+    Subclasses ``BaseCallbackHandler`` (lazy import) so the ``ignore_*`` flags and
+    the rest of the callback surface get correct no-op defaults — a duck-typed
+    object with ``__getattr__`` would answer ``ignore_chat_model`` truthy and
+    LangChain would skip it. See :class:`_HermesApiHookCallback` for the fields.
+    """
+    from langchain_core.callbacks import BaseCallbackHandler
+
+    class _HermesApiHookCallback(BaseCallbackHandler):
+        __doc__ = _HERMES_API_HOOK_DOC
+        raise_error = False
+
+        def __init__(self, *, session_id, platform, model, provider, base_url):
+            super().__init__()
+            self._session_id = session_id or ""
+            self._platform = platform or ""
+            self._model = model or ""
+            self._provider = provider or ""
+            self._base_url = base_url or ""
+            self._started: dict = {}
+
+        def _flatten_messages(self, messages):
+            out = []
+            try:
+                for group in messages or []:
+                    for m in group or []:
+                        role = getattr(m, "type", None) or getattr(m, "role", "") or ""
+                        out.append({"role": role, "content": getattr(m, "content", "")})
+            except Exception:
+                return []
+            return out
+
+        def _fire(self, name, **fields):
+            try:
+                from hermes_cli.lifecycle import has_hook, invoke_hook
+
+                if has_hook(name):
+                    invoke_hook(name, **fields)
+            except Exception:
+                logger.debug("deepagents %s hook failed", name, exc_info=True)
+
+        def on_chat_model_start(self, serialized, messages, *, run_id=None, **kwargs):
+            self._started[str(run_id)] = time.time()
+            self._fire(
+                "pre_api_request",
+                api_request_id=str(run_id),
+                session_id=self._session_id, platform=self._platform,
+                model=self._model, provider=self._provider, base_url=self._base_url,
+                request_messages=self._flatten_messages(messages),
+                started_at=self._started[str(run_id)],
+            )
+
+        def on_llm_end(self, response, *, run_id=None, **kwargs):
+            start = self._started.pop(str(run_id), None)
+            now = time.time()
+            llm_output = getattr(response, "llm_output", None) or {}
+            usage = llm_output.get("token_usage") or llm_output.get("usage") or {}
+            text = ""
+            finish_reason = None
+            try:
+                gens = getattr(response, "generations", None) or []
+                if gens and gens[0]:
+                    g0 = gens[0][0]
+                    text = getattr(g0, "text", "") or ""
+                    info = getattr(g0, "generation_info", None) or {}
+                    finish_reason = info.get("finish_reason")
+            except Exception:
+                pass
+            self._fire(
+                "post_api_request",
+                api_request_id=str(run_id),
+                session_id=self._session_id, platform=self._platform,
+                model=self._model, provider=self._provider, base_url=self._base_url,
+                response_model=llm_output.get("model_name") or llm_output.get("model"),
+                finish_reason=finish_reason,
+                started_at=start, ended_at=now,
+                api_duration=(now - start) if start is not None else None,
+                response={"text": text, "usage": usage},
+            )
+
+    return _HermesApiHookCallback(
+        session_id=session_id, platform=platform, model=model,
+        provider=provider, base_url=base_url,
+    )
+
+
+_HERMES_API_HOOK_DOC = """LangChain callback firing Hermes pre/post_api_request.
+
+FAITHFUL SUBSET: LangChain's callback args do not carry every field the native
+hook passes (no api_mode-shaped request payload, no middleware_trace, no native
+char/token accounting). We pass the fields we can source accurately and omit the
+rest — plugin callbacks are signature-inspected (they receive only the fields
+they declare), so a subset is safe. Guarded on has_hook so it is inert without a
+registered consumer. The native runtime fires these from its turn loop
+(agent/turn_api_request.py, turn_response_intake.py); DeepAgents runs the model
+inside LangGraph, so this bridge restores them, keyed by run_id."""
 
 
 # ---------------------------------------------------------------------------
@@ -1903,6 +2005,21 @@ class DeepAgentsAIAgent:
                 config.setdefault("metadata", {})["langfuse_session_id"] = (
                     self._session_id
                 )
+
+        # Fire the Hermes pre/post_api_request plugin hooks for this runtime too
+        # (native fires them from its turn loop). Only wire the bridge when a
+        # consumer is registered, so it is a no-op cost otherwise.
+        try:
+            from hermes_cli.lifecycle import has_hook
+
+            if has_hook("pre_api_request") or has_hook("post_api_request"):
+                _api_cb = _make_api_hook_callback(
+                    session_id=self._session_id or "", platform=self._platform or "",
+                    model=self.model, provider=self.provider, base_url=self._base_url or "",
+                )
+                config["callbacks"] = list(config.get("callbacks") or []) + [_api_cb]
+        except Exception:
+            logger.debug("deepagents: api-request hook bridge not wired", exc_info=True)
 
         # Add LangSmith tracing tags / metadata when tracing is enabled
         if self._ls_api_key:

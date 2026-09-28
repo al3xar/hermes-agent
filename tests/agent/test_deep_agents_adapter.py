@@ -1589,3 +1589,68 @@ class TestSessionStartHook:
             self._agent()._maybe_fire_session_start()
 
         assert calls == []
+
+
+class TestApiHookBridge:
+    """The DeepAgents runtime fires pre/post_api_request via a LangChain callback
+    (native fires them from its turn loop). Faithful subset; inert without a hook."""
+
+    def _drive(self):
+        from agent.deep_agents_runtime import _make_api_hook_callback
+        import uuid
+
+        cb = _make_api_hook_callback(
+            session_id="s1", platform="cli", model="M", provider="custom", base_url="http://x",
+        )
+        rid = uuid.uuid4()
+
+        class _Msg:
+            type = "human"
+            content = "hi"
+
+        class _Gen:
+            text = "answer"
+            generation_info = {"finish_reason": "stop"}
+
+        class _Resp:
+            generations = [[_Gen()]]
+            llm_output = {"model_name": "M", "token_usage": {"total_tokens": 42}}
+
+        cb.on_chat_model_start({}, [[_Msg()]], run_id=rid)
+        cb.on_llm_end(_Resp(), run_id=rid)
+        return cb
+
+    def test_fires_pre_and_post_api_request(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        fired = []
+        with patch.object(lifecycle, "has_hook", return_value=True), patch.object(
+            lifecycle, "invoke_hook", side_effect=lambda name, **kw: fired.append((name, kw)),
+        ):
+            self._drive()
+
+        names = [f[0] for f in fired]
+        assert names == ["pre_api_request", "post_api_request"]
+        pre = dict(fired[0][1])
+        post = dict(fired[1][1])
+        assert pre["model"] == "M" and pre["request_messages"] == [{"role": "human", "content": "hi"}]
+        assert post["finish_reason"] == "stop" and post["response"]["usage"]["total_tokens"] == 42
+
+    def test_inert_without_registered_hook(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        fired = []
+        with patch.object(lifecycle, "has_hook", return_value=False), patch.object(
+            lifecycle, "invoke_hook", side_effect=lambda name, **kw: fired.append(name),
+        ):
+            self._drive()
+        assert fired == []
+
+    def test_handler_is_not_ignored_by_langchain(self):
+        # A truthy ignore_chat_model would make LangChain skip the handler.
+        from agent.deep_agents_runtime import _make_api_hook_callback
+
+        cb = _make_api_hook_callback(
+            session_id="s", platform="", model="M", provider="p", base_url="u",
+        )
+        assert cb.ignore_chat_model is False and cb.ignore_llm is False
