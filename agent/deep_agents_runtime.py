@@ -260,6 +260,34 @@ def _looks_like_openai_reasoning_model(name: str) -> bool:
     return n.startswith(("o1", "o3", "o4", "gpt-5")) or "-o1" in n or "-o3" in n
 
 
+def _openai_compat_reasoning_extra_body(reasoning_config) -> dict:
+    """Reasoning params for an OpenAI-compatible (vLLM/llama.cpp/custom) endpoint.
+
+    The native runtime routes a custom endpoint's reasoning through the custom
+    ProviderProfile, which sends a **top-level** ``reasoning_effort`` clamped to
+    the OpenAI-compat wire set (``plugins/model-providers/custom``). The
+    deepagents path builds the client with ``_make_repair_chat_openai`` and, until
+    now, dropped the effort entirely — so ``reasoning_effort: xhigh`` never
+    reached the model and its thinking output diverged from native. This mirrors
+    the profile's mapping so both runtimes put the same field on the wire; the
+    dict is passed as ``extra_body`` (openai-python merges it top-level).
+
+    Returns ``{}`` when there is nothing to send (no effort, or no config), so
+    the endpoint's own default applies exactly as on the native path.
+    """
+    from agent.reasoning_effort import OPENAI_COMPAT_WIRE_EFFORTS, clamp_effort
+
+    if not isinstance(reasoning_config, dict):
+        return {}
+    effort = str(reasoning_config.get("effort", "") or "").strip().lower()
+    if effort == "none" or reasoning_config.get("enabled", True) is False:
+        # Disabled reasoning is an explicit signal, mirrored top-level as native does.
+        return {"reasoning_effort": "none"}
+    if not effort:
+        return {}
+    return {"reasoning_effort": clamp_effort(effort, OPENAI_COMPAT_WIRE_EFFORTS)}
+
+
 def _build_reasoning_model(provider, model_name, reasoning_config):
     """Return a provider chat-model with extended thinking enabled, or ``None``.
 
@@ -1571,13 +1599,27 @@ class DeepAgentsAIAgent:
                 # sometimes emit tool calls as ``<model_tool_calls>`` text the
                 # OpenAI-compatible layer doesn't parse, so the graph would see
                 # no tool and the XML would land on screen (see module notes).
-                model = _make_repair_chat_openai(
+                # Forward the reasoning effort the same way native does for a
+                # custom endpoint: a top-level ``reasoning_effort`` (via
+                # extra_body) so the vLLM/Qwen model reasons at the configured
+                # depth instead of silently dropping it (parity with native).
+                _reasoning_extra = _openai_compat_reasoning_extra_body(
+                    self._get_cap("reasoning_config")
+                )
+                _repair_kwargs = dict(
                     # The endpoint serves the model under its full id
                     # (prefix included) — don't use the stripped name.
                     model=getattr(self, "_model_raw", None) or model,
                     base_url=self._base_url,
                     api_key=self._api_key or "EMPTY",
                 )
+                if _reasoning_extra:
+                    _repair_kwargs["extra_body"] = _reasoning_extra
+                    logger.info(
+                        "deepagents: custom-endpoint reasoning_effort=%s",
+                        _reasoning_extra.get("reasoning_effort"),
+                    )
+                model = _make_repair_chat_openai(**_repair_kwargs)
 
         # Create the LangGraph agent (recursion_limit set per-call via config)
         agent = create_deep_agent(

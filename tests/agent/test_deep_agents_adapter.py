@@ -1153,6 +1153,41 @@ class TestReasoningConfig:
             )
 
 
+class TestOpenAICompatReasoningExtraBody:
+    """The custom/vLLM endpoint must send the same top-level reasoning_effort
+    the native custom ProviderProfile sends, so thinking depth matches native."""
+
+    def test_effort_clamped_to_wire_set(self):
+        from agent.deep_agents_runtime import _openai_compat_reasoning_extra_body
+
+        # xhigh is in the OpenAI-compat wire set → forwarded unchanged (Hades uses xhigh).
+        assert _openai_compat_reasoning_extra_body(
+            {"enabled": True, "effort": "xhigh"}
+        ) == {"reasoning_effort": "xhigh"}
+        # ultra is not on the wire → clamped to max, mirroring the custom profile.
+        assert _openai_compat_reasoning_extra_body(
+            {"effort": "ultra"}
+        ) == {"reasoning_effort": "max"}
+
+    def test_disabled_sends_none(self):
+        from agent.deep_agents_runtime import _openai_compat_reasoning_extra_body
+
+        assert _openai_compat_reasoning_extra_body(
+            {"enabled": False}
+        ) == {"reasoning_effort": "none"}
+        assert _openai_compat_reasoning_extra_body(
+            {"effort": "none"}
+        ) == {"reasoning_effort": "none"}
+
+    def test_no_effort_or_no_config_sends_nothing(self):
+        from agent.deep_agents_runtime import _openai_compat_reasoning_extra_body
+
+        # Empty/absent effort → leave it off the wire so the endpoint default applies.
+        assert _openai_compat_reasoning_extra_body({"enabled": True}) == {}
+        assert _openai_compat_reasoning_extra_body({}) == {}
+        assert _openai_compat_reasoning_extra_body(None) == {}
+
+
 class TestStreamHelpers:
     def test_split_stream_item_tuple(self):
         from agent.deep_agents_runtime import _split_stream_item
