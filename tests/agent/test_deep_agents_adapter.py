@@ -788,6 +788,59 @@ class TestBuildHermesTools:
             f"DeepAgents built-in tools drifted: {live ^ set(_DEEPAGENTS_BUILTIN_TOOL_NAMES)}"
         )
 
+    def test_delegate_task_routes_to_agent_dispatcher(self):
+        """delegate_task is agent-loop-only for handle_function_call (it rejects
+        it: "must be handled by the agent loop"). The DeepAgents runtime has no
+        native loop, so the built tool must route delegate_task to the agent's
+        own dispatcher (synchronous child spawn) — keeping multi-provider
+        delegation (Claude/Codex) working. Other tools still go to
+        handle_function_call."""
+        from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
+
+        class _AgentStub:
+            def __init__(self):
+                self.calls = []
+
+            def _dispatch_delegate_task(self, args):
+                self.calls.append(args)
+                return '{"ok": true}'
+
+        stub = _AgentStub()
+        hfc_calls = []
+        with self._patch_defs([_fn_def("delegate_task")]), patch.object(
+            model_tools, "handle_function_call",
+            side_effect=lambda **kw: hfc_calls.append(kw) or "{}",
+        ):
+            tools = build_hermes_tools(
+                enabled_toolsets=["delegation"], disabled_toolsets=[], agent=stub
+            )
+            tools[0].func(goal="do it")
+
+        assert stub.calls == [{"goal": "do it"}], "delegate_task must reach the dispatcher"
+        assert hfc_calls == [], "delegate_task must NOT go to handle_function_call"
+
+    def test_non_delegate_tool_still_uses_handle_function_call(self):
+        """The delegate_task routing must not divert other tools."""
+        from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
+
+        class _AgentStub:
+            def _dispatch_delegate_task(self, args):  # pragma: no cover - must not run
+                raise AssertionError("terminal must not route to the delegate dispatcher")
+
+        hfc_calls = []
+        with self._patch_defs([_fn_def("terminal")]), patch.object(
+            model_tools, "handle_function_call",
+            side_effect=lambda **kw: hfc_calls.append(kw.get("function_name")) or "{}",
+        ):
+            tools = build_hermes_tools(
+                enabled_toolsets=["terminal"], disabled_toolsets=[], agent=_AgentStub()
+            )
+            tools[0].func(command="ls")
+
+        assert hfc_calls == ["terminal"]
+
     def test_handles_empty_definitions(self):
         from agent.deep_agents_runtime import build_hermes_tools
 

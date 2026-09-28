@@ -352,7 +352,7 @@ def _build_reasoning_model(provider, model_name, reasoning_config):
 
 
 def _structured_tool_from_schema(name, description, parameters,
-                                 enabled_toolsets=None, disabled_toolsets=None):
+                                 enabled_toolsets=None, disabled_toolsets=None, agent=None):
     """Build a LangChain ``StructuredTool`` that routes to Hermes dispatch.
 
     The tool's parameter schema (OpenAI/JSON-schema object) MUST be forwarded
@@ -381,6 +381,13 @@ def _structured_tool_from_schema(name, description, parameters,
 
     def _execute_sync(**kwargs):
         try:
+            # Agent-loop-only tools (delegate_task) are rejected by
+            # handle_function_call ("must be handled by the agent loop"); the
+            # native loop intercepts them. DeepAgents has no such loop, so route
+            # delegate_task to the agent's own dispatcher (child spawn), keeping
+            # multi-provider delegation (Claude/Codex) working here too.
+            if name == "delegate_task" and agent is not None and hasattr(agent, "_dispatch_delegate_task"):
+                return agent._dispatch_delegate_task(kwargs)
             return handle_function_call(
                 function_name=name, function_args=kwargs,
                 enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
@@ -451,7 +458,7 @@ _DEEPAGENTS_BUILTIN_TOOL_NAMES = frozenset({
 })
 
 
-def build_hermes_tools(enabled_toolsets, disabled_toolsets):
+def build_hermes_tools(enabled_toolsets, disabled_toolsets, agent=None):
     """Build LangChain StructuredTool list from Hermes tool definitions.
 
     Toolset resolution goes through ``model_tools.get_tool_definitions`` —
@@ -503,6 +510,7 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets):
             _structured_tool_from_schema(
                 tool_name, fn.get("description", ""), fn.get("parameters"),
                 enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
+                agent=agent,
             )
         )
     return tools
@@ -1571,6 +1579,7 @@ class DeepAgentsAIAgent:
         tools = build_hermes_tools(
             enabled_toolsets=enabled_toolsets,
             disabled_toolsets=disabled_toolsets,
+            agent=self,
         )
         # Signature of the baked (directly-visible) tool set, so run_conversation
         # can detect a mid-session change and rebuild — native parity (the native
@@ -2147,6 +2156,60 @@ class DeepAgentsAIAgent:
         return result.get("final_response", "")
 
     # ------------------------------------------------------------------
+    # Native-parent interface for delegation. ``tools/delegate_tool.py``
+    # spawns the child from parent attributes read by their public names
+    # (``api_key``, ``session_id``); expose the stored ``_``-prefixed values
+    # under those names so a DeepAgents parent can spawn children exactly as a
+    # native parent does (inherit its provider/model, or run on another
+    # provider — Claude, Codex — via delegation.provider/model or a per-task
+    # override).
+    # ------------------------------------------------------------------
+
+    @property
+    def api_key(self):
+        return getattr(self, "_api_key", None)
+
+    @property
+    def base_url(self):
+        return getattr(self, "_base_url", None)
+
+    @property
+    def session_id(self):
+        return getattr(self, "_session_id", "") or ""
+
+    def _dispatch_delegate_task(self, function_args: dict) -> str:
+        """Run delegate_task under the DeepAgents runtime.
+
+        The native runtime intercepts delegate_task in its turn loop
+        (``agent/inline_tool_executors.py``); ``handle_function_call`` rejects it
+        (``_AGENT_LOOP_TOOLS``: "must be handled by the agent loop"). DeepAgents
+        has no such loop, so we dispatch it here. Unlike native, we run
+        ``background=False``: DeepAgents has no async-delegation completion queue
+        to re-enter a handle, so the child runs synchronously and its result
+        returns inline to this tool call. The child is a full native ``AIAgent``,
+        so it can target a different provider/model (Claude, Codex) via
+        ``delegation.provider``/``delegation.model`` in config or a per-task
+        override — capability the DeepAgents built-in ``task`` tool cannot offer.
+        """
+        from tools.delegate_tool import (
+            _strip_model_hidden_task_fields, delegate_task as _delegate_task,
+        )
+
+        return _delegate_task(
+            goal=function_args.get("goal"),
+            context=function_args.get("context"),
+            tasks=_strip_model_hidden_task_fields(function_args.get("tasks")),
+            max_iterations=function_args.get("max_iterations"),
+            role=function_args.get("role"),
+            background=False,
+            images=function_args.get("images"),
+            action=function_args.get("action"),
+            subagent_id=function_args.get("subagent_id"),
+            message=function_args.get("message"),
+            parent_agent=self,
+        )
+
+    # ------------------------------------------------------------------
     # Observability — Langfuse tracing for deep agents.
     #
     # The deep agents runtime doesn't use run_agent.py or
@@ -2179,7 +2242,11 @@ class DeepAgentsAIAgent:
 
     @property
     def model(self):
-        return ""  # LangGraph tracks internally
+        # Report the real model id (the endpoint serves it under its full id).
+        # LangGraph binds its own model internally, but delegation (child spawn
+        # inherits parent.model) and the lifecycle hooks read this by name, so an
+        # empty string would spawn a modelless child / mislabel traces.
+        return getattr(self, "_model_raw", "") or ""
 
     @property
     def iteration_budget(self):
