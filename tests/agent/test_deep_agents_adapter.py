@@ -1452,3 +1452,45 @@ class TestMaybeRefreshTools:
         with patch.object(model_tools, "get_tool_definitions", return_value=same_defs):
             agent._maybe_refresh_tools()
         assert agent._rebuilt == [], "must not rebuild when the tool set is unchanged"
+
+
+class TestSessionStartHook:
+    """The native runtime fires on_session_start at session init
+    (agent/conversation_loop.py). The deepagents runtime skips that loop, so it
+    must fire the hook itself — once per session, matching native."""
+
+    def _agent(self):
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        a = DeepAgentsAIAgent.__new__(DeepAgentsAIAgent)
+        object.__setattr__(a, "_session_id", "s1")
+        object.__setattr__(a, "_platform", "cli")
+        return a
+
+    def test_fires_on_session_start_once(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        calls = []
+        with patch.object(lifecycle, "has_hook", return_value=True), patch.object(
+            lifecycle, "invoke_hook",
+            side_effect=lambda name, **kw: calls.append((name, kw)),
+        ):
+            a = self._agent()
+            a._maybe_fire_session_start()
+            a._maybe_fire_session_start()  # second call is a no-op (once per session)
+
+        assert [c[0] for c in calls] == ["on_session_start"]
+        assert calls[0][1]["session_id"] == "s1"
+        assert calls[0][1]["platform"] == "cli"
+
+    def test_no_fire_when_no_hook_registered(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        calls = []
+        with patch.object(lifecycle, "has_hook", return_value=False), patch.object(
+            lifecycle, "invoke_hook",
+            side_effect=lambda name, **kw: calls.append(name),
+        ):
+            self._agent()._maybe_fire_session_start()
+
+        assert calls == []

@@ -1710,6 +1710,29 @@ class DeepAgentsAIAgent:
         logger.info("DeepAgents agent rebuilt (tool list refreshed)")
         return True
 
+    def _maybe_fire_session_start(self) -> None:
+        """Fire the ``on_session_start`` plugin hook once per session, matching
+        the native runtime (agent/conversation_loop.py fires it at session init).
+        The deepagents runtime skips conversation_loop, so without this the hook
+        never fires here. Guarded so it runs once even across many turns.
+        Best-effort: a hook failure never blocks the turn.
+        """
+        if getattr(self, "_session_start_fired", False):
+            return
+        self._session_start_fired = True
+        try:
+            from hermes_cli.lifecycle import has_hook, invoke_hook
+
+            if has_hook("on_session_start"):
+                invoke_hook(
+                    "on_session_start",
+                    session_id=self._session_id or "",
+                    model=self.model,
+                    platform=self._platform or "",
+                )
+        except Exception:
+            logger.debug("on_session_start hook failed", exc_info=True)
+
     def _maybe_refresh_tools(self) -> None:
         """Rebuild the graph when the directly-visible tool set changed since the
         last build — so tools that appear mid-conversation (e.g. an MCP server
@@ -1799,8 +1822,10 @@ class DeepAgentsAIAgent:
         the forwarding dict so the gateway's per-turn attribute-setting
         pattern works without modification.
         """
-        # Native parity: pick up tools that appeared since the graph was baked
-        # (e.g. a mid-session MCP connection) before running this turn.
+        # Native parity: fire the session lifecycle hook once, and pick up tools
+        # that appeared since the graph was baked (e.g. a mid-session MCP
+        # connection) before running this turn.
+        self._maybe_fire_session_start()
         self._maybe_refresh_tools()
 
         langchain_history = _convert_messages_to_langchain(conversation_history or [])
