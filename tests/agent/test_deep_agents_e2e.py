@@ -860,6 +860,8 @@ class TestToolDispatcherEndToEnd:
             mock_hfc.assert_called_once_with(
                 function_name="test_tool",
                 function_args={"myarg": "value"},
+                enabled_toolsets=None,
+                disabled_toolsets=None,
             )
 
     def test_tool_adapter_wraps_errors_as_json(self):
@@ -1083,6 +1085,86 @@ class TestRebuildAgent:
         new_graph = MagicMock()
         object.__setattr__(agent, "_agent", new_graph)
         assert agent._current_agent() is new_graph
+
+
+class TestCustomEndpointReasoning:
+    """A custom/vLLM endpoint must build its ChatOpenAI with the configured
+    reasoning effort (parity with native, which sends top-level reasoning_effort)."""
+
+    def _make_agent(self, reasoning_config):
+        import threading
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        agent = object.__new__(DeepAgentsAIAgent)
+        for k, v in {
+            "_agent_lock": threading.Lock(),
+            "_langgraph_checkpointer": False,
+            "_langgraph_store": False,
+            "_langsmith_api_key": None,
+            "_langsmith_project": "hermes",
+            "_langsmith_tags": ["hermes"],
+            "_base_url": "https://vllm.example/v1",
+            "provider": "custom",
+            "_model_raw": "Qwen3.8-27B",
+            "_api_key": "k",
+            "_debug": False,
+            "_callbacks": {"reasoning_config": reasoning_config},
+        }.items():
+            object.__setattr__(agent, k, v)
+        # Stub the heavy collaborators so only the model-binding branch runs.
+        object.__setattr__(agent, "_build_hermes_system_prompt", lambda: "SP")
+        object.__setattr__(agent, "_ensure_mcp_discovery", lambda: None)
+        return agent
+
+    def test_custom_endpoint_forwards_reasoning_effort(self, monkeypatch):
+        import agent.deep_agents_runtime as dar
+
+        captured = {}
+
+        def _fake_repair(**kw):
+            captured.update(kw)
+            return MagicMock(name="chat_model")
+
+        monkeypatch.setattr(dar, "_make_repair_chat_openai", _fake_repair)
+        monkeypatch.setattr(dar, "build_hermes_tools", lambda **kw: [])
+        monkeypatch.setattr(dar, "create_deep_agent", lambda **kw: MagicMock(name="graph"), raising=False)
+
+        agent = self._make_agent({"enabled": True, "effort": "xhigh"})
+        agent._build_langgraph_agent(
+            model="Qwen3.8-27B",
+            enabled_toolsets=None,
+            disabled_toolsets=None,
+            skip_context_files=True,
+            quiet_mode=True,
+            skip_memory=True,
+            system_prompt="SP",
+        )
+        assert captured.get("extra_body") == {"reasoning_effort": "xhigh"}
+
+    def test_custom_endpoint_without_effort_omits_extra_body(self, monkeypatch):
+        import agent.deep_agents_runtime as dar
+
+        captured = {}
+
+        def _fake_repair(**kw):
+            captured.update(kw)
+            return MagicMock(name="chat_model")
+
+        monkeypatch.setattr(dar, "_make_repair_chat_openai", _fake_repair)
+        monkeypatch.setattr(dar, "build_hermes_tools", lambda **kw: [])
+        monkeypatch.setattr(dar, "create_deep_agent", lambda **kw: MagicMock(name="graph"), raising=False)
+
+        agent = self._make_agent({"enabled": True})  # no effort
+        agent._build_langgraph_agent(
+            model="Qwen3.8-27B",
+            enabled_toolsets=None,
+            disabled_toolsets=None,
+            skip_context_files=True,
+            quiet_mode=True,
+            skip_memory=True,
+            system_prompt="SP",
+        )
+        assert "extra_body" not in captured
 
 
 # ---------------------------------------------------------------------------

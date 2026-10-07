@@ -706,6 +706,36 @@ class TestBuildHermesTools:
         # The StructuredTool exposes the forwarded parameter as a callable arg.
         assert "command" in tools[0].args
 
+    def test_forwards_session_toolset_scope_to_handle_function_call(self):
+        """Native parity: a built tool must forward the session's enabled/disabled
+        toolsets to handle_function_call. The tool_search bridge scopes its
+        deferred-tool catalog to that scope (model_tools._dispatch_bridge_tool);
+        without it the bridge sees only default deferrables, so a large session
+        catalog (e.g. an MCP server) is invisible to tool_search and the model
+        loops. tool_executor passes agent.enabled_toolsets — deepagents must too."""
+        from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
+
+        captured = {}
+
+        def _fake(function_name=None, function_args=None,
+                  enabled_toolsets=None, disabled_toolsets=None, **kw):
+            captured["enabled_toolsets"] = enabled_toolsets
+            captured["disabled_toolsets"] = disabled_toolsets
+            return "{}"
+
+        # Patch BEFORE build: _structured_tool_from_schema binds
+        # model_tools.handle_function_call at build time (see the adapter test).
+        with self._patch_defs([_fn_def("tool_search")]), \
+                patch.object(model_tools, "handle_function_call", side_effect=_fake):
+            tools = build_hermes_tools(
+                enabled_toolsets=["terminal", "nyxstrike"], disabled_toolsets=["x"]
+            )
+            tools[0].func(queries=["health"])
+
+        assert captured["enabled_toolsets"] == ["terminal", "nyxstrike"]
+        assert captured["disabled_toolsets"] == ["x"]
+
     def test_builds_bridge_tools_without_registry_entry(self):
         """tool_search/tool_describe/tool_call have no registry entry but are
         emitted by tool-search assembly — they must still get adapters."""
@@ -715,6 +745,101 @@ class TestBuildHermesTools:
         with self._patch_defs(defs):
             tools = build_hermes_tools(enabled_toolsets=["x"], disabled_toolsets=[])
         assert {t.name for t in tools} == {"tool_search", "tool_describe", "tool_call"}
+
+    def test_drops_deepagents_duplicates_keeps_distinct_named(self):
+        """Prefer the DeepAgents base: Hermes tools that duplicate a DeepAgents
+        built-in BY NAME are not added (no colliding pair). Distinct-named Hermes
+        tools are kept, so no capability is lost."""
+        from agent.deep_agents_runtime import build_hermes_tools
+
+        defs = [
+            _fn_def("read_file"), _fn_def("write_file"), _fn_def("glob"), _fn_def("grep"),
+            _fn_def("terminal"), _fn_def("delegate_task"), _fn_def("search_files"),
+            _fn_def("tool_search"),
+        ]
+        with self._patch_defs(defs):
+            tools = build_hermes_tools(enabled_toolsets=["x"], disabled_toolsets=[])
+        names = {t.name for t in tools}
+        # DeepAgents provides these from its base middleware — not duplicated.
+        assert names.isdisjoint({"read_file", "write_file", "glob", "grep"})
+        # Distinct-named Hermes tools stay — no lost functionality.
+        assert {"terminal", "delegate_task", "search_files", "tool_search"} <= names
+
+    def test_deepagents_builtin_set_matches_library(self):
+        """Drift guard: the hardcoded built-in set must match what a bare
+        create_deep_agent actually injects, so a library upgrade that adds/renames
+        a base tool is caught here instead of silently re-introducing collisions."""
+        from langchain_core.language_models.fake_chat_models import FakeListChatModel
+        from agent.deep_agents_runtime import (
+            create_deep_agent, _DEEPAGENTS_BUILTIN_TOOL_NAMES,
+        )
+
+        graph = create_deep_agent(
+            model=FakeListChatModel(responses=["ok"]), tools=[],
+            system_prompt="x", name="probe",
+        )
+        live = set()
+        for node in getattr(graph, "nodes", {}).values():
+            bound = getattr(node, "bound", None) or node
+            tbn = getattr(bound, "tools_by_name", None)
+            if isinstance(tbn, dict):
+                live |= set(tbn)
+        assert live == set(_DEEPAGENTS_BUILTIN_TOOL_NAMES), (
+            f"DeepAgents built-in tools drifted: {live ^ set(_DEEPAGENTS_BUILTIN_TOOL_NAMES)}"
+        )
+
+    def test_delegate_task_routes_to_agent_dispatcher(self):
+        """delegate_task is agent-loop-only for handle_function_call (it rejects
+        it: "must be handled by the agent loop"). The DeepAgents runtime has no
+        native loop, so the built tool must route delegate_task to the agent's
+        own dispatcher (synchronous child spawn) — keeping multi-provider
+        delegation (Claude/Codex) working. Other tools still go to
+        handle_function_call."""
+        from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
+
+        class _AgentStub:
+            def __init__(self):
+                self.calls = []
+
+            def _dispatch_delegate_task(self, args):
+                self.calls.append(args)
+                return '{"ok": true}'
+
+        stub = _AgentStub()
+        hfc_calls = []
+        with self._patch_defs([_fn_def("delegate_task")]), patch.object(
+            model_tools, "handle_function_call",
+            side_effect=lambda **kw: hfc_calls.append(kw) or "{}",
+        ):
+            tools = build_hermes_tools(
+                enabled_toolsets=["delegation"], disabled_toolsets=[], agent=stub
+            )
+            tools[0].func(goal="do it")
+
+        assert stub.calls == [{"goal": "do it"}], "delegate_task must reach the dispatcher"
+        assert hfc_calls == [], "delegate_task must NOT go to handle_function_call"
+
+    def test_non_delegate_tool_still_uses_handle_function_call(self):
+        """The delegate_task routing must not divert other tools."""
+        from agent.deep_agents_runtime import build_hermes_tools
+        import model_tools
+
+        class _AgentStub:
+            def _dispatch_delegate_task(self, args):  # pragma: no cover - must not run
+                raise AssertionError("terminal must not route to the delegate dispatcher")
+
+        hfc_calls = []
+        with self._patch_defs([_fn_def("terminal")]), patch.object(
+            model_tools, "handle_function_call",
+            side_effect=lambda **kw: hfc_calls.append(kw.get("function_name")) or "{}",
+        ):
+            tools = build_hermes_tools(
+                enabled_toolsets=["terminal"], disabled_toolsets=[], agent=_AgentStub()
+            )
+            tools[0].func(command="ls")
+
+        assert hfc_calls == ["terminal"]
 
     def test_handles_empty_definitions(self):
         from agent.deep_agents_runtime import build_hermes_tools
@@ -1153,6 +1278,41 @@ class TestReasoningConfig:
             )
 
 
+class TestOpenAICompatReasoningExtraBody:
+    """The custom/vLLM endpoint must send the same top-level reasoning_effort
+    the native custom ProviderProfile sends, so thinking depth matches native."""
+
+    def test_effort_clamped_to_wire_set(self):
+        from agent.deep_agents_runtime import _openai_compat_reasoning_extra_body
+
+        # xhigh is in the OpenAI-compat wire set → forwarded unchanged (Hades uses xhigh).
+        assert _openai_compat_reasoning_extra_body(
+            {"enabled": True, "effort": "xhigh"}
+        ) == {"reasoning_effort": "xhigh"}
+        # ultra is not on the wire → clamped to max, mirroring the custom profile.
+        assert _openai_compat_reasoning_extra_body(
+            {"effort": "ultra"}
+        ) == {"reasoning_effort": "max"}
+
+    def test_disabled_sends_none(self):
+        from agent.deep_agents_runtime import _openai_compat_reasoning_extra_body
+
+        assert _openai_compat_reasoning_extra_body(
+            {"enabled": False}
+        ) == {"reasoning_effort": "none"}
+        assert _openai_compat_reasoning_extra_body(
+            {"effort": "none"}
+        ) == {"reasoning_effort": "none"}
+
+    def test_no_effort_or_no_config_sends_nothing(self):
+        from agent.deep_agents_runtime import _openai_compat_reasoning_extra_body
+
+        # Empty/absent effort → leave it off the wire so the endpoint default applies.
+        assert _openai_compat_reasoning_extra_body({"enabled": True}) == {}
+        assert _openai_compat_reasoning_extra_body({}) == {}
+        assert _openai_compat_reasoning_extra_body(None) == {}
+
+
 class TestStreamHelpers:
     def test_split_stream_item_tuple(self):
         from agent.deep_agents_runtime import _split_stream_item
@@ -1345,3 +1505,152 @@ class TestRoundTripConversion:
         step1 = _convert_messages_to_langchain(original)
         step2 = _convert_langchain_to_hermes(step1)
         assert step2[0]["role"] == "assistant" and step2[0]["tool_calls"] == tool_calls
+
+
+class TestMaybeRefreshTools:
+    """run_conversation refreshes the baked tool set when it changed since the
+    last build, so tools that appear mid-session (e.g. an MCP connection) are
+    usable in the SAME conversation — native parity (the native loop re-snapshots
+    tools every turn). Rebuild fires ONLY on an actual change (cache safety)."""
+
+    def _make_agent(self, baked_names):
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        a = DeepAgentsAIAgent.__new__(DeepAgentsAIAgent)
+        object.__setattr__(a, "_build_kwargs",
+                           {"enabled_toolsets": ["nyxstrike"], "disabled_toolsets": []})
+        object.__setattr__(a, "_baked_tool_sig", frozenset(baked_names))
+        object.__setattr__(a, "_rebuilt", [])
+
+        def _fake_rebuild():
+            a._rebuilt.append(True)
+            return True
+
+        object.__setattr__(a, "rebuild_agent", _fake_rebuild)
+        return a
+
+    def test_rebuilds_when_visible_tool_set_changed(self):
+        import model_tools
+
+        agent = self._make_agent({"tool_search", "terminal"})
+        # A new tool is now resolvable that was not baked.
+        new_defs = [_fn_def("tool_search"), _fn_def("terminal"), _fn_def("newly_arrived")]
+        with patch.object(model_tools, "get_tool_definitions", return_value=new_defs):
+            agent._maybe_refresh_tools()
+        assert agent._rebuilt == [True], "expected a rebuild when the tool set changed"
+
+    def test_no_rebuild_when_tool_set_unchanged(self):
+        import model_tools
+
+        agent = self._make_agent({"tool_search", "terminal"})
+        same_defs = [_fn_def("tool_search"), _fn_def("terminal")]
+        with patch.object(model_tools, "get_tool_definitions", return_value=same_defs):
+            agent._maybe_refresh_tools()
+        assert agent._rebuilt == [], "must not rebuild when the tool set is unchanged"
+
+
+class TestSessionStartHook:
+    """The native runtime fires on_session_start at session init
+    (agent/conversation_loop.py). The deepagents runtime skips that loop, so it
+    must fire the hook itself — once per session, matching native."""
+
+    def _agent(self):
+        from agent.deep_agents_runtime import DeepAgentsAIAgent
+
+        a = DeepAgentsAIAgent.__new__(DeepAgentsAIAgent)
+        object.__setattr__(a, "_session_id", "s1")
+        object.__setattr__(a, "_platform", "cli")
+        return a
+
+    def test_fires_on_session_start_once(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        calls = []
+        with patch.object(lifecycle, "has_hook", return_value=True), patch.object(
+            lifecycle, "invoke_hook",
+            side_effect=lambda name, **kw: calls.append((name, kw)),
+        ):
+            a = self._agent()
+            a._maybe_fire_session_start()
+            a._maybe_fire_session_start()  # second call is a no-op (once per session)
+
+        assert [c[0] for c in calls] == ["on_session_start"]
+        assert calls[0][1]["session_id"] == "s1"
+        assert calls[0][1]["platform"] == "cli"
+
+    def test_no_fire_when_no_hook_registered(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        calls = []
+        with patch.object(lifecycle, "has_hook", return_value=False), patch.object(
+            lifecycle, "invoke_hook",
+            side_effect=lambda name, **kw: calls.append(name),
+        ):
+            self._agent()._maybe_fire_session_start()
+
+        assert calls == []
+
+
+class TestApiHookBridge:
+    """The DeepAgents runtime fires pre/post_api_request via a LangChain callback
+    (native fires them from its turn loop). Faithful subset; inert without a hook."""
+
+    def _drive(self):
+        from agent.deep_agents_runtime import _make_api_hook_callback
+        import uuid
+
+        cb = _make_api_hook_callback(
+            session_id="s1", platform="cli", model="M", provider="custom", base_url="http://x",
+        )
+        rid = uuid.uuid4()
+
+        class _Msg:
+            type = "human"
+            content = "hi"
+
+        class _Gen:
+            text = "answer"
+            generation_info = {"finish_reason": "stop"}
+
+        class _Resp:
+            generations = [[_Gen()]]
+            llm_output = {"model_name": "M", "token_usage": {"total_tokens": 42}}
+
+        cb.on_chat_model_start({}, [[_Msg()]], run_id=rid)
+        cb.on_llm_end(_Resp(), run_id=rid)
+        return cb
+
+    def test_fires_pre_and_post_api_request(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        fired = []
+        with patch.object(lifecycle, "has_hook", return_value=True), patch.object(
+            lifecycle, "invoke_hook", side_effect=lambda name, **kw: fired.append((name, kw)),
+        ):
+            self._drive()
+
+        names = [f[0] for f in fired]
+        assert names == ["pre_api_request", "post_api_request"]
+        pre = dict(fired[0][1])
+        post = dict(fired[1][1])
+        assert pre["model"] == "M" and pre["request_messages"] == [{"role": "human", "content": "hi"}]
+        assert post["finish_reason"] == "stop" and post["response"]["usage"]["total_tokens"] == 42
+
+    def test_inert_without_registered_hook(self):
+        import hermes_cli.lifecycle as lifecycle
+
+        fired = []
+        with patch.object(lifecycle, "has_hook", return_value=False), patch.object(
+            lifecycle, "invoke_hook", side_effect=lambda name, **kw: fired.append(name),
+        ):
+            self._drive()
+        assert fired == []
+
+    def test_handler_is_not_ignored_by_langchain(self):
+        # A truthy ignore_chat_model would make LangChain skip the handler.
+        from agent.deep_agents_runtime import _make_api_hook_callback
+
+        cb = _make_api_hook_callback(
+            session_id="s", platform="", model="M", provider="p", base_url="u",
+        )
+        assert cb.ignore_chat_model is False and cb.ignore_llm is False

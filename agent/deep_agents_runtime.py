@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import threading
+import time
 import uuid
 from typing import Any, List, Optional
 
@@ -260,6 +261,34 @@ def _looks_like_openai_reasoning_model(name: str) -> bool:
     return n.startswith(("o1", "o3", "o4", "gpt-5")) or "-o1" in n or "-o3" in n
 
 
+def _openai_compat_reasoning_extra_body(reasoning_config) -> dict:
+    """Reasoning params for an OpenAI-compatible (vLLM/llama.cpp/custom) endpoint.
+
+    The native runtime routes a custom endpoint's reasoning through the custom
+    ProviderProfile, which sends a **top-level** ``reasoning_effort`` clamped to
+    the OpenAI-compat wire set (``plugins/model-providers/custom``). The
+    deepagents path builds the client with ``_make_repair_chat_openai`` and, until
+    now, dropped the effort entirely — so ``reasoning_effort: xhigh`` never
+    reached the model and its thinking output diverged from native. This mirrors
+    the profile's mapping so both runtimes put the same field on the wire; the
+    dict is passed as ``extra_body`` (openai-python merges it top-level).
+
+    Returns ``{}`` when there is nothing to send (no effort, or no config), so
+    the endpoint's own default applies exactly as on the native path.
+    """
+    from agent.reasoning_effort import OPENAI_COMPAT_WIRE_EFFORTS, clamp_effort
+
+    if not isinstance(reasoning_config, dict):
+        return {}
+    effort = str(reasoning_config.get("effort", "") or "").strip().lower()
+    if effort == "none" or reasoning_config.get("enabled", True) is False:
+        # Disabled reasoning is an explicit signal, mirrored top-level as native does.
+        return {"reasoning_effort": "none"}
+    if not effort:
+        return {}
+    return {"reasoning_effort": clamp_effort(effort, OPENAI_COMPAT_WIRE_EFFORTS)}
+
+
 def _build_reasoning_model(provider, model_name, reasoning_config):
     """Return a provider chat-model with extended thinking enabled, or ``None``.
 
@@ -323,7 +352,8 @@ def _build_reasoning_model(provider, model_name, reasoning_config):
 # ---------------------------------------------------------------------------
 
 
-def _structured_tool_from_schema(name, description, parameters):
+def _structured_tool_from_schema(name, description, parameters,
+                                 enabled_toolsets=None, disabled_toolsets=None, agent=None):
     """Build a LangChain ``StructuredTool`` that routes to Hermes dispatch.
 
     The tool's parameter schema (OpenAI/JSON-schema object) MUST be forwarded
@@ -338,12 +368,31 @@ def _structured_tool_from_schema(name, description, parameters):
     is the native runtime's dispatch entrypoint — it covers registry tools,
     MCP tools, and the synthetic ``tool_search`` / ``tool_describe`` /
     ``tool_call`` bridge tools alike.
+
+    ``enabled_toolsets`` / ``disabled_toolsets`` are the session's toolset scope
+    and MUST be forwarded to ``handle_function_call`` exactly as the native
+    runtime does (``agent/tool_executor.py`` passes ``agent.enabled_toolsets``).
+    The tool_search bridge builds its deferred-tool catalog from that scope
+    (``model_tools._dispatch_bridge_tool``); without it the bridge sees only the
+    default event-triggered deferrables, so a large session catalog (e.g. an MCP
+    server's tools) is invisible to ``tool_search`` and the model loops trying to
+    reach tools it can never find. Passing the scope reaches native parity.
     """
     from model_tools import handle_function_call
 
     def _execute_sync(**kwargs):
         try:
-            return handle_function_call(function_name=name, function_args=kwargs)
+            # Agent-loop-only tools (delegate_task) are rejected by
+            # handle_function_call ("must be handled by the agent loop"); the
+            # native loop intercepts them. DeepAgents has no such loop, so route
+            # delegate_task to the agent's own dispatcher (child spawn), keeping
+            # multi-provider delegation (Claude/Codex) working here too.
+            if name == "delegate_task" and agent is not None and hasattr(agent, "_dispatch_delegate_task"):
+                return agent._dispatch_delegate_task(kwargs)
+            return handle_function_call(
+                function_name=name, function_args=kwargs,
+                enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
+            )
         except Exception as e:
             error_str = str(e)
             return json.dumps({"error": error_str}, ensure_ascii=False)
@@ -396,7 +445,21 @@ class _HermesToolAdapter:
         return self._entry.toolset
 
 
-def build_hermes_tools(enabled_toolsets, disabled_toolsets):
+# Tools that ``create_deep_agent`` provides from its own required scaffolding
+# (FilesystemMiddleware + SubAgentMiddleware — see graph._REQUIRED_MIDDLEWARE,
+# unstrippable by design). We do NOT add the Hermes tools that duplicate these
+# by name: the project's choice is to prefer the DeepAgents base for filesystem
+# and shell, so the model sees one implementation, not two colliding ones. Only
+# same-name duplicates are dropped — Hermes tools with a distinct name (terminal,
+# execute_code, search_files, delegate_task, …) are kept, so no capability is
+# lost. The drift guard test in tests/agent/test_deep_agents_adapter.py asserts
+# this set still matches the live DeepAgents built-ins.
+_DEEPAGENTS_BUILTIN_TOOL_NAMES = frozenset({
+    "read_file", "write_file", "edit_file", "ls", "delete", "glob", "grep", "execute", "task",
+})
+
+
+def build_hermes_tools(enabled_toolsets, disabled_toolsets, agent=None):
     """Build LangChain StructuredTool list from Hermes tool definitions.
 
     Toolset resolution goes through ``model_tools.get_tool_definitions`` —
@@ -439,12 +502,120 @@ def build_hermes_tools(enabled_toolsets, disabled_toolsets):
         tool_name = fn.get("name", "")
         if not tool_name:
             continue
+        # DeepAgents already provides this tool from its base middleware — don't
+        # add the Hermes duplicate (prefer the DeepAgents base, avoid a same-name
+        # collision). Distinct-named Hermes tools fall through and are kept.
+        if tool_name in _DEEPAGENTS_BUILTIN_TOOL_NAMES:
+            continue
         tools.append(
             _structured_tool_from_schema(
-                tool_name, fn.get("description", ""), fn.get("parameters")
+                tool_name, fn.get("description", ""), fn.get("parameters"),
+                enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
+                agent=agent,
             )
         )
     return tools
+
+
+def _make_api_hook_callback(*, session_id, platform, model, provider, base_url):
+    """Build the LangChain callback that bridges model-call lifecycle events to
+    the Hermes ``pre_api_request`` / ``post_api_request`` plugin hooks.
+
+    Subclasses ``BaseCallbackHandler`` (lazy import) so the ``ignore_*`` flags and
+    the rest of the callback surface get correct no-op defaults — a duck-typed
+    object with ``__getattr__`` would answer ``ignore_chat_model`` truthy and
+    LangChain would skip it. See :class:`_HermesApiHookCallback` for the fields.
+    """
+    from langchain_core.callbacks import BaseCallbackHandler
+
+    class _HermesApiHookCallback(BaseCallbackHandler):
+        __doc__ = _HERMES_API_HOOK_DOC
+        raise_error = False
+
+        def __init__(self, *, session_id, platform, model, provider, base_url):
+            super().__init__()
+            self._session_id = session_id or ""
+            self._platform = platform or ""
+            self._model = model or ""
+            self._provider = provider or ""
+            self._base_url = base_url or ""
+            self._started: dict = {}
+
+        def _flatten_messages(self, messages):
+            out = []
+            try:
+                for group in messages or []:
+                    for m in group or []:
+                        role = getattr(m, "type", None) or getattr(m, "role", "") or ""
+                        out.append({"role": role, "content": getattr(m, "content", "")})
+            except Exception:
+                return []
+            return out
+
+        def _fire(self, name, **fields):
+            try:
+                from hermes_cli.lifecycle import has_hook, invoke_hook
+
+                if has_hook(name):
+                    invoke_hook(name, **fields)
+            except Exception:
+                logger.debug("deepagents %s hook failed", name, exc_info=True)
+
+        def on_chat_model_start(self, serialized, messages, *, run_id=None, **kwargs):
+            self._started[str(run_id)] = time.time()
+            self._fire(
+                "pre_api_request",
+                api_request_id=str(run_id),
+                session_id=self._session_id, platform=self._platform,
+                model=self._model, provider=self._provider, base_url=self._base_url,
+                request_messages=self._flatten_messages(messages),
+                started_at=self._started[str(run_id)],
+            )
+
+        def on_llm_end(self, response, *, run_id=None, **kwargs):
+            start = self._started.pop(str(run_id), None)
+            now = time.time()
+            llm_output = getattr(response, "llm_output", None) or {}
+            usage = llm_output.get("token_usage") or llm_output.get("usage") or {}
+            text = ""
+            finish_reason = None
+            try:
+                gens = getattr(response, "generations", None) or []
+                if gens and gens[0]:
+                    g0 = gens[0][0]
+                    text = getattr(g0, "text", "") or ""
+                    info = getattr(g0, "generation_info", None) or {}
+                    finish_reason = info.get("finish_reason")
+            except Exception:
+                pass
+            self._fire(
+                "post_api_request",
+                api_request_id=str(run_id),
+                session_id=self._session_id, platform=self._platform,
+                model=self._model, provider=self._provider, base_url=self._base_url,
+                response_model=llm_output.get("model_name") or llm_output.get("model"),
+                finish_reason=finish_reason,
+                started_at=start, ended_at=now,
+                api_duration=(now - start) if start is not None else None,
+                response={"text": text, "usage": usage},
+            )
+
+    return _HermesApiHookCallback(
+        session_id=session_id, platform=platform, model=model,
+        provider=provider, base_url=base_url,
+    )
+
+
+_HERMES_API_HOOK_DOC = """LangChain callback firing Hermes pre/post_api_request.
+
+FAITHFUL SUBSET: LangChain's callback args do not carry every field the native
+hook passes (no api_mode-shaped request payload, no middleware_trace, no native
+char/token accounting). We pass the fields we can source accurately and omit the
+rest — plugin callbacks are signature-inspected (they receive only the fields
+they declare), so a subset is safe. Guarded on has_hook so it is inert without a
+registered consumer. The native runtime fires these from its turn loop
+(agent/turn_api_request.py, turn_response_intake.py); DeepAgents runs the model
+inside LangGraph, so this bridge restores them, keyed by run_id."""
 
 
 # ---------------------------------------------------------------------------
@@ -1510,7 +1681,13 @@ class DeepAgentsAIAgent:
         tools = build_hermes_tools(
             enabled_toolsets=enabled_toolsets,
             disabled_toolsets=disabled_toolsets,
+            agent=self,
         )
+        # Signature of the baked (directly-visible) tool set, so run_conversation
+        # can detect a mid-session change and rebuild — native parity (the native
+        # loop re-snapshots tools every turn). Deferred tools need no rebuild: the
+        # tool_search bridge reads the live registry per call.
+        self._baked_tool_sig = frozenset(getattr(t, "name", "") for t in tools)
 
         # Optional: LangGraph checkpointer for tracing / state persistence
         checkpointer = None
@@ -1571,16 +1748,45 @@ class DeepAgentsAIAgent:
                 # sometimes emit tool calls as ``<model_tool_calls>`` text the
                 # OpenAI-compatible layer doesn't parse, so the graph would see
                 # no tool and the XML would land on screen (see module notes).
-                model = _make_repair_chat_openai(
+                # Forward the reasoning effort the same way native does for a
+                # custom endpoint: a top-level ``reasoning_effort`` (via
+                # extra_body) so the vLLM/Qwen model reasons at the configured
+                # depth instead of silently dropping it (parity with native).
+                _reasoning_extra = _openai_compat_reasoning_extra_body(
+                    self._get_cap("reasoning_config")
+                )
+                _repair_kwargs = dict(
                     # The endpoint serves the model under its full id
                     # (prefix included) — don't use the stripped name.
                     model=getattr(self, "_model_raw", None) or model,
                     base_url=self._base_url,
                     api_key=self._api_key or "EMPTY",
                 )
+                if _reasoning_extra:
+                    _repair_kwargs["extra_body"] = _reasoning_extra
+                    logger.info(
+                        "deepagents: custom-endpoint reasoning_effort=%s",
+                        _reasoning_extra.get("reasoning_effort"),
+                    )
+                model = _make_repair_chat_openai(**_repair_kwargs)
+
+        # DeepAgents' default backend is StateBackend() — an in-memory VIRTUAL
+        # filesystem. Its read_file/write_file would then operate on a scratchpad,
+        # not the real disk, so the base file tools could not read real files
+        # (the native read_file reads any path). Back the base filesystem with a
+        # real-disk FilesystemBackend (virtual_mode=False → absolute paths pass
+        # through, relative resolve under cwd) so the DeepAgents file tools have
+        # the same reach as the native runtime — no lost capability.
+        backend = None
+        try:
+            from deepagents.backends import FilesystemBackend
+
+            backend = FilesystemBackend(virtual_mode=False)
+        except Exception:
+            logger.debug("deepagents FilesystemBackend unavailable; default backend", exc_info=True)
 
         # Create the LangGraph agent (recursion_limit set per-call via config)
-        agent = create_deep_agent(
+        _dagent_kwargs = dict(
             model=model,
             tools=tools,
             system_prompt=system_prompt,
@@ -1590,6 +1796,9 @@ class DeepAgentsAIAgent:
             debug=bool(debug_val),
             name="hermes-agent",
         )
+        if backend is not None:
+            _dagent_kwargs["backend"] = backend
+        agent = create_deep_agent(**_dagent_kwargs)
 
         # Store refs for per-call tracing hooks
         self._checkpointer = checkpointer
@@ -1649,6 +1858,65 @@ class DeepAgentsAIAgent:
         logger.info("DeepAgents agent rebuilt (tool list refreshed)")
         return True
 
+    def _maybe_fire_session_start(self) -> None:
+        """Fire the ``on_session_start`` plugin hook once per session, matching
+        the native runtime (agent/conversation_loop.py fires it at session init).
+        The deepagents runtime skips conversation_loop, so without this the hook
+        never fires here. Guarded so it runs once even across many turns.
+        Best-effort: a hook failure never blocks the turn.
+        """
+        if getattr(self, "_session_start_fired", False):
+            return
+        self._session_start_fired = True
+        try:
+            from hermes_cli.lifecycle import has_hook, invoke_hook
+
+            if has_hook("on_session_start"):
+                invoke_hook(
+                    "on_session_start",
+                    session_id=self._session_id or "",
+                    model=self.model,
+                    platform=self._platform or "",
+                )
+        except Exception:
+            logger.debug("on_session_start hook failed", exc_info=True)
+
+    def _maybe_refresh_tools(self) -> None:
+        """Rebuild the graph when the directly-visible tool set changed since the
+        last build — so tools that appear mid-conversation (e.g. an MCP server
+        that connects, or a toolset that becomes available) are usable in the
+        SAME session, matching the native runtime, which re-snapshots tools every
+        turn. Deferred tools need no rebuild: the tool_search bridge reads the
+        live registry on each call. A rebuild is a prompt-cache break, so it
+        fires only on an actual change — the same freshness/cost trade the native
+        loop makes. Best-effort: a signature failure leaves the current graph.
+        """
+        try:
+            from model_tools import get_tool_definitions
+
+            bk = getattr(self, "_build_kwargs", None) or {}
+            defs = get_tool_definitions(
+                enabled_toolsets=bk.get("enabled_toolsets"),
+                disabled_toolsets=bk.get("disabled_toolsets"),
+                quiet_mode=True,
+            ) or []
+            current = frozenset(
+                (d.get("function", {}) or {}).get("name", "")
+                for d in defs
+                if isinstance(d, dict)
+            )
+        except Exception:
+            logger.debug("tool-refresh signature failed", exc_info=True)
+            return
+
+        baked = getattr(self, "_baked_tool_sig", None)
+        if baked is not None and current != baked:
+            logger.info(
+                "DeepAgents: visible tool set changed (%d→%d), rebuilding graph",
+                len(baked), len(current),
+            )
+            self.rebuild_agent()
+
     # ------------------------------------------------------------------
     # Callback forwarding (__setattr__ / _get_cap / __getattr__)
     #
@@ -1702,6 +1970,12 @@ class DeepAgentsAIAgent:
         the forwarding dict so the gateway's per-turn attribute-setting
         pattern works without modification.
         """
+        # Native parity: fire the session lifecycle hook once, and pick up tools
+        # that appeared since the graph was baked (e.g. a mid-session MCP
+        # connection) before running this turn.
+        self._maybe_fire_session_start()
+        self._maybe_refresh_tools()
+
         langchain_history = _convert_messages_to_langchain(conversation_history or [])
         if system_message:
             langchain_history = [
@@ -1731,6 +2005,21 @@ class DeepAgentsAIAgent:
                 config.setdefault("metadata", {})["langfuse_session_id"] = (
                     self._session_id
                 )
+
+        # Fire the Hermes pre/post_api_request plugin hooks for this runtime too
+        # (native fires them from its turn loop). Only wire the bridge when a
+        # consumer is registered, so it is a no-op cost otherwise.
+        try:
+            from hermes_cli.lifecycle import has_hook
+
+            if has_hook("pre_api_request") or has_hook("post_api_request"):
+                _api_cb = _make_api_hook_callback(
+                    session_id=self._session_id or "", platform=self._platform or "",
+                    model=self.model, provider=self.provider, base_url=self._base_url or "",
+                )
+                config["callbacks"] = list(config.get("callbacks") or []) + [_api_cb]
+        except Exception:
+            logger.debug("deepagents: api-request hook bridge not wired", exc_info=True)
 
         # Add LangSmith tracing tags / metadata when tracing is enabled
         if self._ls_api_key:
@@ -1984,6 +2273,60 @@ class DeepAgentsAIAgent:
         return result.get("final_response", "")
 
     # ------------------------------------------------------------------
+    # Native-parent interface for delegation. ``tools/delegate_tool.py``
+    # spawns the child from parent attributes read by their public names
+    # (``api_key``, ``session_id``); expose the stored ``_``-prefixed values
+    # under those names so a DeepAgents parent can spawn children exactly as a
+    # native parent does (inherit its provider/model, or run on another
+    # provider — Claude, Codex — via delegation.provider/model or a per-task
+    # override).
+    # ------------------------------------------------------------------
+
+    @property
+    def api_key(self):
+        return getattr(self, "_api_key", None)
+
+    @property
+    def base_url(self):
+        return getattr(self, "_base_url", None)
+
+    @property
+    def session_id(self):
+        return getattr(self, "_session_id", "") or ""
+
+    def _dispatch_delegate_task(self, function_args: dict) -> str:
+        """Run delegate_task under the DeepAgents runtime.
+
+        The native runtime intercepts delegate_task in its turn loop
+        (``agent/inline_tool_executors.py``); ``handle_function_call`` rejects it
+        (``_AGENT_LOOP_TOOLS``: "must be handled by the agent loop"). DeepAgents
+        has no such loop, so we dispatch it here. Unlike native, we run
+        ``background=False``: DeepAgents has no async-delegation completion queue
+        to re-enter a handle, so the child runs synchronously and its result
+        returns inline to this tool call. The child is a full native ``AIAgent``,
+        so it can target a different provider/model (Claude, Codex) via
+        ``delegation.provider``/``delegation.model`` in config or a per-task
+        override — capability the DeepAgents built-in ``task`` tool cannot offer.
+        """
+        from tools.delegate_tool import (
+            _strip_model_hidden_task_fields, delegate_task as _delegate_task,
+        )
+
+        return _delegate_task(
+            goal=function_args.get("goal"),
+            context=function_args.get("context"),
+            tasks=_strip_model_hidden_task_fields(function_args.get("tasks")),
+            max_iterations=function_args.get("max_iterations"),
+            role=function_args.get("role"),
+            background=False,
+            images=function_args.get("images"),
+            action=function_args.get("action"),
+            subagent_id=function_args.get("subagent_id"),
+            message=function_args.get("message"),
+            parent_agent=self,
+        )
+
+    # ------------------------------------------------------------------
     # Observability — Langfuse tracing for deep agents.
     #
     # The deep agents runtime doesn't use run_agent.py or
@@ -2016,7 +2359,11 @@ class DeepAgentsAIAgent:
 
     @property
     def model(self):
-        return ""  # LangGraph tracks internally
+        # Report the real model id (the endpoint serves it under its full id).
+        # LangGraph binds its own model internally, but delegation (child spawn
+        # inherits parent.model) and the lifecycle hooks read this by name, so an
+        # empty string would spawn a modelless child / mislabel traces.
+        return getattr(self, "_model_raw", "") or ""
 
     @property
     def iteration_budget(self):

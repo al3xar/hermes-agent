@@ -121,6 +121,7 @@ def _deepagents_init(
     ``DeepAgentsAIAgent`` accepts are forwarded; the impl captures every other
     callback via ``__setattr__`` after construction.
     """
+    from agent.agent_init import _CONTROL_STATE, _set_defaults
     from agent.deep_agents_runtime import DeepAgentsAIAgent
 
     agent._runtime_mode = "deepagents"
@@ -143,6 +144,12 @@ def _deepagents_init(
         ephemeral_system_prompt=ephemeral_system_prompt,
         credential_pool=credential_pool,
     )
+    # The facade still inherits InterruptControlMixin (the gateway calls
+    # agent.interrupt()/clear_interrupt() on busy sessions), whose state
+    # (_execution_thread_id, _active_children_lock, ...) init_agent seeds on
+    # the native path only. The impl has none of it, so __getattr__ would raise.
+    # Seeded after the impl exists: _da_setattr/_da_getattr read _deep_agents_impl.
+    _set_defaults(agent, _CONTROL_STATE)
     # Expose gateway-facing attrs via the impl's __setattr__ forwarders.
     agent.__setattr__("reasoning_config", reasoning_config)
     agent.__setattr__("service_tier", service_tier)
