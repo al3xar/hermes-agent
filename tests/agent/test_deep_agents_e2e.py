@@ -962,7 +962,7 @@ class TestEnsureMcpDiscovery:
 
     def test_waits_for_background_discovery_when_running(self):
         import hermes_cli.mcp_startup as ms
-        import tools.mcp_tool as mt
+        import tools.mcp_tool_discovery as mt
 
         agent = self._make_agent(timeout=55.0)
         with patch(
@@ -983,7 +983,7 @@ class TestEnsureMcpDiscovery:
 
     def test_runs_synchronous_discovery_when_not_started(self):
         import hermes_cli.mcp_startup as ms
-        import tools.mcp_tool as mt
+        import tools.mcp_tool_discovery as mt
 
         agent = self._make_agent()
         with patch(
@@ -1002,7 +1002,7 @@ class TestEnsureMcpDiscovery:
 
     def test_noop_when_no_mcp_servers_configured(self):
         import hermes_cli.mcp_startup as ms
-        import tools.mcp_tool as mt
+        import tools.mcp_tool_discovery as mt
 
         agent = self._make_agent()
         with patch(
@@ -1014,7 +1014,7 @@ class TestEnsureMcpDiscovery:
         assert not wait.called and not disc.called
 
     def test_never_raises_on_discovery_failure(self):
-        import tools.mcp_tool as mt
+        import tools.mcp_tool_discovery as mt
 
         agent = self._make_agent()
         with patch(

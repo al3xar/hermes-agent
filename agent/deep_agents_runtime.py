@@ -1526,7 +1526,7 @@ class DeepAgentsAIAgent:
         # ourselves. Idempotent, and each server is bounded by its own
         # connect_timeout so a dead server can't hang construction forever.
         try:
-            from tools.mcp_tool import discover_mcp_tools
+            from tools.mcp_tool_discovery import discover_mcp_tools
 
             discover_mcp_tools()
         except Exception:
