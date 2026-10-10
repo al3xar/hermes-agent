@@ -417,7 +417,7 @@ class GatewaySlashCommandsMixin(
         await asyncio.to_thread(_sub)
         return True
 
-    async def _handle_stop_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
+    async def _handle_stop_command(self, event: MessageEvent) -> str | EphemeralReply:
         """Handle /stop command - interrupt a running agent.  A truly hung agent (blocked thread
         never checking _interrupt_requested) is caught by the early intercept in _handle_message();
         this handler runs via normal dispatch or as a fallback, and force-cleans the session lock in
@@ -526,7 +526,7 @@ class GatewaySlashCommandsMixin(
         self._resume_paused_platform(platform)
         return t("gateway.platform.resumed", name=name)
 
-    async def _handle_restart_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
+    async def _handle_restart_command(self, event: MessageEvent) -> str | EphemeralReply:
         """Handle /restart command - drain active work, then restart the gateway."""
         from gateway.run import _hermes_home
         # Idempotency check: if the previous gateway process recorded this same /restart (platform +
@@ -979,7 +979,7 @@ class GatewaySlashCommandsMixin(
             return f"Switched to {state} runtime (saved to config)"
         return f"Switched to {state} runtime (session only)"
 
-    async def _handle_yolo_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
+    async def _handle_yolo_command(self, event: MessageEvent) -> str | EphemeralReply:
         """Handle /yolo — toggle dangerous command approval bypass for this session only. The flag is
         persisted on the routing entry so it survives a gateway restart."""
         from tools.approval_yolo import toggle_session_yolo
@@ -1020,7 +1020,7 @@ class GatewaySlashCommandsMixin(
             logger.warning("Failed to save tool_progress mode: %s", e)
             return f"{description}\n" + t("gateway.verbose.save_failed", error=e)
 
-    async def _handle_busy_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
+    async def _handle_busy_command(self, event: MessageEvent) -> str | EphemeralReply:
         """Handle /busy — control what happens when messaging while Hermes is working."""
         arg = event.get_command_args().strip().lower()
         if not arg or arg == "status":
