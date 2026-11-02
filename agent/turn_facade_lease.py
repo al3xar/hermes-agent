@@ -109,6 +109,8 @@ class DurableTurnLease:
         in-flight tick finishes before ``clear_interrupt`` runs."""
         for handle in self.timer_handles:
             handle.cancel(wait=timeout)
+        # The watchdog holds this lease's bound methods: drop it so the finished turn frees by refcount.
+        self.timer_handles, self.watchdog = [], None
 
     def release(self) -> None:
         """Release the row and drop the agent's holder attrs (only if they still name this lease)."""
@@ -347,7 +349,8 @@ def admit_durable_turn_lease(
         on_wait=_on_wait, on_contended=_on_contended,
         should_abort=lambda: getattr(agent, "_interrupt_requested", False),
     ):
-        admission.early_result = _lease_not_acquired_result(agent, session_id, conversation_history)
+        admission.early_result = _lease_not_acquired_result(agent, session_id, conversation_history,
+                                                            waited=announced)
         return admission
 
     # Assign only after admission so the finally cannot release a holder that never owned the
@@ -437,7 +440,9 @@ def carry_unadmitted_user_message(
     append_message(early_result["messages"], deferred_user, timestamp=timestamp)
 
 
-def _lease_not_acquired_result(agent, session_id: str, conversation_history) -> dict[str, Any]:
+def _lease_not_acquired_result(agent, session_id: str, conversation_history, *, waited: bool) -> dict[str, Any]:
+    """``waited``: another holder was seen (the user was told so), not merely an interrupt that
+    landed before the first acquisition attempt, which no other process was involved in."""
     base = {"messages": list(conversation_history or []), "api_calls": 0, "completed": False}
     if getattr(agent, "_interrupt_requested", False):
         logger.info("session turn lease wait aborted by interrupt: %s", session_id)
@@ -449,6 +454,8 @@ def _lease_not_acquired_result(agent, session_id: str, conversation_history) -> 
             "final_response": (
                 "Stopped waiting for another Hermes process on this session. "
                 "Your message was not processed."
+                if waited else
+                "Stopped before this turn started. Your message was not processed."
             ),
             **base,
             "interrupted": True,
