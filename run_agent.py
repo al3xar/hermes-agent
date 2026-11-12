@@ -10,7 +10,7 @@
 try:
     import hermes_bootstrap
 except ModuleNotFoundError as exc:  # partial `hermes update` left the bootstrap unregistered
-    if exc.name != "hermes_bootstrap":
+    if exc.name != "hermes_bootstrap" and not "hermes_bootstrap".startswith(f"{exc.name}."):
         raise  # the bootstrap exists but cannot load: skipping it would skip PM activation
 
 import sys
@@ -289,7 +289,7 @@ class AIAgent(
         pass_session_id: bool = False, requested_provider: str | None = None,
         capabilities: dict[str, bool] | None = None, cwd: str | None = None,
         runtime: str = "native",  # "native" | "deepagents"
-        side_agent: bool = False, memory_manager=None,
+        side_agent: bool = False, memory_manager=None, memory_agent_context: str | None = None,
         tool_result_metadata_callback: Optional[Callable[..., dict]] = None,
     ):
         """Forwarder — see ``agent.agent_init.init_agent`` (native runtime) or
@@ -435,8 +435,9 @@ class AIAgent(
         advertised ``session_search`` tool stays usable."""
         # Persistence-isolated forks (background review) must not lazily open the canonical state DB —
         # that would re-arm the flush to write the fork's harness turn into the user's real session.
-        if getattr(self, "_persist_disabled", False):
-            return None
+        from tools.hosted_tool_policy import host_feature_enabled
+        if getattr(self, "_persist_disabled", False) or not host_feature_enabled("session_recall"):
+            return None  # hosted: the profile's state.db is not the agent's recall store
         if self._session_db is not None:
             return self._session_db
         try:
@@ -485,6 +486,13 @@ class AIAgent(
                 origin_json=_gateway_origin_json(self), parent_session_id=self._parent_session_id,
                 cwd=_launch_cwd_for_session(source), profile_name=profile_for_session,
             )
+            if getattr(self, "_session_db_reserved", False) is True:
+                # A reserved child row already exists, and first-turn writers (prompt-refresh epoch,
+                # usage anchor) may have patched its model_config before this create, so the
+                # keep-existing upsert dropped the constructor config. Merge it beside them.
+                patch = {k: v for k, v in (self._session_row_model_config() or {}).items() if v is not None}
+                if patch:
+                    self._session_db.patch_session_model_config(self.session_id, patch)
             self._session_db_created = True
         except Exception as e:
             # Transient failure (e.g. SQLite lock): _session_db_created stays False so the next turn retries.
@@ -901,6 +909,9 @@ class AIAgent(
         (/refine, with or without focus) is user-initiated: it bypasses the automatic-only delegate,
         ``enabled`` and idle-defer gates (#87250: ``enabled: false`` stops only automatic forks).
         """
+        from tools.hosted_tool_policy import host_feature_enabled
+        if not host_feature_enabled("background_review"):
+            return  # hosted: the review fork writes the profile's memory and skills on this host
         # Automatic-review gates run at enqueue/spawn time; the idle dispatcher re-checks `enabled` at dispatch time.
         if not explicit and focus is None and getattr(self, "_delegate_depth", 0) > 0:
             return
@@ -1545,19 +1556,18 @@ class AIAgent(
     def run_conversation(
         self,
         user_message: Any,
-        system_message: str = None,
-        conversation_history: List[Dict[str, Any]] = None,
-        task_id: str = None,
+        system_message: str | None = None,
+        conversation_history: list[dict[str, Any]] | None = None,
+        task_id: str | None = None,
         stream_callback: Optional[callable] = None,
-        persist_user_message: Optional[Any] = None,
-        persist_user_timestamp: Optional[float] = None,
-        persist_user_display_kind: Optional[str] = None,
-        persist_user_display_metadata: Optional[Dict[str, Any]] = None,
-        persist_user_platform_id: Optional[str] = None,
-        moa_config: Optional[dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        **native_kwargs: Any,
+    ) -> dict[str, Any]:
         """Deep-agents dispatch seam; otherwise defer to ``TurnFacadeMixin.run_conversation``
-        (native runtime, see ``agent.turn_facade`` / ``agent.conversation_loop``)."""
+        (native runtime, see ``agent.turn_facade`` / ``agent.conversation_loop``).
+
+        Native-only keywords pass through ``native_kwargs`` untouched so upstream can add
+        parameters to the native signature without this fork seam dropping or rejecting them.
+        """
         if hasattr(self, "_deep_agents_impl"):
             return self._deep_agents_impl.run_conversation(
                 user_message=user_message,
@@ -1572,12 +1582,7 @@ class AIAgent(
             conversation_history=conversation_history,
             task_id=task_id,
             stream_callback=stream_callback,
-            persist_user_message=persist_user_message,
-            persist_user_timestamp=persist_user_timestamp,
-            persist_user_display_kind=persist_user_display_kind,
-            persist_user_display_metadata=persist_user_display_metadata,
-            persist_user_platform_id=persist_user_platform_id,
-            moa_config=moa_config,
+            **native_kwargs,
         )
 
 

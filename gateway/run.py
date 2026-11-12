@@ -7,7 +7,7 @@ Run via ``python -m gateway.run`` or ``python cli.py --gateway``."""
 try:
     import hermes_bootstrap
 except ModuleNotFoundError as exc:  # a partial ``hermes update`` can leave the bootstrap unregistered
-    if exc.name != "hermes_bootstrap":
+    if exc.name != "hermes_bootstrap" and not "hermes_bootstrap".startswith(f"{exc.name}."):
         raise  # the bootstrap exists but cannot load: skipping it would skip PM activation
 
 import asyncio
@@ -34,13 +34,14 @@ from agent.async_utils import safe_schedule_threadsafe
 from agent.i18n import t
 from agent.conversation_compression import (
     COMPACTION_DONE_STATUS, COMPACTION_HEARTBEAT_STATUS, COMPACTION_STATUS, COMPRESSION_RETRY_CONTEXT_REDUCED_STATUS_TEMPLATE,
-    COMPRESSION_RETRY_MESSAGES_STATUS_TEMPLATE, COMPRESSION_RETRY_TOKENS_STATUS_TEMPLATE,
+    COMPRESSION_REFUSED_WOULD_GROW_WARNING, COMPRESSION_RETRY_MESSAGES_STATUS_TEMPLATE, COMPRESSION_RETRY_TOKENS_STATUS_TEMPLATE,
     COMPRESSION_RETRY_TOO_LARGE_STATUS_TEMPLATE, IDLE_COMPACTION_STATUS_TEMPLATE,
     PRE_API_COMPRESSION_STATUS_TEMPLATE, PREFLIGHT_COMPRESSION_STATUS_TEMPLATE)
+from gateway.run_status_filter import EMPTY_LADDER_STATUS_PATTERN, _status_template_to_regex, hidden_outside_dm, is_terminal_failure_status
 from agent.conversation_compression_archive import MERGED_DURABLE_ROWS, RETIRED_DURABLE_ROWS, UNNAMED_DURABLE_ROWS
 from agent.conversation_loop import INTERRUPT_WAITING_FOR_MODEL_PREFIX
 from agent.interrupt_compat import request_hard_interrupt
-from agent.message_metadata import ABSORBED_MESSAGE_UIDS, MESSAGE_UID, copy_identity_fields, is_compaction_scaffolding, scaffolding_replay_fields
+from agent.message_metadata import ABSORBED_MESSAGE_UIDS, MESSAGE_UID, copy_identity_fields, is_compaction_scaffolding, replay_metadata_fields
 from agent.turn_context import compression_made_progress
 from agent.session_activity import ActivityProvenance, AwakeIdleMeter
 from hermes_cli.config import _is_ssh_remote_tilde_cwd, cfg_get, config_exists
@@ -99,11 +100,11 @@ _TELEGRAM_NOISY_STATUS_RE = re.compile(
     r"|context\s+reduced\s+to\s+[\d,]+\s+tokens\s+\(was\s+[\d,]+\),\s+retrying"
     r"|session\s+compressed\s+\d+\s+times"
     r"|rate\s+limited\.\s+waiting\s+\d"
-    r"|retrying\s+in\s+\d"
+    rf"|retrying(?:\s+\(\d+/\d+\))?\s+in\s+\d|{EMPTY_LADDER_STATUS_PATTERN}"  # + counted '(1/3) in 6s'
     r"|max\s+retries\s+\(\d+\).*(?:trying\s+fallback|exhausted|invalid\s+responses)"
     r"|stream\s+(?:drop|drop\s+mid\s+tool-call).+retry\s+\d"
     r"|stale\s+connections\s+from\s+a\s+previous\s+provider\s+issue"
-    rf"|{re.escape(COMPACTION_DONE_STATUS)}"
+    rf"|{re.escape(COMPACTION_DONE_STATUS)}|{re.escape(COMPRESSION_REFUSED_WOULD_GROW_WARNING)}"
     r")",
     re.IGNORECASE | re.DOTALL)
 
@@ -314,14 +315,6 @@ def _record_hygiene_cooldown(
         recorder(session_id, time.time() + cooldown_seconds, error)
     except Exception as exc:
         logger.debug("session hygiene cooldown persist failed: %s", exc)
-
-
-def _status_template_to_regex(template: str) -> str:
-    """Compile a compression status template constant into a regex source.
-
-    Literal text is escaped verbatim (wording drift can't diverge from the matcher); ``{field}`` -> numeric."""
-    parts = re.split(r"\{[^{}]*\}", template)
-    return r"[\d,]+".join(re.escape(part) for part in parts)
 
 
 # ROUTINE compression progress statuses, derived from the SAME template constants the emit sites format.
@@ -593,10 +586,10 @@ def _format_exec_approval_fallback(
     allow_session: bool = True, smart_denied: bool = False) -> str:
     """Render the text fallback from approval capabilities, not platform names. Same words as
     the button card (``BasePlatformAdapter._format_exec_approval``), plus the typed ``/approve``
-    steps a surface without buttons needs."""
+    steps a surface without buttons needs. The command is never cut: ``/approve`` must only ever
+    answer a command the user could read in full (#62359)."""
     from gateway.platforms.base_exec_approval import (
         approval_timeout_seconds, ea_header_text, ea_reason_label_text, format_approval_deadline_line)
-    cmd_preview = BasePlatformAdapter._truncate_preview(command, BasePlatformAdapter._EA_CMD_BUDGET)  # as on a card
     heading = (t("gateway.exec_approval.smart_deny_heading") if smart_denied
                else f"⚠️ **{ea_header_text()}**")
 
@@ -607,7 +600,7 @@ def _format_exec_approval_fallback(
             choices.append(t("gateway.exec_approval.text_choice_always", prefix=command_prefix))
     choices.append(t("gateway.exec_approval.text_choice_deny", prefix=command_prefix))
     return (
-        t("gateway.exec_approval.text_body", heading=heading, command=cmd_preview,
+        t("gateway.exec_approval.text_body", heading=heading, command=command,  # whole: send() splits it
           reason_label=ea_reason_label_text(), reason=description)
         + t("gateway.exec_approval.text_choice_joiner").join(choices[:-1])
         + t("gateway.exec_approval.text_choice_last", choice=choices[-1])
@@ -663,7 +656,7 @@ def _gateway_provider_error_reply(text: str) -> str:
 # Provider/API failure envelope preambles (not ordinary assistant prose), anchored at line start.
 _PROVIDER_ERROR_MARKERS = (
     r"api\s+(?:call\s+)?failed", r"provider\s+authentication\s+failed", r"non-retryable\s+error",
-    r"rate\s+limited\s+after\s+\d+\s+retries", r"error\s+code\s*:", r"http\s*\d{3}\b",
+    r"rate\s+limited\s+after\s+\d+\s+(?:retries|attempts?)\b", r"error\s+code\s*:", r"http\s*\d{3}\b",
     r"incorrect\s+api\s+key", r"invalid\s+api\s+key")
 _GATEWAY_PROVIDER_ERROR_SHAPE_RE = re.compile(
     r"^\s*(\W*\s*)?("
@@ -721,15 +714,18 @@ def _sanitize_gateway_final_response(platform: Any, text: str) -> str:
     return redacted
 
 
-def _prepare_gateway_status_message(platform: Any, event_type: str, message: str) -> Optional[str]:
+def _prepare_gateway_status_message(platform: Any, event_type: str, message: str, chat_type: Any = "dm") -> Optional[str]:
     """Filter/sanitize agent status callbacks before platform delivery.
 
-    Local/CLI keep the raw diagnostic stream; messaging surfaces drop transient aux/compression noise."""
+    Local/CLI keep the raw diagnostic stream; messaging surfaces drop transient aux/compression noise, and
+    non-DM chats drop DM-only warnings (gateway/run_status_filter.py)."""
     text = str(message or "").strip()
     if not text:
         return None
     if _gateway_surface_passes_raw_text(platform):
         return text
+    if hidden_outside_dm(chat_type, str(message or "")) or is_terminal_failure_status(message):
+        return None
 
     text = _redact_gateway_user_facing_secrets(text)
     # Opt-in `compression.progress_notices` lets ROUTINE (template-derived) progress through; other noise stays.
@@ -738,7 +734,7 @@ def _prepare_gateway_status_message(platform: Any, event_type: str, message: str
     ):
         return None
     if _looks_like_gateway_provider_error(text):
-        return _gateway_provider_error_reply(text)
+        return None
     return text
 
 
@@ -1153,7 +1149,7 @@ def _build_replay_entry(
             entry[_rkey] = _rval
     if preserve_timestamp and msg.get("timestamp"):
         entry["timestamp"] = msg["timestamp"]
-    entry.update(scaffolding_replay_fields(msg))  # a proactive prune re-persists this view: keep the flags
+    entry.update(replay_metadata_fields(msg))  # a proactive prune re-persists this view: keep flags and stamp
     # Replay rebuilds the SAME conversation: every role keeps its uid and merge witness, so a context engine sees the
     # uids the store holds. Tool-call uid maps stay on rows that still carry their calls (those pass through whole).
     copy_identity_fields({key: msg[key] for key in (MESSAGE_UID, ABSORBED_MESSAGE_UIDS) if key in msg}, entry)
@@ -1562,8 +1558,6 @@ def _planned_restart_notification_pending() -> bool:
 # Gateway marker so a lazily imported cli.py load_cli_config() doesn't clobber TERMINAL_CWD.
 os.environ["_HERMES_GATEWAY"] = "1"
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from hermes_constants import get_hermes_home, get_hermes_home_override, get_process_hermes_home
 # The PROCESS's own home, never an import-time ContextVar: a multiplexed backend (``hermes serve``)
 # first imports this module lazily from a session's agent build, under that session's routed profile
@@ -1799,32 +1793,17 @@ def _profile_runtime_scope(
     ``set_hermes_home_override`` is a contextvar (reaches the agent worker via ``copy_context()``);
     ``set_secret_scope`` makes the profile ``.env`` the credential source without mutating
     ``os.environ``, so subprocesses never inherit cross-profile secrets."""
-    from hermes_constants import set_hermes_home_override, reset_hermes_home_override
-    from agent.secret_scope import set_secret_scope, reset_secret_scope
+    from agent.runtime_scope import bind_state, scope_for_profile
 
-    home_token = secret_token = None
+    # One bind: the runtime scope first, then home override, secrets (hydrated under that home
+    # unless the caller prepared them off-loop) and the profile's COMPLETE terminal policy, never
+    # ambient TERMINAL_* a prior turn set (first-writer-wins backend leak; #68559).
+    tokens = bind_state(scope_for_profile(profile_home), secrets=prepared_secret_scope,
+                        hydrate_secrets=hydrate_secrets, terminal_policy=prepared_terminal_scope)
     try:
-        home_token = set_hermes_home_override(str(profile_home))
-        if prepared_secret_scope is not None:
-            secrets = prepared_secret_scope
-        elif hydrate_secrets:
-            secrets = _load_profile_secret_scope(Path(profile_home))
-        else:
-            from tui_gateway.launch_profile_policy import owner_secret_scope  # caller already hydrated off-loop
-            secrets = owner_secret_scope(Path(profile_home))
-        secret_token = set_secret_scope(secrets, profile_home=str(profile_home))
-        # Install the routed profile's COMPLETE terminal policy, never ambient TERMINAL_* a prior turn set.
-        # Without it terminal_tool reads the process-global TERMINAL_* vars a previous profile's turn may have
-        # pinned (first-writer-wins backend leak; #68559).
-        from tools.terminal_scope import install_and_reset_profile_terminal_scope
-
-        with install_and_reset_profile_terminal_scope(Path(profile_home), prepared=prepared_terminal_scope):
-            yield
+        yield
     finally:
-        if secret_token is not None:
-            reset_secret_scope(secret_token)
-        if home_token is not None:
-            reset_hermes_home_override(home_token)
+        tokens.reset()
 
 
 @_asynccontextmanager
@@ -1957,7 +1936,7 @@ _AGENT_ENV_BRIDGE = {
     "gateway_startup_restore_drain_timeout": "HERMES_STARTUP_RESTORE_DRAIN_TIMEOUT",
     "gateway_startup_warmup_timeout": "HERMES_STARTUP_WARMUP_TIMEOUT"}
 # config-authoritative knobs for the session-search index (env stays the cross-process carrier).
-_SESSIONS_ENV_BRIDGE = {"cjk_fts": "HERMES_CJK_FTS", "search_slow_ms": "HERMES_SEARCH_SLOW_MS"}
+_SESSIONS_ENV_BRIDGE = {"search_slow_ms": "HERMES_SEARCH_SLOW_MS"}
 _DISPLAY_ENV_BRIDGE = {
     "busy_input_mode": "HERMES_GATEWAY_BUSY_INPUT_MODE",
     "busy_text_mode": "HERMES_GATEWAY_BUSY_TEXT_MODE",
@@ -2177,7 +2156,7 @@ from gateway.session import (
 # send (via DeliveryRouter) and the media send agree.
 from gateway.delivery import DeliveryRouter
 from gateway.turn_lease import SessionTurnLeaseRegistry
-from gateway.session_state import SessionState, legacy_dict_property, legacy_lease_token_property
+from gateway.session_state import SessionState, legacy_dict_property
 from gateway.authz_mixin import GatewayAuthorizationMixin
 from gateway.kanban_watchers import GatewayKanbanWatchersMixin
 from gateway.slash_commands import GatewaySlashCommandsMixin
@@ -2263,8 +2242,8 @@ _AGENT_PENDING_SENTINEL = object()
 # ``SessionState.conversation`` (cleared via ``ConversationState.clear()``); this list remains for
 # plain-dict stores not yet folded in (``_pending_model_notes``, popped per-key by
 # _clear_conversation_scope) and the public test contract. NOT listed (different lifecycles): turn-scoped
-# _running_agents*/_active_session_leases/_busy_ack_ts/_turn_lease_tokens (_release_running_agent_state +
-# dispatch finally); _session_run_generation (monotonic; clearing breaks stale-run detection);
+# _running_agents/turn.started_ts/turn.busy_ack_ts/turn.lease/turn.lease_tokens (_release_running_agent_state +
+# dispatch finally); persistent.run_generation (monotonic; clearing breaks stale-run detection);
 # _agent_cache (_evict_cached_agent); approval/slash-confirm (_clear_session_boundary_security_state).
 # The state itself now lives in ``SessionState.conversation`` (see gateway/session_state.py) and boundaries
 # clear it structurally via ``ConversationState.clear()`` — adding a field to ConversationState means every
@@ -2273,20 +2252,12 @@ _AGENT_PENDING_SENTINEL = object()
 # eviction path (_evict_cached_agent) with resource cleanup; boundaries call it explicitly.
 _CONVERSATION_SCOPED_STATE: tuple = (
     "_session_model_overrides",
-    "_pending_one_turn_model_restores",
-    "_session_reasoning_overrides",
-    "_session_service_tier_overrides",
     "_pending_model_notes",
-    "_last_resolved_model",
-    "_queued_events",
     # Stall-watchdog "already notified" latch; cleared on /new so a fresh conversation can warn again.
     # See #72016.
     "_session_stall_notified",
     # Transcript-lag streak counter (#114266); a fresh conversation starts with no lag history.
-    "_transcript_lag_streaks",
-    # Sidecar notes staged but never consumed (turn aborted before run_sync) must not leak into a
-    # future conversation's first user message — session keys are source-derived and REUSED.
-    "_pending_turn_sidecar_notes")
+    "_transcript_lag_streaks")
 
 
 def _resolve_runtime_agent_kwargs() -> dict:
@@ -2360,11 +2331,11 @@ def _resolve_gateway_model_context(
     ``route`` (``provider`` / ``base_url`` / ``api_key`` of a session-only /model switch) replaces the
     default runtime credentials so the window is looked up against the endpoint that actually serves
     ``model``; a ``model.context_length`` pin only survives when that route still matches the config.
-    ``context_source`` is ``"default"`` only for a model unknown to the catalog that fell through to
-    ``DEFAULT_FALLBACK_CONTEXT`` — a catalog-listed 256K model is ``"detected"``.
+    ``context_source`` is ``"default"`` only for a model no source knows that fell through to a resolver
+    default (Bedrock's static 128K, or ``DEFAULT_FALLBACK_CONTEXT``) — a catalog-listed model is ``"detected"``.
     """
-    from agent.model_metadata import (
-        DEFAULT_CONTEXT_LENGTHS, DEFAULT_FALLBACK_CONTEXT, _longest_key_match, get_model_context_length)
+    from agent.context_pin import is_fallback_context_length
+    from agent.model_metadata import get_model_context_length
     resolved_model = model or _resolve_gateway_model()
     config_context_length = provider = base_url = api_key = custom_providers = None
     configured_model = configured_provider = configured_base_url = None
@@ -2392,12 +2363,12 @@ def _resolve_gateway_model_context(
 
     def _read_runtime() -> None:
         nonlocal provider, base_url, api_key
-        if route and route.get("base_url"):
-            # A session route with its own endpoint (a /model switch) replaces the default runtime
-            # read; a route without one (persisted / SessionDB / plain config) still resolves the
-            # default runtime credentials so a custom endpoint and its context_length pin survive.
+        if route and (route.get("base_url") or route.get("_runtime_resolved")):
+            # A session route with its own endpoint (a /model switch), or provider-specific runtime
+            # already resolved by the caller, replaces the default runtime read. A persisted route
+            # without either still resolves default credentials so a custom endpoint and its pin survive.
             provider = route.get("provider") or provider
-            base_url = route["base_url"]
+            base_url = route.get("base_url") or ""
             api_key = route.get("api_key")
             return
         runtime = _resolve_runtime_agent_kwargs()
@@ -2427,8 +2398,8 @@ def _resolve_gateway_model_context(
         resolved_model, base_url=base_url or "", api_key=api_key or "",
         config_context_length=config_context_length, provider=provider or "",
         custom_providers=custom_providers)
-    fell_through = (context_length == DEFAULT_FALLBACK_CONTEXT
-                    and _longest_key_match(DEFAULT_CONTEXT_LENGTHS, str(resolved_model).lower()) is None)
+    fell_through = is_fallback_context_length(  # Bedrock's static 128K or the generic 256K, unknown model
+        context_length, model=str(resolved_model), provider=provider or "", base_url=base_url or "")
     context_source = ("config" if config_context_length is not None
                       else "default" if fell_through else "detected")
     return _GatewayModelContext(
@@ -2651,9 +2622,8 @@ def _reap_gateway_turn_processes(
     return killed
 
 
-_TURN_STACK_DUMP_FRAME_MARKERS = (
-    "run_conversation", "run_sync", "_run_sync_with_timeout_lifecycle",
-    "finalize_turn", "end_turn", "run_in_session")
+_TURN_STACK_DUMP_FRAME_MARKERS = ("run_conversation", "run_sync", "_run_sync_with_timeout_lifecycle", "finalize_turn",
+    "end_turn", "run_in_session", "_hmwa_resolve_session", "_hmwa_prepare_turn", "_handle_message_with_agent")
 
 
 def _dump_wedged_turn_stacks(task_id: str) -> None:
@@ -3043,6 +3013,7 @@ def _format_gateway_process_notification(evt: dict) -> str | None:
 def _drain_gateway_watch_events(completion_queue) -> list[dict]:
     """Drain gateway-owned watch events without spinning on requeued events.
     Foreign events requeued inside ``while not queue.empty()`` never terminate: detach, then requeue."""
+    from tools.environments.sandbox_scope import event_visible
     watch_events: list[dict] = []
     requeue: list[dict] = []
     while not completion_queue.empty():
@@ -3051,12 +3022,11 @@ def _drain_gateway_watch_events(completion_queue) -> list[dict]:
         except Exception:
             break
         evt_type = evt.get("type", "completion")
-        if evt_type in {
-            "watch_match", "watch_disabled", "watch_overflow_tripped", "watch_overflow_released",
-            "heartbeat"}:
+        if not event_visible(evt) or evt_type == "async_delegation":
+            requeue.append(evt)  # hosted: only its own scope may deliver it; async_delegation: its own watcher does
+        elif evt_type in {"watch_match", "watch_disabled", "watch_overflow_tripped", "watch_overflow_released",
+                          "heartbeat"}:
             watch_events.append(evt)
-        elif evt_type == "async_delegation":
-            requeue.append(evt)
         # else: process completion events are handled by the watcher task
     for evt in requeue:
         completion_queue.put(evt)
@@ -3363,33 +3333,11 @@ class GatewayRunner(
     _systemd_watchdog: Optional[Any] = None
     _startup_restore_in_progress: bool = False
     _startup_warmup_task: Optional[asyncio.Task] = None
-    # Class-level default so helpers that resolve runtime state
-    # (e.g. ``_resolve_session_agent_runtime``) work on instances built
-    # without ``__init__`` running — mirrors ``_session_model_overrides``.
-    # ``__init__`` overrides this with the config-derived value.
-    _deepagents_mode: bool = False
 
     # Legacy per-session dict attrs as LIVE views over ``self._sessions``; new code: _session_state(key)
     _running_agents = legacy_dict_property("_running_agents")
-    _running_agents_ts = legacy_dict_property("_running_agents_ts")
-    _active_session_leases = legacy_dict_property("_active_session_leases")
-    _busy_ack_ts = legacy_dict_property("_busy_ack_ts")
-    _turn_lease_tokens = legacy_lease_token_property()
-    _session_run_generation = legacy_dict_property("_session_run_generation")
     _session_model_overrides = legacy_dict_property("_session_model_overrides")
-    _pending_one_turn_model_restores = legacy_dict_property("_pending_one_turn_model_restores")
-    _session_reasoning_overrides = legacy_dict_property("_session_reasoning_overrides")
-    _session_service_tier_overrides = legacy_dict_property("_session_service_tier_overrides")
-    _last_resolved_model = legacy_dict_property("_last_resolved_model")
-    _queued_events = legacy_dict_property("_queued_events")
-    _pending_turn_sidecar_notes = legacy_dict_property("_pending_turn_sidecar_notes")
     _pending_messages = legacy_dict_property("_pending_messages")
-    _pending_native_image_paths_by_session = legacy_dict_property(
-        "_pending_native_image_paths_by_session")
-    _session_ephemeral_pin = legacy_dict_property("_session_ephemeral_pin")
-    _session_vc_last = legacy_dict_property("_session_vc_last")
-    _pending_approvals = legacy_dict_property("_pending_approvals")
-    _update_prompt_pending = legacy_dict_property("_update_prompt_pending")
 
     def _sessions_map(self) -> dict[str, SessionState]:
         """Per-session state map; lazily created so bare ``object.__new__`` test runners work."""
@@ -3472,231 +3420,6 @@ class GatewayRunner(
         self._init_runtime_caches()
         self._init_session_db()
         self._init_registries_and_clocks()
-
-    def _init_runtime_settings(self) -> None:
-        """Load ephemeral per-call config (prefill, reasoning, busy modes, timeouts, routing)."""
-        self._prefill_messages = self._load_prefill_messages()
-        self._reasoning_config = self._load_reasoning_config()
-        self._service_tier = self._load_service_tier()
-        self._show_reasoning = self._load_show_reasoning()
-        self._deepagents_mode = bool(getattr(self.config, "deepagents_mode", False))
-        self._busy_input_mode = self._load_busy_input_mode()
-        self._busy_text_mode = self._load_busy_text_mode()
-        # Secondary-profile busy modes snapshotted at multiplex startup; handlers never reread config.
-        self._busy_input_modes_by_profile: dict[str, str] = {}
-        self._busy_text_modes_by_profile: dict[str, str] = {}
-        self._busy_text_timing = self._busy_text_timing_from_config(_load_gateway_config())
-        self._busy_text_timing_by_profile: dict[str, tuple[float, float]] = {}
-        self._human_delay = self._human_delay_from_config(_load_gateway_config())
-        self._human_delay_by_profile: dict[str, Optional[tuple[int, int]]] = {}
-        self._restart_drain_timeout = self._load_restart_drain_timeout()
-        # Live launchd ``ExitTimeOut`` for this job (None when not launchd-owned). Read once at
-        # boot — launchd fixes it at load — and applied only to signal-driven stops, which are the
-        # only stops launchd times. See _load_launchd_exit_timeout().
-        self._stop_requested_by_signal = False
-        self._launchd_exit_timeout_s = self._load_launchd_exit_timeout(self._restart_drain_timeout)
-        self._restart_after_turn_timeout = self._load_restart_after_turn_timeout()
-        self._cron_drain_timeout = self._load_cron_drain_timeout()
-        self._signal_interrupt_grace_timeout = self._load_signal_interrupt_grace_timeout()
-        self._provider_routing = self._load_provider_routing()
-        self._fallback_model = self._load_fallback_model()
-
-    def _init_session_store(self) -> None:
-        """Build the SessionStore (with process-registry reset guard), its async facade and the router."""
-        from tools.process_registry import process_registry
-        self.session_store = SessionStore(
-            self.config.sessions_dir, self.config,
-            has_active_processes_fn=lambda key: process_registry.has_active_for_session(
-                key))
-        # Loop-side boundary: sync helpers use ``session_store`` directly; async handlers await this facade.
-        self._async_session_store = AsyncSessionStore(self.session_store)
-        self.delivery_router = DeliveryRouter(self.config)
-
-    def _init_lifecycle_state(self) -> None:
-        """Initialise run/exit/restart flags, per-session state, and completion-delivery bookkeeping."""
-        self._running = self._exit_cleanly = self._exit_with_failure = self._draining = False
-        self._gateway_loop: Optional[asyncio.AbstractEventLoop] = None
-        self._shutdown_event = asyncio.Event()
-        self._exit_reason: Optional[str] = None
-        self._exit_code: Optional[int] = None
-        self._profile_failed_platforms: dict[str, dict[Platform, asyncio.Task]] = {}
-        self._systemd_watchdog = None
-        # External (NAS-driven) drain, distinct from one-way ``_draining``: set while ``.drain_request.json``
-        # exists — NEW turns refused, process stays up, removing the marker reverts to ``running``.
-        self._external_drain_active = False
-        # ``_signal_initiated_shutdown``: SIGTERM/SIGINT with no planned-stop/takeover marker (container,
-        # OOM, bare kill); _stop_impl must NOT persist gateway_state=stopped or container_boot won't restart.
-        self._restart_requested = self._signal_initiated_shutdown = self._restart_task_started = False
-        self._restart_detached = self._restart_via_service = self._detached_restart_helper_started = False
-        self._restart_command_source: Optional[SessionSource] = None
-        # Construction clock: bounds the /restart redelivery guard's window (missing dedup marker = stale).
-        self._startup_time: float = time.time()
-        # True when booted from a chat /restart (.restart_notify.json existed). One-shot signal so the
-        # marker-missing fallback suppresses a /restart only when we KNOW we just restarted.
-        self._booted_from_restart: bool = False
-        self._stop_task: Optional[asyncio.Task] = None
-        self._restart_task: Optional[asyncio.Task] = None
-        self._executor_lock = threading.Lock()
-        self._executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
-        # Best-effort session housekeeping runs on its OWN pool; see _run_housekeeping_in_executor.
-        self._housekeeping_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
-        # Set on gateway stop so the recreate-on-shutdown path can't resurrect the pool.
-        self._executor_closing = False
-        # ALL per-session state lives here (gateway/session_state.py); use _session_state / _peek_session_state.
-        self._sessions: dict[str, SessionState] = {}
-        # Per-SESSION_ID turn lease: serializes [load history → run → flush] when two ROUTING KEYS resolve
-        # to one session_id (switch_session's many-to-one mapping), which routing-key guards cannot see.
-        self._turn_leases = SessionTurnLeaseRegistry()
-        # Stall-notified keys clear when pending clears / activity resumes / conversation boundary.
-        # Held turn-lease tokens live on SessionState.turn.lease_tokens keyed by run generation, so a
-        # stale unwind can never free a newer turn's lease (#28686). Runner-level queued interrupt text lives on
-        # SessionState.persistent.pending_command_text (NOTE: distinct from the adapter-level
-        # _pending_messages Dict[str, MessageEvent] in gateway/platforms/base.py, which shares the legacy
-        # name). Last successfully-resolved (non-empty) model, keyed by session. Used as a fallback when a
-        # fresh config read transiently returns an empty model (e.g. an mtime-keyed config-cache miss during
-        # a post-interrupt recovery turn). Without this, the agent is built with model="" and every API call
-        # fails HTTP 400 "No models provided" — the session goes silent until the user manually re-sends.
-        # See #35314. The ``"*"`` session entry holds a process-wide last-known-good for sessions seen for
-        # the first time. Lives on SessionState.conversation.last_resolved_model. Overflow buffer for
-        # explicit /queue commands. The adapter-level _pending_messages dict is a single slot per session
-        # (designed for "next-turn" follow-ups where repeated sends collapse into one event).  /queue has
-        # different semantics: each invocation must produce its own full agent turn, in FIFO order, with no
-        # merging. When the slot is occupied, additional /queue items land here and are promoted
-        # one-at-a-time after each run's drain. Cleared on /new and /reset.  /model and other mid-session
-        # operations preserve the queue. Lives on SessionState.conversation.queued_events; native image
-        # paths, busy-ack debounce timestamps and the monotonic run-generation counter (#28686, NEVER reset)
-        # live on SessionState too. See gateway.session_stall.
-        self._session_stall_notified: dict[str, bool] = {}
-        # Consecutive "persisted transcript lagged live cached history" turns per session key; see
-        # run_turn_runner._load_turn_history (#114266). Cleared on /new.
-        self._transcript_lag_streaks: dict[str, int] = {}
-        # Startup restore gate: while restart-interrupted sessions auto-resume, real inbound messages
-        # queue instead of competing with the synthetic resume turns; drained after all resume tasks end.
-        self._startup_restore_in_progress = False
-        self._startup_restore_queue: list[MessageEvent] = []
-        self._startup_restore_tasks: list[asyncio.Task] = []
-        # Set by start_gateway() only for an explicit ``--replace`` launch; scoped to each adapter's
-        # cold-start connect and removed before any reconnect can run.
-        self._platform_lock_takeover_on_start = False
-        # Capped LRU of live SessionSources for fallback routing (shutdown notices, synthetic events) when
-        # the persisted origin is missing and _parse_session_key can't recover thread_id.
-        self._session_sources: OrderedDict[str, SessionSource] = OrderedDict()
-        self._session_sources_max = 512
-        # Lifecycle-scoped completion dedup: closes queue/watcher races inside one gateway without claiming
-        # exactly-once across a crash; durable replay state stays owned by tools.async_delegation.
-        self._completion_delivery_lock = threading.Lock()
-        self._completion_deliveries_inflight: set[tuple[str, str, object]] = set()
-        self._completion_deliveries_delivered: OrderedDict[tuple[str, str, object], None] = OrderedDict()
-        self._completion_delivery_retention = 2048
-        # Agent-triggered terminal completions from one conversation often land in the same scheduler
-        # tick; hold them briefly so the agent gets one synthetic turn instead of one per process.
-        # See #70300.
-        self._completion_notification_batches: dict[tuple[str, ...], list[tuple[str, dict, asyncio.Future]]] = {}
-        self._completion_notification_batch_tasks: dict[tuple[str, ...], asyncio.Task] = {}
-        self._completion_notification_batch_flush_tasks: set[asyncio.Task] = set()
-        self._completion_notification_batch_window = 0.1
-        self._completion_notification_batches_stopping = False
-
-    def _init_runtime_caches(self) -> None:
-        """Agent cache, profile identity, Teams runtime, failed-platform tracking, slash-confirm counter."""
-        # AIAgent per session preserves prompt caching (fresh agent per message ~10x cost on Anthropic).
-        # Value: (AIAgent, config_signature); LRU cap in _enforce_agent_cache_cap, TTL in expiry watcher.
-        self._agent_cache: OrderedDict[str, tuple] = OrderedDict()
-        self._agent_cache_lock = threading.Lock()
-        # Launch-time identity of the profile that owns ``self.adapters``; ``_authorization_adapter``
-        # compares against this rather than the per-turn ``_active_profile_name()``. A multiplex
-        # host's primary map is always the default profile, even when a named profile launched
-        # the process (that launcher is a secondary adapter owner).
-        launch = self._active_profile_name()
-        self._kanban_notifier_profile = launch
-        self._primary_profile_name = (
-            "default" if getattr(self.config, "multiplex_profiles", False) else launch
-        )
-        # Teams meeting pipeline runtime (bound later when msgraph_webhook adapter exists).
-        self._teams_pipeline_runtime = None
-        self._teams_pipeline_runtime_error: Optional[str] = None
-        # Failed-to-connect platforms for background reconnection: Platform -> {config, attempts, next_retry}
-        self._failed_platforms: dict[Platform, dict[str, Any]] = {}
-        # Strong refs to detached fatal-error handler tasks so the loop can't GC them mid-run.
-        self._fatal_handler_tasks: set = set()
-        # Slash-confirm state lives in tools.slash_confirm (module-level) so adapters resolve callbacks
-        # without a runner backref; local counter keeps confirm_ids compact (64-byte callback_data caps).
-        import itertools
-        self._slash_confirm_counter = itertools.count(1)
-
-    def _init_session_db(self) -> None:
-        """Open the session DB for the active scope and run opportunistic state.db / checkpoint maintenance."""
-        # Session DB is a property caching one AsyncSessionDB per path (a handle bound here would pin the
-        # root home under multiplex); priming here keeps startup diagnostics at init.
-        # Initialize session database for session_search tool support. Same frozen-handle class of bug as
-        # SessionStore._db (#88532): a handle bound here is pinned to the process's root home, but /resume,
-        # /title, /history and session search all run inside _profile_runtime_scope on a multiplexed gateway
-        # and must see that profile's own state.db.
-        self._session_db_pinned: Any = _SESSION_DB_UNPINNED
-        self._session_db_handles: dict[Path, Any] = {}
-        self._session_db_handles_lock = threading.Lock()
-        from gateway.session_db_recovery import RecoverableHandleCache
-        self._session_db_handle_cache = RecoverableHandleCache(
-            handles=self._session_db_handles, lock=self._session_db_handles_lock)
-        try:
-            self._open_session_db_for_active_scope(raise_on_error=True)
-        except Exception as e:
-            # WARNING (not DEBUG) so it lands in errors.log; else an NFS HERMES_HOME silently loses /resume etc.
-            logger.warning("SQLite session store not available: %s", e)
-            self._session_db_init_error = str(e)  # surfaced on the home channel(s) once connected
-
-        # Opportunistic state.db maintenance (prune + optional VACUUM), at most once per min_interval_hours.
-        # A few blocking seconds per day is fine for a long-lived gateway; failures log, never raise.
-        # Surface the failure to the user via their home channel(s) once the gateway connects. Without this,
-        # state.db corruption or NFS/SMB lock failures silently degrade the entire gateway — messages may
-        # flow but nothing is persisted, and the user has no indication until they try /resume and find
-        # nothing (#88235).
-        # Once per SERVED profile, each under its own scope: both the store and the ``sessions:``
-        # config that governs it must be the profile's own. Bound to ``self._session_db`` this ran
-        # against the construction-time launch home only, so a multiplexed secondary profile's
-        # state.db was never pruned or vacuumed by anybody, and the launch profile's
-        # retention_days/auto_prune decided whether it happened at all.
-        from gateway.run_profile_reconcile import _for_each_served_profile
-        _launch_sessions = _launch_sessions_dir(self.config)  # resolved OUTSIDE any profile scope
-        _housekeeping_chore(
-            "state.db startup maintenance",
-            lambda: _for_each_served_profile(
-                self, lambda _label: _housekeeping_state_db_maintenance(_launch_sessions)))
-        # Checkpoint store pruning is a housekeeping chore (``_housekeeping_checkpoint_prune``), not a
-        # constructor step: its ``git gc`` repacks the whole store (tens of seconds on a GB store) and
-        # here it ran before the control socket, adapters and the code_sha stamp — so the first
-        # restart of the day (the ``hermes update`` one) looked hung and failed fleet verification.
-
-    def _init_registries_and_clocks(self) -> None:
-        """Pairing stores, hook registry, voice modes, background-task set, liveness and idle clocks."""
-        # ``pairing_store``: global/default store (CLI, callers without profile context); ``pairing_stores``:
-        # per-profile map ``authz_mixin._is_user_authorized`` routes through (one whitelist per profile).
-        from gateway.pairing import PairingStore
-        from gateway.hooks import ProfileHookRegistries
-        self.pairing_store = PairingStore()
-        self.pairing_stores: dict[str, PairingStore] = {}
-        # One HookRegistry per served profile home, resolved from the active scope at emit time.
-        self.hooks = ProfileHookRegistries()
-        # Per-chat voice reply mode: "off" | "voice_only" | "all"
-        self._voice_mode: dict[str, str] = self._load_voice_modes()
-        # Per-(bot, guild, text channel, user) transcript dedup: voice/STT can emit one utterance twice.
-        self._recent_voice_transcripts: dict[tuple, list[tuple[float, str]]] = {}
-        # Background tasks kept referenced so they are not garbage-collected mid-execution.
-        self._background_tasks: set = set()
-        # Event-loop liveness heartbeat: rewritten every 30s while the loop dispatches; supervisors use
-        # the file mtime / updated_at to tell "process alive" from "loop frozen".
-        # See #66892.
-        self._gateway_started_at: float = time.time()
-        self._loop_heartbeat_task: Optional[asyncio.Task] = None
-        self._loop_floor_timer_handle = self._loop_liveness_watchdog = None
-        # scale-to-zero: gateway-scoped "last inbound seen" clock, stamped in _handle_message (the single
-        # inbound chokepoint) and seeded to "now" so a fresh gateway isn't idle from epoch.
-        self._last_inbound_at: float = time.time()
-        # Re-arm cooldown after a wake so we don't go dormant again before the drained backlog updates
-        # the clock; and a one-shot latch so the "platform owns the suspend" notice logs once.
-        self._scale_to_zero_cooldown_until: float = 0.0
-        self._scale_to_zero_no_suspend_logged: bool = False
-        self._scale_to_zero_direct_platform_logged: bool = False
 
     def _open_session_db_for_active_scope(self, raise_on_error: bool = False) -> Any:
         """AsyncSessionDB for the active profile scope, resolved per access (not in ``__init__``) since
@@ -4207,6 +3930,7 @@ class GatewayRunner(
             user_id=str(source.user_id) if source.user_id else "",
             user_id_alt=str(source.user_id_alt) if source.user_id_alt else "",
             user_name=str(source.user_name) if source.user_name else "",
+            actor_id=context.actor_user_id, actor_name=context.actor_user_name, turn_event=context.turn_event,  # None: route user
             scope_id=str(getattr(source, "scope_id", "") or ""),
             parent_chat_id=str(getattr(source, "parent_chat_id", "") or ""),
             session_key=context.session_key,
@@ -4215,8 +3939,7 @@ class GatewayRunner(
             session_id=context.session_id or "",
             message_id=str(source.message_id) if source.message_id else "",
             profile=getattr(source, "profile", "") or "",
-            async_delivery=_async_delivery,
-            cron_session="", session_history_delivery=_history_delivery)
+            async_delivery=_async_delivery, cron_session="", session_history_delivery=_history_delivery)
 
     def _clear_session_env(self, tokens: list) -> None:
         """Restore session context variables to their pre-handler values."""
@@ -5409,14 +5132,10 @@ def _exit_after_graceful_shutdown(exit_code: int) -> None:
     """Flush stdio, release the PID file + lock, stamp the clean exit, flush opt-in metrics, hard-exit.
     ``os._exit`` (not ``sys.exit``): SystemExit runs ``Py_FinalizeEx``, which joins every non-daemon
     thread — exactly the hang a wedged worker causes. It bypasses ``atexit``, so the metrics flush,
-    PID/lock release and the bounded log drain (file handlers sit behind a ``QueueListener`` thread)
-    are done here explicitly; graceful teardown is already complete by the time this runs. See #53107.
-    The atexit-registered ``remove_pid_file`` / ``release_gateway_runtime_lock`` (``start_gateway``) never
-    run either. ``_stop_impl`` releases both on the full shutdown, but the EARLY exits — clean-fatal-config
-    (#51228) and startup-aborted-before-running — raise ``SystemExit`` right after ``runner.start()``
-    without ``_stop_impl``, so atexit was all that released them there; this backstop does now (#53107).
-    Both are idempotent (``remove_pid_file`` only unlinks this process's PID file; the lock release no-ops
-    once released): a no-op on the normal shutdown, the actual cleanup on the early exits.
+    PID/lock release, CPU profile and bounded log drain (``QueueListener`` thread) are done here explicitly.
+    The atexit ``remove_pid_file`` / ``release_gateway_runtime_lock`` (``start_gateway``) never run either:
+    ``_stop_impl`` releases both on full shutdown, but the EARLY exits (clean-fatal-config #51228,
+    startup-aborted) raise ``SystemExit`` without it, so this idempotent backstop does (#53107).
     """
     for stream in (sys.stdout, sys.stderr):
         with suppress(Exception):
@@ -5439,13 +5158,17 @@ def _exit_after_graceful_shutdown(exit_code: int) -> None:
         from hermes_cli.observability.shared_metrics_process import flush_before_hard_exit
         flush_before_hard_exit()  # the runtimes' atexit flush: open sessions + queued opt-in rows (bounded)
 
+    def _write_cpu_profile() -> None:  # --cpu-profile's atexit writer never runs past os._exit; no-op when off
+        from hermes_cli.cpu_profile import write_cpu_profile
+        write_cpu_profile()
+
     def _drain_logs() -> None:
         # os._exit bypasses the listener's atexit drain. Bounded, no restart — NOT flush_log_queue():
         # a listener wedged on the rotation lock would re-freeze shutdown in an unbounded stop() join.
         from hermes_logging import drain_log_queue
         drain_log_queue(timeout=1.0)
 
-    for _step in (_release_locks, _mark_exited, _flush_metrics, _drain_logs):
+    for _step in (_release_locks, _mark_exited, _flush_metrics, _write_cpu_profile, _drain_logs):
         _best_effort(_step)
     os._exit(exit_code)
 

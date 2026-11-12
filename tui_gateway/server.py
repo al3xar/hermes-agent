@@ -189,7 +189,7 @@ _LONG_HANDLERS = frozenset({
     "subscription.resume", "subscription.upgrade", "usage.bars", "session.usage", "billing.step_up",
     "browser.manage", "cli.exec", "complete.path", "complete.slash", "llm.oneshot", "model.options",
     "pet.cells", "pet.gallery", "pet.generate", "pet.hatch", "pet.info", "pet.select", "pet.thumb",
-    "learning.frames", "plugins.manage", "plugins.catalog.lookup", "reload.mcp", "mcp.servers.test",
+    "image.render", "learning.frames", "plugins.manage", "plugins.catalog.lookup", "reload.mcp", "mcp.servers.test",
     "mcp.servers.oauth.start",
     "process.list", "profiles.configure", "profiles.create", "profiles.describe", "profiles.get_asset",
     "profiles.list", "profiles.set_asset", "bot_relay.roster.sync", "bot_relay.outbox.drain",
@@ -675,7 +675,7 @@ def _open_requests(sid: str) -> list[dict]:
     if (session := _sessions.get(sid)) is not None:
         with session.get("history_lock", threading.Lock()):
             mirrored = session.get("_compute_host_open_request")
-            return [dict(mirrored)] if isinstance(mirrored, dict) else []
+            return [dict(mirrored)] if isinstance(mirrored, dict) and mirrored.get("replayable", True) else []
     return []
 
 
@@ -1232,13 +1232,13 @@ def _write_config_key(key_path: str, value):
 
 
 def _write_config_keys(updates: dict) -> None:
-    """Set related dotted keys together: ONE backend write without a config file (remote), so a
-    refused key changes none of them; one raw round-trip save with the file backend."""
+    """Set related dotted keys in ONE write (remote: one backend write; file: one raw save): a refused key changes none."""
+    from .methods_config_set import _refuse_managed_keys
+    _refuse_managed_keys(*updates)  # an administrator-pinned key: refused whole, nothing written
     if not supports_file_tooling():
         _write_config_changes(updates)
         return
-    # Write-back round-trip: raw read is mandatory — saving the overlaid/expanded view would persist it.
-    cfg = _load_cfg_raw()
+    cfg = _load_cfg_raw()  # write-back round-trip: raw, never the overlaid/expanded view
     for key_path, value in updates.items():
         current = cfg
         *parents, leaf = key_path.split(".")
@@ -1264,21 +1264,17 @@ _BOOL_WORDS = {
 
 
 def _restart_slash_worker(sid: str, session: dict):
-    # Close the slash-worker subprocess as part of finalize itself, not just in the callers.
-    # Defense-in-depth: every session-end path goes through _finalize_session (it's the single
-    # ``_finalized``-guarded chokepoint), so folding worker cleanup in here means a future code path that
-    # calls _finalize_session directly — without the surrounding _teardown_session / _shutdown_sessions
-    # worker.close() — can't reintroduce the #38095 leak. Idempotent: _SlashWorker.close() is
-    # poll()-guarded, so the explicit close() still in those callers is harmless.
-    worker = session.get("slash_worker")
+    # Respawn on the agent's current route (model, provider, base_url) after a switch or compression.
+    worker, agent = session.get("slash_worker"), session.get("agent")
     if worker is None:
         return  # never spawned one; spawning here would fork the per-worker MCP fleet for nothing
     with contextlib.suppress(Exception):
         worker.close()
     try:
-        new_worker = _SlashWorker(session["session_key"], getattr(session.get("agent"), "model", _resolve_model()),
+        new_worker = _SlashWorker(session["session_key"], getattr(agent, "model", _resolve_model()),
                                   profile_home=session.get("profile_home"),
-                                  provider=getattr(session.get("agent"), "provider", None) or None)
+                                  provider=getattr(agent, "provider", None) or None,
+                                  base_url=getattr(agent, "base_url", None) or None)
     except Exception:
         session["slash_worker"] = None
         return
@@ -1614,224 +1610,6 @@ class _RuntimeFallbackResolution(NamedTuple):
     used_fallback: bool
 
 
-def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _RuntimeFallbackResolution:
-    """Resolve the primary runtime or one complete provider/model fallback. Provider-only fallback entries
-    are skipped so the unavailable primary model can never leak into a different runtime."""
-    from hermes_cli.auth import AuthError
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    try:
-        return _RuntimeFallbackResolution(resolve_runtime_provider(**(resolve_kwargs or {})), None, False)
-    except AuthError as primary_exc:
-        for entry in _load_fallback_model() or []:
-            fb_provider = str(entry.get("provider") or "").strip() if isinstance(entry, dict) else ""
-            fb_model = str(entry.get("model") or "").strip() if isinstance(entry, dict) else ""
-            if not fb_provider or not fb_model:
-                continue
-            try:
-                from hermes_cli.fallback_config import effective_runtime_provider, resolve_entry_api_key
-                fb_kwargs: dict = {"requested": fb_provider, "target_model": fb_model,
-                                   **({"explicit_base_url": entry["base_url"]} if entry.get("base_url") else {})}
-                if fb_api_key := resolve_entry_api_key(entry):
-                    fb_kwargs["explicit_api_key"] = fb_api_key
-                runtime = resolve_runtime_provider(**fb_kwargs)
-                # Named custom entries resolve to the bare "custom" billing class; keep the configured
-                # identity so the session/UI shows the provider name, matching the manual-switch path (#98739).
-                runtime["provider"] = effective_runtime_provider(entry, runtime)
-                from hermes_cli.auth import primary_failure_wording
-                logging.getLogger(__name__).warning(
-                    "Primary %s (%s), falling back to %s model %s",
-                    primary_failure_wording(primary_exc)[0], primary_exc, fb_provider, fb_model)
-                return _RuntimeFallbackResolution(runtime, fb_model, True)
-            except Exception:
-                continue
-        raise
-
-
-def _resolve_agent_model_runtime(model_override, provider_override) -> tuple[str, dict]:
-    """(model, runtime) for a new agent; a per-session override (/model switch or a resumed row's persisted
-    runtime) wins over global config/env. Older rows stored the resolved provider "custom" (no named entry
-    matches) — recover the identity from the persisted base_url or the rebuild fails "No LLM provider
-    configured". Persisted base_url/api_key/api_mode are honored only for the original runtime, never a fallback."""
-    if isinstance(model_override, dict) and model_override.get("model"):
-        model = str(model_override.get("model") or "")
-        requested_provider = model_override.get("provider") or provider_override or None
-        override_base_url = model_override.get("base_url")
-        resolve_kwargs = {}
-        if str(requested_provider or "").strip().lower() == "custom":
-            from hermes_cli.runtime_provider import canonical_custom_identity
-            if recovered := canonical_custom_identity(base_url=override_base_url or None, model=model or None):
-                requested_provider = recovered
-            if override_base_url:
-                # Failing identity recovery, still hand base_url to the direct-alias branch so pool/env credentials resolve.
-                resolve_kwargs["explicit_base_url"] = override_base_url
-        resolve_kwargs.update(requested=requested_provider, target_model=model or None)
-        overrides = {k: model_override.get(k) for k in ("base_url", "api_key", "api_mode")}
-    else:
-        model, requested_provider = _resolve_startup_runtime()
-        if isinstance(model_override, str) and model_override:
-            model = model_override
-        if provider_override:
-            requested_provider = provider_override
-        resolve_kwargs = {"requested": requested_provider, "target_model": model or None}
-        overrides = {}
-    resolution = _resolve_runtime_with_fallback(resolve_kwargs)
-    if resolution.used_fallback:
-        if not resolution.selected_model:
-            raise RuntimeError("Auth fallback resolved without a model")
-        # Same pre-agent switch the messaging gateway surfaces (#74349); _make_agent pops it onto the
-        # agent's one-shot notice so the TUI/Desktop user sees which provider actually answered.
-        from hermes_cli.fallback_config import pre_agent_fallback_notice
-        # requested_provider=None means resolve_runtime_provider read the persisted config provider;
-        # ``model: <id>`` (string shorthand) names no provider.
-        cfg_model = _load_cfg().get("model")
-        primary_provider = requested_provider or (cfg_model.get("provider") if isinstance(cfg_model, dict) else None)
-        resolution.runtime["_fallback_notice"] = pre_agent_fallback_notice(
-            primary_provider, model, resolution.runtime.get("provider"), resolution.selected_model)
-        return resolution.selected_model, resolution.runtime
-    if resolution.runtime.get("source") == "local-runtime":
-        # Live supervisor beat any persisted loopback URL for this identity.
-        overrides.pop("base_url", None)
-    resolution.runtime.update({k: v for k, v in overrides.items() if v})
-    if any(overrides.values()):
-        _rederive_per_model_route(model, resolution.runtime)
-    return model, resolution.runtime
-
-
-def _rederive_per_model_route(model: str, runtime: dict) -> None:
-    """A row's persisted api_mode/base_url were written for whichever model the session last ran. Providers
-    that pick the wire per model (OpenCode Zen/Go, Copilot, Nous) must re-derive both from the target model,
-    or a resumed opencode-go session keeps a MiniMax-era anthropic_messages route (and its /v1-stripped or
-    other-family relay URL) for a chat_completions model like deepseek-v4-flash-vision-exp (#96066)."""
-    from hermes_cli.model_switch import model_derived_api_mode
-    from hermes_cli.models import normalize_opencode_base_url
-    provider = str(runtime.get("requested_provider") or runtime.get("provider") or "")
-    api_mode = model_derived_api_mode(provider, model)
-    if api_mode is None:
-        return
-    runtime["api_mode"] = api_mode
-    runtime["base_url"] = normalize_opencode_base_url(provider, api_mode, runtime.get("base_url"))
-
-
-def _startup_system_prompt(cfg: dict, task_id: str) -> str:
-    """Config ephemeral system prompt + HERMES_TUI_SKILLS preload block. Hard-fails only when EVERY requested
-    skill is missing (cli.py parity): a typo'd name must not auto-block the Kanban task."""
-    from hermes_cli.config import resolve_ephemeral_system_prompt_from_config
-    system_prompt = resolve_ephemeral_system_prompt_from_config(cfg)
-    startup_skills = _parse_tui_skills_env()
-    if not startup_skills:
-        return system_prompt
-    from agent.skill_commands import build_preloaded_skills_prompt, format_missing_skills
-    skills_prompt, loaded_skills, missing_skills = build_preloaded_skills_prompt(startup_skills, task_id=task_id)
-    if missing_skills:
-        if not loaded_skills:
-            raise ValueError(format_missing_skills(missing_skills))
-        logger.warning("Skipping %s. Continuing with: %s. List available skills with `hermes skills list`.",
-                       format_missing_skills(missing_skills), ", ".join(loaded_skills))
-    if skills_prompt:
-        system_prompt = "\n\n".join(part for part in (system_prompt, skills_prompt) if part).strip()
-    return system_prompt
-
-
-def _transport_auth_user_id(transport) -> str | None:
-    """``<provider>:<user id>`` the WS-upgrade credential authenticated for ``transport``, or None for the legacy
-    token, stdio and the PTY child's server-internal credential. The prefix keeps a basic-auth ``alice`` and an
-    OIDC ``alice`` apart."""
-    identity = getattr(transport, "auth_identity", None)
-    if _methods_browser_control._is_authenticated_identity(identity):
-        return f"{str(identity['provider']).strip()}:{str(identity['user_id']).strip()}"
-    return None
-
-
-def _session_auth_user_id(session: dict | None) -> str | None:
-    """The login ``session`` was created under, stamped on the record as ``auth_user_id``. A second window turns
-    the transport slot into a FanoutTransport, which names no login, so only a record without the slot reads
-    its transport."""
-    session = session or {}
-    if "auth_user_id" in session:
-        return session["auth_user_id"]
-    return _transport_auth_user_id(session.get("transport"))
-
-
-def _make_agent(
-    sid: str, key: str, session_id: str | None = None, session_db=None,
-    model_override: dict | str | None = None, provider_override: str | None = None,
-    reasoning_config_override: dict | None = None, service_tier_override: str | None = None,
-    platform_override: str | None = None, context_cwd_is_launch_artifact: bool | None = None,
-    cwd_override: str | None = None, auth_user_id: str | None = None):
-    # AC-4 test seam: dead unless armed by the isolated certify harness.
-    from tui_gateway.synthetic_turn import maybe_build_synthetic_agent
-    synthetic = maybe_build_synthetic_agent(session_id or key, model_override)
-    if synthetic is not None:
-        return synthetic
-    from run_agent import AIAgent
-    # MCP discovery runs in a daemon thread (a dead server can't freeze the shell); the agent snapshots its tool
-    # list once, so briefly wait for in-flight discovery. Dashboard /api/ws uses mcp_startup; TUI stdio uses entry.
-    for _mod in ("hermes_cli.mcp_startup", "tui_gateway.entry"):
-        with contextlib.suppress(Exception):
-            importlib.import_module(_mod).wait_for_mcp_discovery()
-    cfg = _load_cfg()
-    # Load hooks alongside the same profile config used to construct this agent.
-    from agent.shell_hooks import register_from_config
-    register_from_config(cfg)
-    system_prompt = _startup_system_prompt(cfg, session_id or key)
-    model, runtime = _resolve_agent_model_runtime(model_override, provider_override)
-    # Honor gateway.deepagents_mode (or top-level deepagents_mode) from
-    # config.yaml — same precedence as api_server._create_agent — so the
-    # TUI / dashboard runs the same runtime as the gateway platforms.
-    # Without this the TUI defaults to runtime="native", diverging from the
-    # gateway and skipping the DeepAgents/LangGraph runtime (and its Langfuse
-    # CallbackHandler tracing).
-    _gw_section = cfg.get("gateway")
-    _deepagents_raw = (
-        _gw_section.get("deepagents_mode") if isinstance(_gw_section, dict) else None
-    )
-    if _deepagents_raw is None:
-        _deepagents_raw = cfg.get("deepagents_mode")
-    _runtime_kwargs: dict = {}
-    if str(_deepagents_raw).strip().lower() in {"true", "1", "yes", "on"}:
-        _runtime_kwargs["runtime"] = "deepagents"
-    fallback_notice = runtime.pop("_fallback_notice", None)
-    _pr = _load_provider_routing()
-    platform = _resolve_agent_platform(platform_override)
-    ignore_rules = is_truthy_value(os.environ.get("HERMES_IGNORE_RULES"))
-    with _sessions_lock:
-        session = _sessions.get(sid)
-    agent = AIAgent(
-        model=model, max_iterations=_cfg_max_turns(cfg, 500), provider=runtime.get("provider"),
-        requested_provider=runtime.get("requested_provider"),
-        base_url=runtime.get("base_url"), api_key=runtime.get("api_key"), api_mode=runtime.get("api_mode"),
-        acp_command=runtime.get("command"), acp_args=runtime.get("args"),
-        credential_pool=runtime.get("credential_pool"), quiet_mode=True,
-        verbose_logging=False,  # DEBUG agent logging; independent of tool_progress_mode
-        reasoning_config=(
-            reasoning_config_override if reasoning_config_override is not None else _load_reasoning_config(str(model or ""))),
-        service_tier=service_tier_override if service_tier_override is not None else _load_service_tier(),
-        enabled_toolsets=_onboarding_toolsets(_load_enabled_toolsets(platform), session_db, session_id or key),
-        disabled_toolsets=_load_disabled_toolsets(),
-        # OpenRouter provider_routing prefs (gateway + CLI parity).
-        providers_allowed=_pr.get("only"), providers_ignored=_pr.get("ignore"), providers_order=_pr.get("order"),
-        provider_sort=_pr.get("sort"), provider_require_parameters=_pr.get("require_parameters", False),
-        provider_data_collection=_pr.get("data_collection"), platform=platform, session_id=session_id or key,
-        cwd=cwd_override,
-        # The dashboard login identity reaches memory providers as the runtime user, like a gateway user id.
-        # Builds that run before the record exists (branch, eager resume, compute host) pass it explicitly.
-        user_id=auth_user_id if auth_user_id is not None else _session_auth_user_id(session),
-        session_db=session_db if session_db is not None else _get_db(), ephemeral_system_prompt=system_prompt or None,
-        checkpoints_enabled=_resolve_checkpoints_enabled(cfg),
-        pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
-        skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
-        # The resolved provider's request body (a custom entry's extra_body), as the CLI/cron/gateway pass it.
-        request_overrides=runtime.get("request_overrides"),
-        prefill_messages=_load_prefill_messages() or None, **_agent_cbs(sid),
-        **_runtime_kwargs,
-    )
-    if context_cwd_is_launch_artifact is None:
-        context_cwd_is_launch_artifact = _context_cwd_is_launch_artifact(session)
-    agent._context_cwd_is_launch_artifact = bool(context_cwd_is_launch_artifact)
-    if fallback_notice:
-        # Emitted once on the first successful reply via _emit_pending_fallback_notice -> status_callback.
-        agent._pending_fallback_notice = fallback_notice
-    return agent
 
 
 def _hydrate_session_cwd(sid: str, key: str, session_db, profile_home: str | None) -> None:
